@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, BarChart3, Calendar, Search, Heart, Map, CreditCard, Settings } from "lucide-react";
+import { Home, BarChart3, Calendar, Search, Heart, Map, CreditCard, Settings, Users, ShoppingBag } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
@@ -7,6 +7,8 @@ const navItems = [
   { to: "/training", icon: Calendar, label: "Training" },
   { to: "/races", icon: Search, label: "Races" },
   { to: "/health", icon: Heart, label: "Health" },
+  { to: "/social", icon: Users, label: "Social" },
+  { to: "/equipment", icon: ShoppingBag, label: "Équipement" },
   { to: "/explore", icon: Map, label: "Explore" },
   { to: "/pricing", icon: CreditCard, label: "Pricing" },
 ];
