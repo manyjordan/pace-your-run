@@ -21,6 +21,12 @@ const mobileNav = [
   { to: "/run", icon: Play, label: "Run", highlight: true },
   { to: "/live", icon: Radio, label: "Live" },
   { to: "/equipment", icon: ShoppingBag, label: "Équip." },
+  { to: "/performance", icon: BarChart3, label: "Stats" },
+  { to: "/training", icon: Calendar, label: "Plan" },
+  { to: "/races", icon: Search, label: "Courses" },
+  { to: "/health", icon: Heart, label: "Santé" },
+  { to: "/explore", icon: Map, label: "Explore" },
+  { to: "/pricing", icon: CreditCard, label: "Pricing" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
@@ -72,7 +78,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
 
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
-        <div className="flex items-center justify-around py-2">
+        <div className="flex items-center gap-1 overflow-x-auto py-2 px-2 scrollbar-hide">
           {mobileNav.map((item) => {
             const isActive = location.pathname === item.to;
             const isHighlight = item.highlight;
@@ -82,7 +88,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className="flex flex-col items-center gap-0.5 px-2 py-1 -mt-5"
+                  className="flex flex-col items-center gap-0.5 px-3 py-1 -mt-5 flex-shrink-0"
                 >
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent/30">
                     <item.icon className="h-6 w-6" />
@@ -96,12 +102,12 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center gap-0.5 px-2 py-1 text-xs transition-colors ${
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors flex-shrink-0 ${
                   isActive ? "text-accent" : "text-muted-foreground"
                 }`}
               >
                 <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.label}</span>
+                <span className="font-medium whitespace-nowrap">{item.label}</span>
               </NavLink>
             );
           })}
