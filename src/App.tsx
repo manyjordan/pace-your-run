@@ -13,6 +13,8 @@ import Explore from "./pages/Explore.tsx";
 import Social from "./pages/Social.tsx";
 import Equipment from "./pages/Equipment.tsx";
 import Pricing from "./pages/Pricing.tsx";
+import Run from "./pages/Run.tsx";
+import Live from "./pages/Live.tsx";
 import SettingsPage from "./pages/Settings.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -32,6 +34,8 @@ const App = () => (
             <Route path="/races" element={<Races />} />
             <Route path="/health" element={<Health />} />
             <Route path="/social" element={<Social />} />
+            <Route path="/run" element={<Run />} />
+            <Route path="/live" element={<Live />} />
             <Route path="/equipment" element={<Equipment />} />
             <Route path="/explore" element={<Explore />} />
             <Route path="/pricing" element={<Pricing />} />

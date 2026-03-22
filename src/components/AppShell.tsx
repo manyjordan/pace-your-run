@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, BarChart3, Calendar, Search, Heart, Map, CreditCard, Settings, Users, ShoppingBag } from "lucide-react";
+import { Home, BarChart3, Calendar, Search, Heart, Map, CreditCard, Settings, Users, ShoppingBag, Play, Radio } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: Home, label: "Dashboard" },
@@ -11,6 +11,16 @@ const navItems = [
   { to: "/equipment", icon: ShoppingBag, label: "Équipement" },
   { to: "/explore", icon: Map, label: "Explore" },
   { to: "/pricing", icon: CreditCard, label: "Pricing" },
+  { to: "/run", icon: Play, label: "Run" },
+  { to: "/live", icon: Radio, label: "Live" },
+];
+
+const mobileNav = [
+  { to: "/", icon: Home, label: "Home" },
+  { to: "/social", icon: Users, label: "Social" },
+  { to: "/run", icon: Play, label: "Run", highlight: true },
+  { to: "/live", icon: Radio, label: "Live" },
+  { to: "/equipment", icon: ShoppingBag, label: "Équip." },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
@@ -63,8 +73,25 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       {/* Mobile bottom nav */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
         <div className="flex items-center justify-around py-2">
-          {navItems.slice(0, 5).map((item) => {
+          {mobileNav.map((item) => {
             const isActive = location.pathname === item.to;
+            const isHighlight = item.highlight;
+
+            if (isHighlight) {
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className="flex flex-col items-center gap-0.5 px-2 py-1 -mt-5"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent/30">
+                    <item.icon className="h-6 w-6" />
+                  </div>
+                  <span className="text-[10px] font-bold text-accent">{item.label}</span>
+                </NavLink>
+              );
+            }
+
             return (
               <NavLink
                 key={item.to}
