@@ -21,6 +21,12 @@ const mobileNav = [
   { to: "/run", icon: Play, label: "Run", highlight: true },
   { to: "/live", icon: Radio, label: "Live" },
   { to: "/equipment", icon: ShoppingBag, label: "Équip." },
+  { to: "/performance", icon: BarChart3, label: "Stats" },
+  { to: "/training", icon: Calendar, label: "Plan" },
+  { to: "/races", icon: Search, label: "Courses" },
+  { to: "/health", icon: Heart, label: "Santé" },
+  { to: "/explore", icon: Map, label: "Explore" },
+  { to: "/pricing", icon: CreditCard, label: "Pricing" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
