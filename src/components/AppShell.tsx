@@ -1,32 +1,12 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, BarChart3, Calendar, Search, Heart, Map, CreditCard, Settings, Users, ShoppingBag, Play, Radio } from "lucide-react";
+import { Home, BarChart3, Calendar, Heart, Settings, Users, Play, ClipboardList } from "lucide-react";
 
 const navItems = [
-  { to: "/", icon: Home, label: "Dashboard" },
-  { to: "/performance", icon: BarChart3, label: "Performance" },
-  { to: "/training", icon: Calendar, label: "Training" },
-  { to: "/races", icon: Search, label: "Races" },
-  { to: "/health", icon: Heart, label: "Health" },
-  { to: "/social", icon: Users, label: "Social" },
-  { to: "/equipment", icon: ShoppingBag, label: "Équipement" },
-  { to: "/explore", icon: Map, label: "Explore" },
-  { to: "/pricing", icon: CreditCard, label: "Pricing" },
-  { to: "/run", icon: Play, label: "Run" },
-  { to: "/live", icon: Radio, label: "Live" },
-];
-
-const mobileNav = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/social", icon: Users, label: "Social" },
-  { to: "/run", icon: Play, label: "Run", highlight: true },
-  { to: "/live", icon: Radio, label: "Live" },
-  { to: "/equipment", icon: ShoppingBag, label: "Équip." },
-  { to: "/performance", icon: BarChart3, label: "Stats" },
-  { to: "/training", icon: Calendar, label: "Plan" },
-  { to: "/races", icon: Search, label: "Courses" },
+  { to: "/run", icon: Play, label: "Run" },
+  { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
-  { to: "/explore", icon: Map, label: "Explore" },
-  { to: "/pricing", icon: CreditCard, label: "Pricing" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
@@ -76,19 +56,19 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       {/* Main */}
       <main className="container py-6 pb-24 md:pb-6">{children}</main>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav — 5 tabs */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
-        <div className="flex items-center gap-1 overflow-x-auto py-2 px-2 scrollbar-hide">
-          {mobileNav.map((item) => {
+        <div className="flex items-center justify-around py-2 px-2">
+          {navItems.map((item) => {
             const isActive = location.pathname === item.to;
-            const isHighlight = item.highlight;
+            const isRun = item.to === "/run";
 
-            if (isHighlight) {
+            if (isRun) {
               return (
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className="flex flex-col items-center gap-0.5 px-3 py-1 -mt-5 flex-shrink-0"
+                  className="flex flex-col items-center gap-0.5 px-3 py-1 -mt-5"
                 >
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent/30">
                     <item.icon className="h-6 w-6" />
@@ -102,7 +82,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors flex-shrink-0 ${
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors ${
                   isActive ? "text-accent" : "text-muted-foreground"
                 }`}
               >
