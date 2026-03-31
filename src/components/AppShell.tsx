@@ -2,9 +2,9 @@ import { NavLink, useLocation } from "react-router-dom";
 import { Home, BarChart3, Calendar, Heart, Settings, Users, Play, ClipboardList } from "lucide-react";
 
 const navItems = [
-  { to: "/", icon: Home, label: "Home" },
-  { to: "/social", icon: Users, label: "Social" },
-  { to: "/run", icon: Play, label: "Run" },
+  { to: "/", icon: Home, label: "Accueil" },
+  { to: "/social", icon: Users, label: "Communauté" },
+  { to: "/run", icon: Play, label: "Course" },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
 ];

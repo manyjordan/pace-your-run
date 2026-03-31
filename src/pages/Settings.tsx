@@ -1,32 +1,32 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { Watch, Bell, Shield, Palette, ChevronRight } from "lucide-react";
+import { Watch, Bell, Shield, ChevronRight } from "lucide-react";
 
 const settingsGroups = [
   {
-    title: "Connected Devices",
+    title: "Appareils connectés",
     icon: Watch,
     items: [
-      { label: "Garmin Connect", status: "Connected", connected: true },
-      { label: "Apple Watch", status: "Not connected", connected: false },
-      { label: "Strava Sync", status: "Connected", connected: true },
+      { label: "Garmin Connect", status: "Connecté", connected: true },
+      { label: "Apple Watch", status: "Non connecté", connected: false },
+      { label: "Synchronisation Strava", status: "Connecté", connected: true },
     ],
   },
   {
     title: "Notifications",
     icon: Bell,
     items: [
-      { label: "Training Reminders", status: "Enabled", connected: true },
-      { label: "Race Alerts", status: "Enabled", connected: true },
-      { label: "Social Activity", status: "Disabled", connected: false },
+      { label: "Rappels d'entraînement", status: "Activé", connected: true },
+      { label: "Alertes de course", status: "Activé", connected: true },
+      { label: "Activité sociale", status: "Désactivé", connected: false },
     ],
   },
   {
-    title: "Privacy",
+    title: "Confidentialité",
     icon: Shield,
     items: [
-      { label: "Profile Visibility", status: "Friends Only", connected: true },
-      { label: "Activity Sharing", status: "Public", connected: true },
-      { label: "Data Export", status: "", connected: true },
+      { label: "Visibilité du profil", status: "Amis uniquement", connected: true },
+      { label: "Partage d'activité", status: "Public", connected: true },
+      { label: "Export des données", status: "", connected: true },
     ],
   },
 ];
@@ -34,7 +34,7 @@ const settingsGroups = [
 const SettingsPage = () => (
   <div className="space-y-6">
     <ScrollReveal>
-      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Settings</h1>
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Réglages</h1>
     </ScrollReveal>
 
     {settingsGroups.map((group, gi) => (

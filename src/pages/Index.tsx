@@ -12,26 +12,26 @@ import {
 
 /* ── Dashboard data ── */
 const weeklyData = [
-  { day: "Mon", km: 8.2 }, { day: "Tue", km: 0 }, { day: "Wed", km: 12.5 },
-  { day: "Thu", km: 6.1 }, { day: "Fri", km: 0 }, { day: "Sat", km: 18.3 }, { day: "Sun", km: 5.0 },
+  { day: "Lun", km: 8.2 }, { day: "Mar", km: 0 }, { day: "Mer", km: 12.5 },
+  { day: "Jeu", km: 6.1 }, { day: "Ven", km: 0 }, { day: "Sam", km: 18.3 }, { day: "Dim", km: 5.0 },
 ];
 
 const statCards = [
   { label: "Distance", value: "50.1", unit: "km", icon: Route, change: "+12%" },
-  { label: "Duration", value: "4h 23m", unit: "", icon: Clock, change: "+8%" },
-  { label: "Elevation", value: "482", unit: "m", icon: Mountain, change: "+5%" },
-  { label: "Avg HR", value: "148", unit: "bpm", icon: Heart, change: "-3%" },
+  { label: "Durée", value: "4h 23m", unit: "", icon: Clock, change: "+8%" },
+  { label: "Dénivelé", value: "482", unit: "m", icon: Mountain, change: "+5%" },
+  { label: "FC moy.", value: "148", unit: "bpm", icon: Heart, change: "-3%" },
 ];
 
 const upcomingSessions = [
-  { type: "Tempo Run", distance: "8km", pace: "4:45/km", day: "Tomorrow", color: "hsl(var(--lime))" },
-  { type: "Easy Recovery", distance: "5km", pace: "5:30/km", day: "Wednesday", color: "hsl(38, 92%, 50%)" },
-  { type: "Interval Training", distance: "10km", pace: "4:15/km", day: "Friday", color: "hsl(0, 72%, 51%)" },
+  { type: "Sortie tempo", distance: "8km", pace: "4:45/km", day: "Demain", color: "hsl(var(--lime))" },
+  { type: "Récupération facile", distance: "5km", pace: "5:30/km", day: "Mercredi", color: "hsl(38, 92%, 50%)" },
+  { type: "Intervalles", distance: "10km", pace: "4:15/km", day: "Vendredi", color: "hsl(0, 72%, 51%)" },
 ];
 
 /* ── Performance data ── */
 const vo2Data = Array.from({ length: 12 }, (_, i) => ({
-  month: ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"][i],
+  month: ["Janv","Fevr","Mars","Avr","Mai","Juin","Juil","Aout","Sept","Oct","Nov","Dec"][i],
   vo2: 48 + Math.sin(i * 0.5) * 3 + i * 0.4,
 }));
 
@@ -46,10 +46,10 @@ const acwrData = Array.from({ length: 12 }, (_, i) => ({
 }));
 
 const prs = [
-  { event: "5K", time: "19:42", date: "Oct 12, 2025", improvement: "-0:38" },
-  { event: "10K", time: "41:15", date: "Nov 3, 2025", improvement: "-1:12" },
-  { event: "Half Marathon", time: "1:32:08", date: "Jan 18, 2026", improvement: "-2:45" },
-  { event: "Marathon", time: "3:18:22", date: "Mar 8, 2025", improvement: "First!" },
+  { event: "5 km", time: "19:42", date: "12 oct. 2025", improvement: "-0:38" },
+  { event: "10 km", time: "41:15", date: "3 nov. 2025", improvement: "-1:12" },
+  { event: "Semi-marathon", time: "1:32:08", date: "18 janv. 2026", improvement: "-2:45" },
+  { event: "Marathon", time: "3:18:22", date: "8 mars 2025", improvement: "Premier !" },
 ];
 
 const shoes = [
@@ -85,7 +85,7 @@ function DashboardSection() {
                 <span className="text-2xl font-bold tabular-nums">{stat.value}</span>
                 <span className="ml-1 text-sm text-muted-foreground">{stat.unit}</span>
               </div>
-              <p className="mt-0.5 text-xs text-muted-foreground">{stat.label} this week</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">{stat.label} cette semaine</p>
             </div>
           </ScrollReveal>
         ))}
@@ -96,10 +96,10 @@ function DashboardSection() {
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="mb-4 flex items-center justify-between">
               <div>
-                <h2 className="text-sm font-semibold">Weekly Volume</h2>
-                <p className="text-xs text-muted-foreground">Distance per day</p>
+                <h2 className="text-sm font-semibold">Volume hebdomadaire</h2>
+                <p className="text-xs text-muted-foreground">Distance par jour</p>
               </div>
-              <div className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-semibold text-lime">50.1 km total</div>
+              <div className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-semibold text-lime">50.1 km au total</div>
             </div>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
@@ -122,12 +122,12 @@ function DashboardSection() {
 
         <ScrollReveal delay={0.1}>
           <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card p-5">
-            <h2 className="mb-4 text-sm font-semibold">Recovery Status</h2>
-            <RecoveryRing value={72} max={100} color="hsl(72, 89%, 58%)" label="Ready to Train" sublabel="/ 100" />
+            <h2 className="mb-4 text-sm font-semibold">Etat de recuperation</h2>
+            <RecoveryRing value={72} max={100} color="hsl(72, 89%, 58%)" label="Pret a s'entrainer" sublabel="/ 100" />
             <div className="mt-4 flex gap-4 text-center text-xs">
-              <div><p className="font-semibold tabular-nums">62ms</p><p className="text-muted-foreground">HRV</p></div>
-              <div><p className="font-semibold tabular-nums">48bpm</p><p className="text-muted-foreground">RHR</p></div>
-              <div><p className="font-semibold tabular-nums">7h 24m</p><p className="text-muted-foreground">Sleep</p></div>
+              <div><p className="font-semibold tabular-nums">62ms</p><p className="text-muted-foreground">VFC</p></div>
+              <div><p className="font-semibold tabular-nums">48bpm</p><p className="text-muted-foreground">FC repos</p></div>
+              <div><p className="font-semibold tabular-nums">7h 24m</p><p className="text-muted-foreground">Sommeil</p></div>
             </div>
           </div>
         </ScrollReveal>
@@ -139,19 +139,19 @@ function DashboardSection() {
             <div className="bg-accent/10 px-5 py-3">
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-lime" />
-                <span className="text-sm font-semibold">Today's Session</span>
+                <span className="text-sm font-semibold">Seance du jour</span>
               </div>
             </div>
             <div className="p-5">
-              <h3 className="text-xl font-bold">Long Run</h3>
-              <p className="mt-1 text-sm text-muted-foreground">18km at 5:15/km · Easy effort with last 3km at marathon pace</p>
+              <h3 className="text-xl font-bold">Sortie longue</h3>
+              <p className="mt-1 text-sm text-muted-foreground">18km a 5:15/km · Effort facile avec les 3 derniers km allure marathon</p>
               <div className="mt-4 flex gap-6 text-xs">
                 <div className="flex items-center gap-1.5"><Route className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">18.0 km</span></div>
                 <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">~1h 35m</span></div>
                 <div className="flex items-center gap-1.5"><Flame className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">~1,050 kcal</span></div>
               </div>
               <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-foreground transition-transform active:scale-[0.97]">
-                <Play className="h-4 w-4" /> Start Run
+                <Play className="h-4 w-4" /> Demarrer la course
               </button>
             </div>
           </div>
@@ -160,7 +160,7 @@ function DashboardSection() {
         <ScrollReveal delay={0.08}>
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">Upcoming Sessions</h2>
+              <h2 className="text-sm font-semibold">Seances a venir</h2>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="space-y-3">
@@ -182,11 +182,11 @@ function DashboardSection() {
       <ScrollReveal>
         <div className="relative overflow-hidden rounded-xl bg-accent p-6 text-accent-foreground">
           <div className="relative z-10">
-            <p className="text-xs font-semibold uppercase tracking-wider opacity-70">Next Race</p>
-            <h3 className="mt-1 text-xl font-bold">Paris Marathon 2026</h3>
-            <p className="mt-1 text-sm opacity-80">April 5, 2026 · Paris, France</p>
+            <p className="text-xs font-semibold uppercase tracking-wider opacity-70">Prochaine course</p>
+            <h3 className="mt-1 text-xl font-bold">Marathon de Paris 2026</h3>
+            <p className="mt-1 text-sm opacity-80">5 avril 2026 · Paris, France</p>
             <div className="mt-4 flex gap-6">
-              {[{ n: 18, l: "days" }, { n: 7, l: "hours" }, { n: 42, l: "min" }].map((t) => (
+              {[{ n: 18, l: "jours" }, { n: 7, l: "heures" }, { n: 42, l: "min" }].map((t) => (
                 <div key={t.l} className="text-center">
                   <p className="text-2xl font-black tabular-nums">{t.n}</p>
                   <p className="text-xs font-medium uppercase opacity-60">{t.l}</p>
@@ -209,7 +209,7 @@ function PerformanceSection() {
         <ScrollReveal>
           <div className="rounded-xl border border-border bg-card p-5">
             <div className="mb-4 flex items-center justify-between">
-              <div><h2 className="text-sm font-semibold">VO2max Trend</h2><p className="text-xs text-muted-foreground">Estimated from pace & HR</p></div>
+              <div><h2 className="text-sm font-semibold">Tendance VO2max</h2><p className="text-xs text-muted-foreground">Estimation selon allure et FC</p></div>
               <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-lime tabular-nums">52.8 ml/kg</span>
             </div>
             <div className="h-48">
@@ -227,7 +227,7 @@ function PerformanceSection() {
 
         <ScrollReveal delay={0.08}>
           <div className="rounded-xl border border-border bg-card p-5">
-            <div className="mb-4"><h2 className="text-sm font-semibold">Weekly Volume</h2><p className="text-xs text-muted-foreground">Kilometers per week</p></div>
+            <div className="mb-4"><h2 className="text-sm font-semibold">Volume hebdomadaire</h2><p className="text-xs text-muted-foreground">Kilometres par semaine</p></div>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={weeklyVolume}>
@@ -244,7 +244,7 @@ function PerformanceSection() {
 
       <ScrollReveal>
         <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4 flex items-center gap-2"><Award className="h-4 w-4 text-lime" /><h2 className="text-sm font-semibold">Personal Records</h2></div>
+          <div className="mb-4 flex items-center gap-2"><Award className="h-4 w-4 text-lime" /><h2 className="text-sm font-semibold">Records personnels</h2></div>
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
             {prs.map((pr, i) => (
               <ScrollReveal key={pr.event} delay={i * 0.06}>
@@ -267,7 +267,7 @@ function PerformanceSection() {
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-lime" />
-              <div><h2 className="text-sm font-semibold">Acute:Chronic Workload Ratio</h2><p className="text-xs text-muted-foreground">Sweet spot: 0.8 – 1.3</p></div>
+              <div><h2 className="text-sm font-semibold">Ratio charge aigue:chronique</h2><p className="text-xs text-muted-foreground">Zone ideale : 0.8 – 1.3</p></div>
             </div>
             <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-bold text-lime tabular-nums">1.12</span>
           </div>
@@ -293,7 +293,7 @@ function PerformanceSection() {
 
       <ScrollReveal>
         <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4 flex items-center gap-2"><Footprints className="h-4 w-4 text-lime" /><h2 className="text-sm font-semibold">Shoe Mileage</h2></div>
+          <div className="mb-4 flex items-center gap-2"><Footprints className="h-4 w-4 text-lime" /><h2 className="text-sm font-semibold">Kilometrage des chaussures</h2></div>
           <div className="space-y-4">
             {shoes.map((shoe) => (
               <div key={shoe.name}>
@@ -304,7 +304,7 @@ function PerformanceSection() {
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                   <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${(shoe.km / shoe.max) * 100}%`, backgroundColor: shoe.km > 700 ? "hsl(0, 72%, 51%)" : shoe.color }} />
                 </div>
-                {shoe.km > 700 && <p className="mt-1 text-xs text-destructive">⚠ Consider replacing soon</p>}
+                {shoe.km > 700 && <p className="mt-1 text-xs text-destructive">⚠ Pensez a bientot les remplacer</p>}
               </div>
             ))}
           </div>
@@ -321,9 +321,9 @@ const Dashboard = () => {
       <ScrollReveal>
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Good morning, <span className="text-lime">Alex</span>
+            Bonjour, <span className="text-lime">Alex</span>
           </h1>
-          <p className="text-sm text-muted-foreground">Week 12 of Marathon Training · 18 days to race day</p>
+          <p className="text-sm text-muted-foreground">Semaine 12 du plan marathon · 18 jours avant la course</p>
         </div>
       </ScrollReveal>
 

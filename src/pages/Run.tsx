@@ -6,12 +6,30 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 
+const COMMUNITY_POSTS_KEY = "pace-community-posts";
+
+type CommunityPost = {
+  id: number;
+  user: string;
+  initials: string;
+  time: string;
+  type: "run" | "race";
+  title: string;
+  description: string;
+  stats: { distance: string; pace: string; duration: string; elevation: string };
+  gpsTrace?: Array<{ lat: number; lng: number; time: number }>;
+  likes: number;
+  comments: number;
+  liked: boolean;
+};
+
 /* ── Run component ── */
 export default function Run() {
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
   const [heartRate, setHeartRate] = useState(0);
+  const [gpsTrace, setGpsTrace] = useState<Array<{ lat: number; lng: number; time: number }>>([]);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const formatTime = (s: number) => {
@@ -31,6 +49,11 @@ export default function Run() {
     setElapsed((e) => e + 1);
     setDistance((d) => d + 0.002 + Math.random() * 0.001);
     setHeartRate(145 + Math.floor(Math.random() * 20));
+    setGpsTrace((t) => [...t, {
+      lat: 48.8566 + (Math.random() - 0.5) * 0.01,
+      lng: 2.3522 + (Math.random() - 0.5) * 0.01,
+      time: Date.now(),
+    }]);
   }, []);
 
   useEffect(() => {
@@ -45,7 +68,43 @@ export default function Run() {
   const start = () => setStatus("running");
   const pause = () => setStatus("paused");
   const resume = () => setStatus("running");
-  const stop = () => { setStatus("idle"); setElapsed(0); setDistance(0); setHeartRate(0); };
+  const publishRunToCommunity = () => {
+    if (elapsed <= 0 || distance <= 0) return;
+    const post: CommunityPost = {
+      id: Date.now(),
+      user: "Moi",
+      initials: "MOI",
+      time: "A l'instant",
+      type: "run",
+      title: "Nouvelle course enregistree",
+      description: `Je viens de terminer ${distance.toFixed(2)} km en ${formatTime(elapsed)}.`,
+      stats: {
+        distance: `${distance.toFixed(2)} km`,
+        pace: `${formatPace(pace)} /km`,
+        duration: formatTime(elapsed),
+        elevation: `+${Math.max(8, Math.round(distance * 7))} m`,
+      },
+      gpsTrace: gpsTrace,
+      likes: 0,
+      comments: 0,
+      liked: false,
+    };
+    const raw = window.localStorage.getItem(COMMUNITY_POSTS_KEY);
+    const existing = raw ? JSON.parse(raw) as CommunityPost[] : [];
+    window.localStorage.setItem(COMMUNITY_POSTS_KEY, JSON.stringify([post, ...existing]));
+    window.dispatchEvent(new Event("pace-community-updated"));
+  };
+
+  const stop = () => {
+    if (status !== "idle" && elapsed > 0 && distance > 0) {
+      publishRunToCommunity();
+    }
+    setStatus("idle");
+    setElapsed(0);
+    setDistance(0);
+    setHeartRate(0);
+    setGpsTrace([]);
+  };
 
   return (
     <div className="space-y-6">
@@ -107,7 +166,7 @@ export default function Run() {
           <ScrollReveal delay={0.1}>
             <Card>
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Splits</h3><ChevronUp className="h-4 w-4 text-muted-foreground" /></div>
+                <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Intervalles</h3><ChevronUp className="h-4 w-4 text-muted-foreground" /></div>
                 {Array.from({ length: Math.floor(distance) }, (_, i) => (
                   <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
                     <span className="text-muted-foreground">Km {i + 1}</span>
