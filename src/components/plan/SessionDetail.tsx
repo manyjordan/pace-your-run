@@ -43,6 +43,11 @@ const sessionGuides: Record<string, { description: string; structure: string; be
     structure: "Courez facile pendant toute la durée à une allure où vous pouvez parler",
     benefits: ["Développe l'endurance", "Renforce le cœur", "Construit la base aérobie"],
   },
+  "Sortie régulière": {
+    description: "Endurance à allure modérée",
+    structure: "Courez à allure confortable et régulière pendant toute la séance",
+    benefits: ["Renforce l'endurance", "Améliore l'efficacité", "Construit la base aérobie"],
+  },
   "Footing facile": {
     description: "Récupération et construction de base",
     structure: "Courez à allure très facile, vous devez pouvoir parler normalement",
