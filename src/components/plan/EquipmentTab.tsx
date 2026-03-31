@@ -9,7 +9,7 @@ import {
   ShoppingCart, ExternalLink,
 } from "lucide-react";
 
-const shoes = [
+const shoes: { name: string; category: string; rating: number; price: string; mileage: number; maxMileage: number; status: "recommended" | "warning" | "good"; usageLabel?: string; tags: string[]; recommendation: string }[] = [
   {
     name: "ASICS Gel Nimbus 26",
     category: "Entraînement quotidien",
@@ -17,7 +17,7 @@ const shoes = [
     price: "189 €",
     mileage: 420,
     maxMileage: 800,
-    status: "recommended" as const,
+    status: "recommended",
     usageLabel: "Pour s'entrainer",
     tags: ["Amorti", "Confort", "Route"],
     recommendation: "Chaussure recommandee pour les footings et les seances d'entrainement.",
@@ -29,10 +29,22 @@ const shoes = [
     price: "259 €",
     mileage: 120,
     maxMileage: 600,
-    status: "recommended" as const,
+    status: "recommended",
     usageLabel: "Pour la competition ou le jour de course",
     tags: ["Carbone", "Legere", "Route"],
     recommendation: "Paire carbone recommandee pour la competition et les jours de course.",
+  },
+  {
+    name: "Hoka Clifton 9",
+    category: "Entraînement",
+    rating: 4.3,
+    price: "140 €",
+    mileage: 750,
+    maxMileage: 800,
+    status: "warning",
+    usageLabel: "À remplacer bientôt",
+    tags: ["Amorti", "Route"],
+    recommendation: "Usure avancée — pensez à les remplacer.",
   },
 ];
 

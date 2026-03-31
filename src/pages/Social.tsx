@@ -263,8 +263,8 @@ export default function Social() {
                 </div>
 
                 {/* GPS Trace Map */}
-                {post.gpsTrace && post.gpsTrace.length > 0 && (
-                  <GPSMap trace={post.gpsTrace} />
+                {"gpsTrace" in post && Array.isArray((post as any).gpsTrace) && (post as any).gpsTrace.length > 0 && (
+                  <GPSMap trace={(post as any).gpsTrace} />
                 )}
 
                 {/* Actions */}
