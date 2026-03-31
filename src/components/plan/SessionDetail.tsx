@@ -23,7 +23,7 @@ const sessionGuides: Record<string, { description: string; structure: string; be
     structure: "10 min échauffement • 8-12 x 400m rapide (1-2 min récup) • 10 min retour calme",
     benefits: ["Augmente la puissance anaérobie", "Améliore la cadence", "Renforce les jambes"],
   },
-  "Tempo leger": {
+  "Tempo léger": {
     description: "Course soutenue juste en-dessous du seuil",
     structure: "10-15 min échauffement • 20-30 min à allure tempo • 10 min récup",
     benefits: ["Augmente le seuil lactique", "Améliore l'endurance", "Bon compromis intensité/volume"],
