@@ -23,7 +23,7 @@ const sessionGuides: Record<string, { description: string; structure: string; be
     structure: "10 min échauffement • 8-12 x 400m rapide (1-2 min récup) • 10 min retour calme",
     benefits: ["Augmente la puissance anaérobie", "Améliore la cadence", "Renforce les jambes"],
   },
-  "Tempo leger": {
+  "Tempo léger": {
     description: "Course soutenue juste en-dessous du seuil",
     structure: "10-15 min échauffement • 20-30 min à allure tempo • 10 min récup",
     benefits: ["Augmente le seuil lactique", "Améliore l'endurance", "Bon compromis intensité/volume"],
@@ -43,22 +43,27 @@ const sessionGuides: Record<string, { description: string; structure: string; be
     structure: "Courez facile pendant toute la durée à une allure où vous pouvez parler",
     benefits: ["Développe l'endurance", "Renforce le cœur", "Construit la base aérobie"],
   },
+  "Sortie régulière": {
+    description: "Endurance à allure modérée",
+    structure: "Courez à allure confortable et régulière pendant toute la séance",
+    benefits: ["Renforce l'endurance", "Améliore l'efficacité", "Construit la base aérobie"],
+  },
   "Footing facile": {
     description: "Récupération et construction de base",
     structure: "Courez à allure très facile, vous devez pouvoir parler normalement",
     benefits: ["Récupération active", "Construit l'aérobie", "Prépare aux séances dures"],
   },
-  "Recuperation": {
+  "Récupération": {
     description: "Récupération active légère",
     structure: "Petit jogging tranquille à allure très facile",
     benefits: ["Améliore la circulation", "Favorise la récupération", "Réduit les courbatures"],
   },
-  "Recuperation active": {
+  "Récupération active": {
     description: "Récupération active légère",
     structure: "Petit jogging tranquille à allure très facile",
     benefits: ["Améliore la circulation", "Favorise la récupération", "Réduit les courbatures"],
   },
-  "Jog de recuperation": {
+  "Jog de récupération": {
     description: "Récupération active très légère",
     structure: "Très facile, priorité à la détente",
     benefits: ["Récupération", "Maintien du fitness", "Flexibilité"],
