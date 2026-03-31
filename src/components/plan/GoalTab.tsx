@@ -306,6 +306,7 @@ export default function GoalTab() {
       )}
 
       {(isDefining || isChanging) && formData.goalType === "weight" && (
+        <ScrollReveal delay={0.08}>
           <Card>
             <CardContent className="p-4 space-y-3">
               {warnings.length > 0 && (
