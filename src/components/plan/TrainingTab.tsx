@@ -144,15 +144,15 @@ function buildSessions(profile: ProfileGoalData): { sessions: Session[]; subtitl
   if (profile.goalType === "weight") {
     const base: Session[] = [
       { day: "Lun", type: "Footing facile", distanceKm: 6, pace: "6:00", color: colorEasy },
-      { day: "Mar", type: "Tempo leger", distanceKm: 5, pace: "5:30", color: colorTempo },
-      { day: "Mer", type: "Recuperation active", distanceKm: 4, pace: "6:30", color: colorRecovery },
+      { day: "Mar", type: "Tempo léger", distanceKm: 5, pace: "5:30", color: colorTempo },
+      { day: "Mer", type: "Récupération active", distanceKm: 4, pace: "6:30", color: colorRecovery },
       { day: "Jeu", type: "Footing facile", distanceKm: 6, pace: "5:55", color: colorEasy },
       { day: "Ven", type: "Intervalles courts", distanceKm: 5, pace: "5:00", color: colorQuality },
       { day: "Sam", type: "Sortie longue facile", distanceKm: 8, pace: "6:10", color: colorLong },
-      { day: "Dim", type: "Jog de recuperation", distanceKm: 4, pace: "6:40", color: colorRecovery },
+      { day: "Dim", type: "Jog de récupération", distanceKm: 4, pace: "6:40", color: colorRecovery },
     ];
     activeDays.forEach((day, i) => sessions.push({ ...base[i], day }));
-    return { sessions, subtitle: `Plan perte de poids adapte a ${days} jour(s)/semaine` };
+    return { sessions, subtitle: `Plan perte de poids adapté à ${days} jour(s)/semaine` };
   }
 
   if (profile.goalType === "race") {
