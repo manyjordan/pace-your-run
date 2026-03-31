@@ -122,8 +122,8 @@ function DashboardSection() {
 
         <ScrollReveal delay={0.1}>
           <div className="flex flex-col items-center justify-center rounded-xl border border-border bg-card p-5">
-            <h2 className="mb-4 text-sm font-semibold">Etat de recuperation</h2>
-            <RecoveryRing value={72} max={100} color="hsl(72, 89%, 58%)" label="Pret a s'entrainer" sublabel="/ 100" />
+            <h2 className="mb-4 text-sm font-semibold">État de récupération</h2>
+            <RecoveryRing value={72} max={100} color="hsl(72, 89%, 58%)" label="Prêt à s'entraîner" sublabel="/ 100" />
             <div className="mt-4 flex gap-4 text-center text-xs">
               <div><p className="font-semibold tabular-nums">62ms</p><p className="text-muted-foreground">VFC</p></div>
               <div><p className="font-semibold tabular-nums">48bpm</p><p className="text-muted-foreground">FC repos</p></div>

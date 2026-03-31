@@ -179,14 +179,14 @@ function buildSessions(profile: ProfileGoalData): { sessions: Session[]; subtitl
   const base: Session[] = [
     { day: "Lun", type: "Endurance fondamentale", distanceKm: enduranceKm, pace: "5:55", color: colorEasy },
     { day: "Mar", type: "Intervalles progressifs", distanceKm: Math.max(6, enduranceKm - 1), pace: "4:50", color: colorQuality },
-    { day: "Mer", type: "Recuperation", distanceKm: 4, pace: "6:25", color: colorRecovery },
-    { day: "Jeu", type: "Sortie reguliere", distanceKm: enduranceKm, pace: "5:40", color: colorTempo },
+    { day: "Mer", type: "Récupération", distanceKm: 4, pace: "6:25", color: colorRecovery },
+    { day: "Jeu", type: "Sortie régulière", distanceKm: enduranceKm, pace: "5:40", color: colorTempo },
     { day: "Ven", type: "Footing facile", distanceKm: Math.max(5, enduranceKm - 2), pace: "6:00", color: colorEasy },
     { day: "Sam", type: "Sortie longue distance", distanceKm: longRun, pace: "5:50", color: colorLong },
-    { day: "Dim", type: "Recuperation active", distanceKm: 5, pace: "6:30", color: colorRecovery },
+    { day: "Dim", type: "Récupération active", distanceKm: 5, pace: "6:30", color: colorRecovery },
   ];
   activeDays.forEach((day, i) => sessions.push({ ...base[i], day }));
-  return { sessions, subtitle: `Plan distance (${targetKm} km) adapte a ${days} jour(s)/semaine` };
+  return { sessions, subtitle: `Plan distance (${targetKm} km) adapté à ${days} jour(s)/semaine` };
 }
 
 export default function TrainingTab() {

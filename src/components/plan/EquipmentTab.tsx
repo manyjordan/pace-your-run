@@ -51,30 +51,30 @@ const shoes: { name: string; category: string; rating: number; price: string; mi
 const nutritionSections = [
   {
     title: "Avant la course",
-    description: "Produits utiles 2h a 30 min avant le depart.",
+    description: "Produits utiles 2h à 30 min avant le départ.",
     products: [
-      { name: "Aptonia Maltodextrine", category: "Boisson glucidique", rating: 4.4, price: "14.99 € /800g", description: "Maltodextrine a consommer avant la course pour augmenter les reserves en glucides.", tags: ["Maltodextrine", "Chargement glucidique"], partner: false },
-      { name: "Maurten Drink Mix 160", category: "Boisson pre-course", rating: 4.7, price: "3.90 € /portion", description: "Apport en glucides facile a digerer avant la course.", tags: ["Carburant", "Glucides"], partner: true },
-      { name: "Powerbar Energize", category: "Barre energie", rating: 4.3, price: "2.20 € /barre", description: "A prendre avant la course pour completer les reserves.", tags: ["Energie", "Pre-effort"], partner: false },
-      { name: "Compote Andros Sport", category: "Puree de fruits", rating: 4.1, price: "1.60 € /unite", description: "Option legere si vous preferez solide + glucides rapides.", tags: ["Digestible", "Rapide"], partner: false },
+      { name: "Aptonia Maltodextrine", category: "Boisson glucidique", rating: 4.4, price: "14.99 € /800g", description: "Maltodextrine à consommer avant la course pour augmenter les réserves en glucides.", tags: ["Maltodextrine", "Chargement glucidique"], partner: false },
+      { name: "Maurten Drink Mix 160", category: "Boisson pré-course", rating: 4.7, price: "3.90 € /portion", description: "Apport en glucides facile à digérer avant la course.", tags: ["Carburant", "Glucides"], partner: true },
+      { name: "Powerbar Energize", category: "Barre énergie", rating: 4.3, price: "2.20 € /barre", description: "À prendre avant la course pour compléter les réserves.", tags: ["Énergie", "Pré-effort"], partner: false },
+      { name: "Compote Andros Sport", category: "Purée de fruits", rating: 4.1, price: "1.60 € /unité", description: "Option légère si vous préférez solide + glucides rapides.", tags: ["Digestible", "Rapide"], partner: false },
     ],
   },
   {
     title: "Pendant la course",
-    description: "Hydratation et energie pendant l'effort.",
+    description: "Hydratation et énergie pendant l'effort.",
     products: [
-      { name: "Maurten Gel 100", category: "Gel energie", rating: 4.7, price: "3.50 € /unite", description: "Gel hydrogel, tres bonne tolerance digestive en course.", tags: ["Hydrogel", "25g glucides"], partner: true },
+      { name: "Maurten Gel 100", category: "Gel énergie", rating: 4.7, price: "3.50 € /unité", description: "Gel hydrogel, très bonne tolérance digestive en course.", tags: ["Hydrogel", "25g glucides"], partner: true },
       { name: "SIS GO Isotonic", category: "Boisson isotonique", rating: 4.3, price: "1.80 € /sachet", description: "Boisson pratique pour maintenir l'apport en glucides.", tags: ["Isotonique", "Hydratation"], partner: true },
-      { name: "SaltStick Caps", category: "Electrolytes", rating: 4.4, price: "0.60 € /capsule", description: "Aide a compenser les pertes en sodium sur efforts longs.", tags: ["Sodium", "Endurance"], partner: false },
+      { name: "SaltStick Caps", category: "Électrolytes", rating: 4.4, price: "0.60 € /capsule", description: "Aide à compenser les pertes en sodium sur efforts longs.", tags: ["Sodium", "Endurance"], partner: false },
     ],
   },
   {
-    title: "Apres la course",
-    description: "Recuperation musculaire et recharge glycogene.",
+    title: "Après la course",
+    description: "Récupération musculaire et recharge glycogène.",
     products: [
-      { name: "Etixx Recovery Shake", category: "Boisson recuperation", rating: 4.5, price: "2.90 € /portion", description: "Mix glucides + proteines pour relancer la recuperation.", tags: ["Recuperation", "Proteines"], partner: true },
-      { name: "Yopro Drink", category: "Boisson proteinee", rating: 4.2, price: "2.10 € /bouteille", description: "Solution simple apres la course, riche en proteines.", tags: ["Proteines", "Pratique"], partner: false },
-      { name: "Tart Cherry Juice", category: "Jus recuperation", rating: 4.1, price: "1.90 € /portion", description: "Peut aider a reduire les courbatures post-effort.", tags: ["Antioxydants", "Recup"], partner: false },
+      { name: "Etixx Recovery Shake", category: "Boisson récupération", rating: 4.5, price: "2.90 € /portion", description: "Mix glucides + protéines pour relancer la récupération.", tags: ["Récupération", "Protéines"], partner: true },
+      { name: "Yopro Drink", category: "Boisson protéinée", rating: 4.2, price: "2.10 € /bouteille", description: "Solution simple après la course, riche en protéines.", tags: ["Protéines", "Pratique"], partner: false },
+      { name: "Tart Cherry Juice", category: "Jus récupération", rating: 4.1, price: "1.90 € /portion", description: "Peut aider à réduire les courbatures post-effort.", tags: ["Antioxydants", "Récup"], partner: false },
     ],
   },
 ];

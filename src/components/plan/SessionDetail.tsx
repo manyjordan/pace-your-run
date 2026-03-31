@@ -48,17 +48,17 @@ const sessionGuides: Record<string, { description: string; structure: string; be
     structure: "Courez à allure très facile, vous devez pouvoir parler normalement",
     benefits: ["Récupération active", "Construit l'aérobie", "Prépare aux séances dures"],
   },
-  "Recuperation": {
+  "Récupération": {
     description: "Récupération active légère",
     structure: "Petit jogging tranquille à allure très facile",
     benefits: ["Améliore la circulation", "Favorise la récupération", "Réduit les courbatures"],
   },
-  "Recuperation active": {
+  "Récupération active": {
     description: "Récupération active légère",
     structure: "Petit jogging tranquille à allure très facile",
     benefits: ["Améliore la circulation", "Favorise la récupération", "Réduit les courbatures"],
   },
-  "Jog de recuperation": {
+  "Jog de récupération": {
     description: "Récupération active très légère",
     structure: "Très facile, priorité à la détente",
     benefits: ["Récupération", "Maintien du fitness", "Flexibilité"],
