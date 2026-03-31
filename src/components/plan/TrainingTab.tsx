@@ -163,14 +163,14 @@ function buildSessions(profile: ProfileGoalData): { sessions: Session[]; subtitl
     const base: Session[] = [
       { day: "Lun", type: "Footing facile", distanceKm: easyKm, pace: "5:45", color: colorEasy },
       { day: "Mar", type: "Intervalles (allure course)", distanceKm: Math.max(6, easyKm), pace: "4:40", color: colorQuality },
-      { day: "Mer", type: "Recuperation", distanceKm: 4, pace: "6:20", color: colorRecovery },
+      { day: "Mer", type: "Récupération", distanceKm: 4, pace: "6:20", color: colorRecovery },
       { day: "Jeu", type: "Seuil / tempo", distanceKm: tempoKm, pace: "5:00", color: colorTempo },
       { day: "Ven", type: "Footing facile", distanceKm: easyKm, pace: "5:50", color: colorEasy },
       { day: "Sam", type: "Sortie longue", distanceKm: longRun, pace: "5:35", color: colorLong },
-      { day: "Dim", type: "Jog de recuperation", distanceKm: 5, pace: "6:25", color: colorRecovery },
+      { day: "Dim", type: "Jog de récupération", distanceKm: 5, pace: "6:25", color: colorRecovery },
     ];
     activeDays.forEach((day, i) => sessions.push({ ...base[i], day }));
-    return { sessions, subtitle: `Plan course (${raceKm} km) adapte a ${days} jour(s)/semaine` };
+    return { sessions, subtitle: `Plan course (${raceKm} km) adapté à ${days} jour(s)/semaine` };
   }
 
   const targetKm = Number(profile.distanceKm) || 20;
