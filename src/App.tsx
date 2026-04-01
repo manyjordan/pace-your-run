@@ -10,6 +10,7 @@ import Run from "./pages/Run.tsx";
 import Plan from "./pages/Plan.tsx";
 import Health from "./pages/Health.tsx";
 import SettingsPage from "./pages/Settings.tsx";
+import StravaCallback from "./pages/StravaCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
             <Route path="/plan" element={<Plan />} />
             <Route path="/health" element={<Health />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/auth/strava/callback" element={<StravaCallback />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </AppShell>

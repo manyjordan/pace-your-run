@@ -526,9 +526,117 @@ const issuesData: Record<string, Issue> = {
       "Reprise progressive sans forcer",
     ],
   },
+  "Cervicalgie": {
+    name: "Cervicalgie (douleur au cou)",
+    symptomesRessentis: [
+      "Douleur au cou, surtout à l'arrière",
+      "Raideur du cou le matin",
+      "Douleur qui s'aggrave en tournant la tête",
+      "Tension dans les épaules et le haut du dos",
+      "Possible mal de tête associé",
+    ],
+    causesProbables: [
+      "Posture incorrecte pendant la course (tête en avant)",
+      "Tension musculaire accumulée",
+      "Bureau longtemps en position assise",
+      "Stress et crispation",
+      "Technique de course non optimale",
+    ],
+    meilleurMoyenSoulager: [
+      "Étirements doux du cou (rotation, flexion latérale)",
+      "Massages des trapèzes et du cou",
+      "Renforcement des stabilisateurs du cou",
+      "Glaçage si inflammation",
+      "Correction de la posture en course",
+    ],
+    risques: [
+      "Douleur chronique du cou",
+      "Limitation de la mobilité",
+      "Irradiation vers les bras",
+    ],
+    conseils: [
+      "Étirement quotidien du cou : 3-4 fois par jour",
+      "Vérifiez votre posture en course (tête neutre, épaules détendues)",
+      "Massage régulier des épaules",
+      "Yoga ou pilates pour la mobilité",
+    ],
+  },
+  "Lombalgie": {
+    name: "Lombalgie (douleur au bas du dos)",
+    symptomesRessentis: [
+      "Douleur en bas du dos, surtout au centre",
+      "Douleur qui s'aggrave après la course",
+      "Raideur en se levant le matin",
+      "Douleur en se penchant en avant",
+      "Possible irradiation vers les jambes",
+    ],
+    causesProbables: [
+      "Manque de gainage et de stabilité du core",
+      "Posture de course incorrecte",
+      "Déséquilibre musculaire (fessiers faibles)",
+      "Augmentation trop rapide du volume",
+      "Flexibilité insuffisante du dos",
+    ],
+    meilleurMoyenSoulager: [
+      "Renforcement du core (gainage, abdominaux)",
+      "Étirements doux du dos et des ischio-jambiers",
+      "Glaçage en cas d'inflammation",
+      "Massage du bas du dos",
+      "Repos relatif et réduction du kilométrage",
+    ],
+    risques: [
+      "Douleur chronique du dos",
+      "Limitation de la mobilité",
+      "Impact sur d'autres zones (genou, hanche)",
+    ],
+    conseils: [
+      "Gainage quotidien : 3-4 x 1 min",
+      "Étirements : spécial ischio-jambiers et dos",
+      "Vérifiez votre posture (dos droit, core actif)",
+      "Augmentation kilométrique progressive (10%/semaine)",
+    ],
+  },
+  "Dorsalgie": {
+    name: "Dorsalgie (douleur au milieu du dos)",
+    symptomesRessentis: [
+      "Douleur entre les omoplates",
+      "Sensation de rigidité du haut du dos",
+      "Douleur qui s'aggrave en course",
+      "Possible tension dans les épaules",
+      "Douleur lors de mouvements de rotation",
+    ],
+    causesProbables: [
+      "Posture avachie (arrondi du dos)",
+      "Technique de course incorrecte",
+      "Faiblesse des muscles du dos",
+      "Tension accumulée au travail",
+      "Manque de mobilité thoracique",
+    ],
+    meilleurMoyenSoulager: [
+      "Étirements du dos et des épaules",
+      "Renforcement des muscles du dos",
+      "Correction de la posture en course",
+      "Yoga ou pilates pour la mobilité",
+      "Massage des omoplates",
+    ],
+    risques: [
+      "Douleur chronique persistante",
+      "Limitation de la performance",
+      "Compensation et douleurs secondaires",
+    ],
+    conseils: [
+      "Posture droite en course : épaules basses, dos droit",
+      "Renforcement du dos 3-4x/semaine",
+      "Étirements quotidiens (5-10 min)",
+      "Yoga ou pilates 1-2x/semaine",
+    ],
+  },
 };
 
 const bodyParts = [
+  { id: "neck", label: "Cou", x: 50, y: 10, issues: ["Cervicalgie"] },
+  { id: "upper-back", label: "Haut du dos", x: 50, y: 25, issues: ["Dorsalgie"] },
+  { id: "lower-back", label: "Bas du dos", x: 50, y: 38, issues: ["Lombalgie"] },
   { id: "knee", label: "Genou", x: 48, y: 62, issues: ["Syndrome rotulien", "Syndrome de l'essuie-glace", "Menisque"] },
   { id: "shin", label: "Tibia", x: 45, y: 72, issues: ["Periostite tibiale", "Fracture de fatigue"] },
   { id: "ankle", label: "Cheville", x: 42, y: 82, issues: ["Entorse de cheville", "Tendinite des peroniers"] },
@@ -573,12 +681,20 @@ const Health = () => {
               <div className="absolute inset-0 flex items-center justify-center">
                 <div className="relative h-full w-full">
                   {/* Head */}
-                  <div className="absolute left-1/2 top-[4%] h-8 w-8 -translate-x-1/2 rounded-full border-2 border-muted-foreground/50 bg-muted/50" />
-                  {/* Torso */}
-                  <div className="absolute left-1/2 top-[16%] h-24 w-16 -translate-x-1/2 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
+                  <div className="absolute left-1/2 top-[2%] h-6 w-6 -translate-x-1/2 rounded-full border-2 border-muted-foreground/50 bg-muted/50" />
+                  {/* Neck area */}
+                  <div className="absolute left-1/2 top-[8%] h-3 w-4 -translate-x-1/2 border border-muted-foreground/40 rounded-sm" />
+                  {/* Upper back/shoulders */}
+                  <div className="absolute left-1/2 top-[14%] h-6 w-20 -translate-x-1/2 border border-muted-foreground/40 rounded-full bg-muted/20" />
+                  {/* Mid back/torso */}
+                  <div className="absolute left-1/2 top-[24%] h-20 w-16 -translate-x-1/2 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
+                  {/* Lower back zone */}
+                  <div className="absolute left-1/2 top-[36%] h-8 w-14 -translate-x-1/2 border border-muted-foreground/40 rounded-md bg-muted/20" />
+                  {/* Hips */}
+                  <div className="absolute left-1/2 top-[48%] h-4 w-18 -translate-x-1/2 border border-muted-foreground/30" />
                   {/* Legs */}
-                  <div className="absolute left-[32%] top-[48%] h-40 w-6 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
-                  <div className="absolute right-[32%] top-[48%] h-40 w-6 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
+                  <div className="absolute left-[32%] top-[54%] h-32 w-5 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
+                  <div className="absolute right-[32%] top-[54%] h-32 w-5 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
 
                   {/* Tap points */}
                   {bodyParts.map((part) => (

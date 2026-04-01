@@ -9,14 +9,24 @@ import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
 } from "recharts";
+import { useEffect, useMemo, useState } from "react";
+import {
+  buildDashboardStats,
+  buildWeeklyDistanceData,
+  formatDistance,
+  formatDuration,
+  formatPace,
+  getLatestActivity,
+  type StravaActivity,
+} from "@/lib/strava";
 
 /* ── Dashboard data ── */
-const weeklyData = [
+const defaultWeeklyData = [
   { day: "Lun", km: 8.2 }, { day: "Mar", km: 0 }, { day: "Mer", km: 12.5 },
   { day: "Jeu", km: 6.1 }, { day: "Ven", km: 0 }, { day: "Sam", km: 18.3 }, { day: "Dim", km: 5.0 },
 ];
 
-const statCards = [
+const defaultStatCards = [
   { label: "Distance", value: "50.1", unit: "km", icon: Route, change: "+12%" },
   { label: "Durée", value: "4h 23m", unit: "", icon: Clock, change: "+8%" },
   { label: "Dénivelé", value: "482", unit: "m", icon: Mountain, change: "+5%" },
@@ -66,7 +76,18 @@ const tooltipStyle = {
 };
 
 /* ── Dashboard Section ── */
-function DashboardSection() {
+function DashboardSection({
+  weeklyData,
+  statCards,
+  latestActivity,
+}: {
+  weeklyData: Array<{ day: string; km: number }>;
+  statCards: Array<{ label: string; value: string; unit: string; icon: typeof Route; change: string }>;
+  latestActivity: StravaActivity | null;
+}) {
+  const totalKm = weeklyData.reduce((sum, item) => sum + item.km, 0).toFixed(1);
+  const latestActivityCalories = latestActivity ? Math.round((latestActivity.distance / 1000) * 62) : 1050;
+
   return (
     <div className="space-y-6">
       {/* Stats row */}
@@ -99,7 +120,7 @@ function DashboardSection() {
                 <h2 className="text-sm font-semibold">Volume hebdomadaire</h2>
                 <p className="text-xs text-muted-foreground">Distance par jour</p>
               </div>
-              <div className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-semibold text-lime">50.1 km au total</div>
+              <div className="rounded-lg bg-accent/10 px-2.5 py-1 text-xs font-semibold text-lime">{totalKm} km au total</div>
             </div>
             <div className="h-48">
               <ResponsiveContainer width="100%" height="100%">
@@ -139,19 +160,23 @@ function DashboardSection() {
             <div className="bg-accent/10 px-5 py-3">
               <div className="flex items-center gap-2">
                 <Zap className="h-4 w-4 text-lime" />
-                <span className="text-sm font-semibold">Seance du jour</span>
+                <span className="text-sm font-semibold">{latestActivity ? "Dernière activité Strava" : "Seance du jour"}</span>
               </div>
             </div>
             <div className="p-5">
-              <h3 className="text-xl font-bold">Sortie longue</h3>
-              <p className="mt-1 text-sm text-muted-foreground">18km a 5:15/km · Effort facile avec les 3 derniers km allure marathon</p>
+              <h3 className="text-xl font-bold">{latestActivity?.name ?? "Sortie longue"}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {latestActivity
+                  ? `${formatDistance(latestActivity.distance)} à ${formatPace(latestActivity.distance, latestActivity.moving_time)} · activité synchronisée depuis Strava`
+                  : "18km a 5:15/km · Effort facile avec les 3 derniers km allure marathon"}
+              </p>
               <div className="mt-4 flex gap-6 text-xs">
-                <div className="flex items-center gap-1.5"><Route className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">18.0 km</span></div>
-                <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">~1h 35m</span></div>
-                <div className="flex items-center gap-1.5"><Flame className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">~1,050 kcal</span></div>
+                <div className="flex items-center gap-1.5"><Route className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">{latestActivity ? formatDistance(latestActivity.distance) : "18.0 km"}</span></div>
+                <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">{latestActivity ? formatDuration(latestActivity.moving_time) : "~1h 35m"}</span></div>
+                <div className="flex items-center gap-1.5"><Flame className="h-3.5 w-3.5 text-muted-foreground" /><span className="tabular-nums">~{latestActivityCalories} kcal</span></div>
               </div>
               <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-accent py-2.5 text-sm font-semibold text-accent-foreground transition-transform active:scale-[0.97]">
-                <Play className="h-4 w-4" /> Demarrer la course
+                <Play className="h-4 w-4" /> {latestActivity ? "Activité synchronisée" : "Demarrer la course"}
               </button>
             </div>
           </div>
@@ -316,14 +341,63 @@ function PerformanceSection() {
 
 /* ── Main Page ── */
 const Dashboard = () => {
+  const [activities, setActivities] = useState<StravaActivity[]>([]);
+  const [athleteName, setAthleteName] = useState("Alex");
+
+  useEffect(() => {
+    const loadStravaActivities = async () => {
+      try {
+        const response = await fetch("/api/strava/activities?per_page=30");
+        const data = await response.json();
+
+        if (data?.athlete) {
+          const fullName = `${data.athlete.firstname ?? ""} ${data.athlete.lastname ?? ""}`.trim();
+          if (fullName) {
+            setAthleteName(fullName.split(" ")[0]);
+          }
+        }
+
+        if (Array.isArray(data?.activities)) {
+          setActivities(data.activities as StravaActivity[]);
+        }
+      } catch {
+        setActivities([]);
+      }
+    };
+
+    void loadStravaActivities();
+  }, []);
+
+  const weeklyData = useMemo(
+    () => (activities.length > 0 ? buildWeeklyDistanceData(activities) : defaultWeeklyData),
+    [activities],
+  );
+
+  const statCards = useMemo(() => {
+    if (activities.length === 0) return defaultStatCards;
+    const dynamicStats = buildDashboardStats(activities);
+
+    return dynamicStats.map((stat, index) => ({
+      ...stat,
+      icon: defaultStatCards[index].icon,
+      change: "Strava",
+    }));
+  }, [activities]);
+
+  const latestActivity = useMemo(() => getLatestActivity(activities), [activities]);
+
   return (
     <div className="space-y-6">
       <ScrollReveal>
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-            Bonjour, <span className="text-lime">Alex</span>
+            Bonjour, <span className="text-lime">{athleteName}</span>
           </h1>
-          <p className="text-sm text-muted-foreground">Semaine 12 du plan marathon · 18 jours avant la course</p>
+          <p className="text-sm text-muted-foreground">
+            {activities.length > 0
+              ? `${activities.length} activités synchronisées depuis Strava`
+              : "Semaine 12 du plan marathon · 18 jours avant la course"}
+          </p>
         </div>
       </ScrollReveal>
 
@@ -336,7 +410,7 @@ const Dashboard = () => {
         </ScrollReveal>
 
         <TabsContent value="dashboard">
-          <DashboardSection />
+          <DashboardSection weeklyData={weeklyData} statCards={statCards} latestActivity={latestActivity} />
         </TabsContent>
         <TabsContent value="performance">
           <PerformanceSection />

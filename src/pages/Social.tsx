@@ -7,10 +7,32 @@ import { Textarea } from "@/components/ui/textarea";
 import { Heart, MessageCircle, Share2, MapPin, Clock, Zap, Trophy, Image as ImageIcon, Send, Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import GPSMap from "@/components/GPSMap";
+import {
+  COMMUNITY_POSTS_KEY,
+  activityToCommunityPost,
+  type CommunityPost,
+  type StravaActivity,
+} from "@/lib/strava";
 
-const COMMUNITY_POSTS_KEY = "pace-community-posts";
+function buildFallbackTrace(seed: number) {
+  const points = 24;
+  const baseLat = 48.8566 + (seed % 7) * 0.0012;
+  const baseLng = 2.3522 + (seed % 5) * 0.0011;
 
-const feedPosts = [
+  return Array.from({ length: points }, (_, i) => ({
+    lat: baseLat + Math.sin((i + seed) / 3) * 0.003 + i * 0.00018,
+    lng: baseLng + Math.cos((i + seed) / 4) * 0.003 + ((i % 6) - 3) * 0.00022,
+    time: seed + i * 1000,
+  }));
+}
+
+function ensurePostTrace(post: CommunityPost): CommunityPost {
+  if (post.gpsTrace?.length) return post;
+  if (post.type !== "run" && post.type !== "race") return post;
+  return { ...post, gpsTrace: buildFallbackTrace(post.id) };
+}
+
+const feedPosts: CommunityPost[] = [
   {
     id: 1,
     user: "Léa Martin",
@@ -94,22 +116,38 @@ export default function Social() {
   );
 
   useEffect(() => {
-    const loadCommunityPosts = () => {
+    const loadCommunityPosts = async () => {
       try {
         const raw = window.localStorage.getItem(COMMUNITY_POSTS_KEY);
-        const generatedPosts = raw ? JSON.parse(raw) as typeof feedPosts : [];
-        setPosts([...generatedPosts, ...feedPosts]);
+        const generatedPosts = raw ? JSON.parse(raw) as CommunityPost[] : [];
+
+        const response = await fetch("/api/strava/activities?per_page=20");
+        const data = await response.json();
+        const athleteName = data?.athlete
+          ? `${data.athlete.firstname ?? ""} ${data.athlete.lastname ?? ""}`.trim()
+          : "Strava";
+        const importedPosts = Array.isArray(data?.activities)
+          ? (data.activities as StravaActivity[]).map((activity) => activityToCommunityPost(activity, athleteName))
+          : [];
+
+        const merged = [...importedPosts, ...generatedPosts, ...feedPosts].map(ensurePostTrace);
+        const deduped = Array.from(new Map(merged.map((post) => [post.id, post])).values());
+        setPosts(deduped);
       } catch {
-        setPosts(feedPosts);
+        setPosts(feedPosts.map(ensurePostTrace));
       }
     };
 
-    loadCommunityPosts();
-    window.addEventListener("storage", loadCommunityPosts);
-    window.addEventListener("pace-community-updated", loadCommunityPosts);
+    void loadCommunityPosts();
+    const handleReload = () => {
+      void loadCommunityPosts();
+    };
+
+    window.addEventListener("storage", handleReload);
+    window.addEventListener("pace-community-updated", handleReload);
     return () => {
-      window.removeEventListener("storage", loadCommunityPosts);
-      window.removeEventListener("pace-community-updated", loadCommunityPosts);
+      window.removeEventListener("storage", handleReload);
+      window.removeEventListener("pace-community-updated", handleReload);
     };
   }, []);
 

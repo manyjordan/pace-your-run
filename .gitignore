@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 *.local
+.strava-session.local.json
 
 # Editor directories and files
 .vscode/*
