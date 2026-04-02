@@ -651,6 +651,20 @@ const Health = () => {
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const selectedPart = bodyParts.find((p) => p.id === selected);
   const issueDetails = selectedIssue ? issuesData[selectedIssue] : null;
+  const cleanMedicalText = (text: string) => text.replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/g, " ").trim();
+  const punctuateMedicalText = (text: string) => {
+    const cleaned = cleanMedicalText(text);
+    if (!cleaned) return "";
+
+    const normalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    return /[.!?…]$/.test(normalized) ? normalized : `${normalized}.`;
+  };
+  const toSentence = (items: string[], maxItems = 2) =>
+    items
+      .slice(0, maxItems)
+      .map(punctuateMedicalText)
+      .filter(Boolean)
+      .join(" ");
 
   return (
     <div className="space-y-6">
@@ -676,46 +690,55 @@ const Health = () => {
           <h2 className="mb-2 text-sm font-semibold">Vérification des symptômes</h2>
           <p className="mb-4 text-xs text-muted-foreground">Cliquez sur une zone du corps pour explorer les problèmes fréquents et leur traitement</p>
           <div className="grid gap-6 md:grid-cols-2">
-            {/* Body diagram - Enhanced styling */}
-            <div className="relative mx-auto h-80 w-48 bg-gradient-to-b from-muted/30 to-muted/50 rounded-lg p-4">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="relative h-full w-full">
-                  {/* Head */}
-                  <div className="absolute left-1/2 top-[2%] h-6 w-6 -translate-x-1/2 rounded-full border-2 border-muted-foreground/50 bg-muted/50" />
-                  {/* Neck area */}
-                  <div className="absolute left-1/2 top-[8%] h-3 w-4 -translate-x-1/2 border border-muted-foreground/40 rounded-sm" />
-                  {/* Upper back/shoulders */}
-                  <div className="absolute left-1/2 top-[14%] h-6 w-20 -translate-x-1/2 border border-muted-foreground/40 rounded-full bg-muted/20" />
-                  {/* Mid back/torso */}
-                  <div className="absolute left-1/2 top-[24%] h-20 w-16 -translate-x-1/2 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
-                  {/* Lower back zone */}
-                  <div className="absolute left-1/2 top-[36%] h-8 w-14 -translate-x-1/2 border border-muted-foreground/40 rounded-md bg-muted/20" />
-                  {/* Hips */}
-                  <div className="absolute left-1/2 top-[48%] h-4 w-18 -translate-x-1/2 border border-muted-foreground/30" />
-                  {/* Legs */}
-                  <div className="absolute left-[32%] top-[54%] h-32 w-5 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
-                  <div className="absolute right-[32%] top-[54%] h-32 w-5 rounded-lg border-2 border-muted-foreground/50 bg-muted/30" />
+            <div className="mx-auto w-full max-w-[320px] rounded-2xl border border-accent/20 bg-gradient-to-b from-card via-card to-accent/5 p-4 shadow-[0_18px_40px_hsl(var(--accent)/0.08)]">
+              <div className="relative mx-auto h-[460px] w-[240px]">
+                <svg viewBox="0 0 240 460" className="h-full w-full">
+                  <defs>
+                    <linearGradient id="bodyFill" x1="0" x2="0" y1="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--accent) / 0.20)" />
+                      <stop offset="100%" stopColor="hsl(var(--muted) / 0.55)" />
+                    </linearGradient>
+                  </defs>
+                  <circle cx="120" cy="42" r="28" fill="url(#bodyFill)" stroke="hsl(var(--border))" strokeWidth="2" />
+                  <rect x="108" y="68" width="24" height="22" rx="10" fill="url(#bodyFill)" stroke="hsl(var(--border))" strokeWidth="2" />
+                  <path d="M78 98 C86 86, 154 86, 162 98 L176 162 C180 176, 170 194, 154 198 L86 198 C70 194, 60 176, 64 162 Z" fill="url(#bodyFill)" stroke="hsl(var(--border))" strokeWidth="2" />
+                  <path d="M92 198 L148 198 L158 248 C162 266, 154 290, 142 304 L128 430 L108 430 L98 304 C86 290, 78 266, 82 248 Z" fill="url(#bodyFill)" stroke="hsl(var(--border))" strokeWidth="2" />
+                  <path d="M72 104 L48 190 C42 208, 52 224, 66 228 L82 206 L94 138" fill="url(#bodyFill)" stroke="hsl(var(--border))" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M168 104 L192 190 C198 208, 188 224, 174 228 L158 206 L146 138" fill="url(#bodyFill)" stroke="hsl(var(--border))" strokeWidth="2" strokeLinecap="round" />
+                  <path d="M102 304 L90 438" fill="none" stroke="hsl(var(--border))" strokeWidth="18" strokeLinecap="round" />
+                  <path d="M138 304 L150 438" fill="none" stroke="hsl(var(--border))" strokeWidth="18" strokeLinecap="round" />
+                </svg>
 
-                  {/* Tap points */}
-                  {bodyParts.map((part) => (
-                    <button
-                      key={part.id}
-                      onClick={() => {
-                        setSelected(selected === part.id ? null : part.id);
-                        setSelectedIssue(null);
-                      }}
-                      className={`absolute h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-all cursor-pointer ${
-                        selected === part.id
-                          ? "border-accent bg-accent/40 scale-125 shadow-lg shadow-accent/50"
-                          : "border-muted-foreground/40 bg-muted-foreground/20 hover:bg-accent/30 hover:border-accent hover:scale-110"
-                      }`}
-                      style={{ left: `${part.x}%`, top: `${part.y}%` }}
-                      title={part.label}
-                    >
-                      <span className="sr-only">{part.label}</span>
-                    </button>
-                  ))}
-                </div>
+                {bodyParts.map((part) => (
+                  <button
+                    key={part.id}
+                    onClick={() => {
+                      setSelected(selected === part.id ? null : part.id);
+                      setSelectedIssue(null);
+                    }}
+                    className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-all ${
+                      selected === part.id
+                        ? "border-accent bg-accent text-accent-foreground scale-110 shadow-[0_0_0_6px_hsl(var(--accent)/0.18)]"
+                        : "border-white/70 bg-[hsl(var(--foreground)/0.14)] hover:border-accent hover:bg-accent/80 hover:text-accent-foreground"
+                    }`}
+                    style={{ left: `${part.x}%`, top: `${part.y}%`, width: "24px", height: "24px" }}
+                    title={part.label}
+                  >
+                    <span className="sr-only">{part.label}</span>
+                  </button>
+                ))}
+
+                {selectedPart && (
+                  <div
+                    className="absolute -translate-y-1/2 rounded-full border border-accent/40 bg-card px-3 py-1 text-xs font-semibold shadow-md"
+                    style={{
+                      left: selectedPart.x < 50 ? "62%" : "4%",
+                      top: `${selectedPart.y}%`,
+                    }}
+                  >
+                    {selectedPart.label}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -727,16 +750,27 @@ const Health = () => {
                     <div className="h-3 w-3 rounded-full bg-accent" />
                     <h3 className="text-sm font-bold">Problèmes courants : {selectedPart.label}</h3>
                   </div>
+                  <div className="rounded-lg border border-accent/30 bg-accent/10 p-3">
+                    <p className="text-xs font-medium text-foreground">
+                      Étape suivante : choisissez un problème ci-dessous pour afficher les détails.
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Le contenu détaillé s'ouvre juste en dessous dans cette même colonne.
+                    </p>
+                  </div>
                   <div className="space-y-2">
                     {selectedPart.issues.map((issue) => (
                       <button
                         key={issue}
                         onClick={() => setSelectedIssue(issue)}
-                        className="w-full rounded-lg border border-border p-3 text-sm transition-all hover:bg-accent/10 hover:border-accent hover:shadow-md text-left"
+                        className="w-full rounded-lg border border-border bg-card p-3 text-left text-sm transition-colors hover:bg-muted/30"
                       >
-                        <p className="font-medium">{issue}</p>
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium">{issue}</p>
+                          <span className="text-xs font-medium text-muted-foreground">Détail</span>
+                        </div>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Cliquez pour découvrir la structure et le traitement
+                          Touchez pour afficher une version courte et pratique.
                         </p>
                       </button>
                     ))}
@@ -755,56 +789,46 @@ const Health = () => {
                   </div>
 
                   <div className="space-y-3 text-sm">
-                    <div className="bg-blue-50/50 dark:bg-blue-950/30 rounded-lg p-3">
-                      <p className="font-semibold text-xs text-blue-700 dark:text-blue-300 mb-2">❓ Symptômes que vous pourriez ressentir</p>
-                      <ul className="text-xs text-blue-600 dark:text-blue-200 space-y-1">
-                        {issueDetails.symptomesRessentis.map((symptom) => (
-                          <li key={symptom} className="ml-3">• {symptom}</li>
-                        ))}
-                      </ul>
+                    <div className="rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="mb-2 text-xs font-semibold text-foreground">Symptômes ressentis</p>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {toSentence(issueDetails.symptomesRessentis)}
+                      </p>
                     </div>
 
-                    <div className="bg-orange-50/50 dark:bg-orange-950/30 rounded-lg p-3">
-                      <p className="font-semibold text-xs text-orange-700 dark:text-orange-300 mb-2">🔍 Causes probables</p>
-                      <ul className="text-xs text-orange-600 dark:text-orange-200 space-y-1">
-                        {issueDetails.causesProbables.map((cause) => (
-                          <li key={cause} className="ml-3">• {cause}</li>
-                        ))}
-                      </ul>
+                    <div className="rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="mb-2 text-xs font-semibold text-foreground">Causes probables</p>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {toSentence(issueDetails.causesProbables)}
+                      </p>
                     </div>
 
-                    <div className="bg-green-50/50 dark:bg-green-950/30 rounded-lg p-3">
-                      <p className="font-semibold text-xs text-green-700 dark:text-green-300 mb-2">💊 Traitement recommandé</p>
-                      <ul className="text-xs text-green-600 dark:text-green-200 space-y-1">
-                        {issueDetails.meilleurMoyenSoulager.map((moyen) => (
-                          <li key={moyen} className="ml-3">• {moyen}</li>
-                        ))}
-                      </ul>
+                    <div className="rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="mb-2 text-xs font-semibold text-foreground">Soulager en priorité</p>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {toSentence(issueDetails.meilleurMoyenSoulager)}
+                      </p>
                     </div>
 
-                    <div className="bg-red-50/50 dark:bg-red-950/30 rounded-lg p-3">
-                      <p className="font-semibold text-xs text-red-700 dark:text-red-300 mb-2">⚠️ Risques si vous continuez</p>
-                      <ul className="text-xs text-red-600 dark:text-red-200 space-y-1">
-                        {issueDetails.risques.map((risque) => (
-                          <li key={risque} className="ml-3">• {risque}</li>
-                        ))}
-                      </ul>
+                    <div className="rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="mb-2 text-xs font-semibold text-foreground">Risques si vous continuez</p>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {toSentence(issueDetails.risques)}
+                      </p>
                     </div>
 
-                    <div className="bg-purple-50/50 dark:bg-purple-950/30 rounded-lg p-3">
-                      <p className="font-semibold text-xs text-purple-700 dark:text-purple-300 mb-2">✅ Conseils pratiques</p>
-                      <ul className="text-xs text-purple-600 dark:text-purple-200 space-y-1">
-                        {issueDetails.conseils.map((conseil) => (
-                          <li key={conseil} className="ml-3">• {conseil}</li>
-                        ))}
-                      </ul>
+                    <div className="rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="mb-2 text-xs font-semibold text-foreground">Conseils pratiques</p>
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        {toSentence(issueDetails.conseils)}
+                      </p>
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-center py-8 text-muted-foreground">
-                  <p className="text-sm">👈 Sélectionnez une zone du corps</p>
-                  <p className="text-xs mt-1">pour explorer les blessures fréquentes</p>
+                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-accent/30 bg-accent/5 py-8 text-center text-muted-foreground">
+                  <p className="text-sm font-medium">Sélectionnez une zone du corps</p>
+                  <p className="mt-1 text-xs">Puis choisissez le problème affiché juste en dessous pour voir le détail.</p>
                 </div>
               )}
             </div>

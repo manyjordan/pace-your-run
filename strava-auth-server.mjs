@@ -49,6 +49,17 @@ function getAppOrigin(req) {
   return "http://localhost:8080";
 }
 
+async function fetchStravaJson(path, accessToken) {
+  const response = await fetch(`https://www.strava.com/api/v3${path}`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  const data = await response.json();
+  return { response, data };
+}
+
 async function exchangeToken(params) {
   const response = await fetch("https://www.strava.com/oauth/token", {
     method: "POST",
@@ -158,20 +169,54 @@ const server = createServer(async (req, res) => {
     }
 
     try {
-      const perPage = url.searchParams.get("per_page") || "30";
-      const page = url.searchParams.get("page") || "1";
-      const response = await fetch(
-        `https://www.strava.com/api/v3/athlete/activities?per_page=${perPage}&page=${page}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        },
-      );
+      const allHistory = url.searchParams.get("all_history") === "1";
+      const perPage = Number(url.searchParams.get("per_page") || (allHistory ? "100" : "30"));
+      const page = Number(url.searchParams.get("page") || "1");
 
-      const activities = await response.json();
+      let activities = [];
 
-      if (!response.ok || !Array.isArray(activities)) {
+      if (allHistory) {
+        let currentPage = page;
+        let keepFetching = true;
+
+        while (keepFetching) {
+          const { response, data } = await fetchStravaJson(
+            `/athlete/activities?per_page=${perPage}&page=${currentPage}`,
+            session.access_token,
+          );
+
+          if (!response.ok || !Array.isArray(data)) {
+            return sendJson(res, 502, {
+              connected: true,
+              athlete: session.athlete ?? null,
+              activities: [],
+              error: "Unable to fetch Strava activities",
+            });
+          }
+
+          activities.push(...data);
+          keepFetching = data.length === perPage;
+          currentPage += 1;
+        }
+      } else {
+        const { response, data } = await fetchStravaJson(
+          `/athlete/activities?per_page=${perPage}&page=${page}`,
+          session.access_token,
+        );
+
+        activities = data;
+
+        if (!response.ok || !Array.isArray(activities)) {
+          return sendJson(res, 502, {
+            connected: true,
+            athlete: session.athlete ?? null,
+            activities: [],
+            error: "Unable to fetch Strava activities",
+          });
+        }
+      }
+
+      if (!Array.isArray(activities)) {
         return sendJson(res, 502, {
           connected: true,
           athlete: session.athlete ?? null,
@@ -191,6 +236,54 @@ const server = createServer(async (req, res) => {
         athlete: session.athlete ?? null,
         activities: [],
         error: "Unexpected error while fetching activities",
+      });
+    }
+  }
+
+  const detailMatch = url.pathname.match(/^\/api\/strava\/activities\/(\d+)\/details$/);
+  if (detailMatch && req.method === "GET") {
+    const session = await getValidSession();
+
+    if (!session?.access_token) {
+      return sendJson(res, 200, {
+        connected: false,
+        activity: null,
+        streams: null,
+      });
+    }
+
+    try {
+      const activityId = detailMatch[1];
+      const [{ response: activityResponse, data: activity }, { response: streamsResponse, data: streams }] =
+        await Promise.all([
+          fetchStravaJson(`/activities/${activityId}`, session.access_token),
+          fetchStravaJson(
+            `/activities/${activityId}/streams?keys=time,distance,heartrate,velocity_smooth,altitude&key_by_type=true`,
+            session.access_token,
+          ),
+        ]);
+
+      if (!activityResponse.ok || !activity?.id) {
+        return sendJson(res, 502, {
+          connected: true,
+          activity: null,
+          streams: null,
+          error: "Unable to fetch Strava activity details",
+        });
+      }
+
+      return sendJson(res, 200, {
+        connected: true,
+        athlete: session.athlete ?? null,
+        activity,
+        streams: streamsResponse.ok ? streams : null,
+      });
+    } catch {
+      return sendJson(res, 500, {
+        connected: true,
+        activity: null,
+        streams: null,
+        error: "Unexpected error while fetching activity details",
       });
     }
   }

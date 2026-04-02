@@ -6,24 +6,24 @@
 
 @layer base {
   :root {
-    --background: 210 11% 96%;
+    --background: 45 100% 92%;
     --foreground: 213 44% 11%;
-    --card: 0 0% 100%;
+    --card: 45 100% 98%;
     --card-foreground: 213 44% 11%;
-    --popover: 0 0% 100%;
+    --popover: 45 100% 98%;
     --popover-foreground: 213 44% 11%;
     --primary: 213 44% 11%;
     --primary-foreground: 45 97% 54%;
-    --secondary: 210 14% 89%;
+    --secondary: 45 100% 86%;
     --secondary-foreground: 213 44% 11%;
-    --muted: 210 14% 92%;
-    --muted-foreground: 213 10% 48%;
+    --muted: 45 95% 86%;
+    --muted-foreground: 213 16% 38%;
     --accent: 45 97% 54%;
     --accent-foreground: 213 44% 11%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --border: 210 14% 86%;
-    --input: 210 14% 86%;
+    --border: 45 80% 78%;
+    --input: 45 80% 78%;
     --ring: 45 97% 54%;
     --radius: 0.75rem;
     --lime: 45 97% 54%;
@@ -31,14 +31,14 @@
     --navy: 213 44% 11%;
     --navy-light: 213 30% 20%;
     --navy-muted: 213 20% 30%;
-    --surface: 210 14% 97%;
-    --sidebar-background: 0 0% 98%;
+    --surface: 47 100% 96%;
+    --sidebar-background: 46 100% 90%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-primary-foreground: 45 100% 92%;
+    --sidebar-accent: 46 100% 84%;
     --sidebar-accent-foreground: 240 5.9% 10%;
-    --sidebar-border: 220 13% 91%;
+    --sidebar-border: 45 80% 76%;
     --sidebar-ring: 45 97% 54%;
   }
 
@@ -85,6 +85,11 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    background-image:
+      radial-gradient(circle at top left, hsl(var(--accent) / 0.22), transparent 28%),
+      radial-gradient(circle at top right, hsl(var(--accent) / 0.14), transparent 22%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(48 100% 95%) 100%);
+    background-attachment: fixed;
   }
   html {
     scroll-behavior: smooth;

@@ -1,4 +1,5 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { ActivityDetail } from "@/components/ActivityDetail";
 import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -96,10 +97,40 @@ const friendsSeed = [
 
 export default function Social() {
   const [posts, setPosts] = useState(feedPosts);
+  const [activities, setActivities] = useState<StravaActivity[]>([]);
   const [newPost, setNewPost] = useState("");
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [friendQuery, setFriendQuery] = useState("");
   const [friends, setFriends] = useState(friendsSeed);
+  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const [selectedTrace, setSelectedTrace] = useState<CommunityPost["gpsTrace"] | undefined>(undefined);
+
+  const buildActivityFromPost = (post: CommunityPost): StravaActivity => {
+    const parseDistance = Number.parseFloat(post.stats.distance.replace(",", "."));
+    const [hoursOrMinutes = "0", minutesOrSeconds = "0", seconds = "0"] = post.stats.duration.split(":");
+    const durationSeconds =
+      post.stats.duration.split(":").length === 3
+        ? Number.parseInt(hoursOrMinutes, 10) * 3600 +
+          Number.parseInt(minutesOrSeconds, 10) * 60 +
+          Number.parseInt(seconds, 10)
+        : Number.parseInt(hoursOrMinutes, 10) * 60 + Number.parseInt(minutesOrSeconds, 10);
+
+    return {
+      id: post.id,
+      name: post.title,
+      distance: Number.isFinite(parseDistance) ? parseDistance * 1000 : 0,
+      moving_time: durationSeconds,
+      elapsed_time: durationSeconds,
+      total_elevation_gain: Number.parseInt(post.stats.elevation.replace(/[^\d-]/g, ""), 10) || 0,
+      start_date: new Date().toISOString(),
+    };
+  };
+
+  const handleOpenActivity = (post: CommunityPost) => {
+    const matched = activities.find((activity) => activity.id === post.id);
+    setSelectedActivity(matched ?? buildActivityFromPost(post));
+    setSelectedTrace(post.gpsTrace);
+  };
 
   const toggleLike = (id: number) => {
     setPosts(posts.map(p =>
@@ -129,11 +160,13 @@ export default function Social() {
         const importedPosts = Array.isArray(data?.activities)
           ? (data.activities as StravaActivity[]).map((activity) => activityToCommunityPost(activity, athleteName))
           : [];
+        setActivities(Array.isArray(data?.activities) ? (data.activities as StravaActivity[]) : []);
 
         const merged = [...importedPosts, ...generatedPosts, ...feedPosts].map(ensurePostTrace);
         const deduped = Array.from(new Map(merged.map((post) => [post.id, post])).values());
         setPosts(deduped);
       } catch {
+        setActivities([]);
         setPosts(feedPosts.map(ensurePostTrace));
       }
     };
@@ -153,6 +186,18 @@ export default function Social() {
 
   return (
     <div className="space-y-6">
+      {selectedActivity && (
+        <ActivityDetail
+          activity={selectedActivity}
+          onClose={() => {
+            setSelectedActivity(null);
+            setSelectedTrace(undefined);
+          }}
+          allActivities={activities}
+          fallbackTrace={selectedTrace}
+        />
+      )}
+
       <ScrollReveal>
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -246,7 +291,7 @@ export default function Social() {
         {/* Posts */}
         {posts.map((post, i) => (
           <ScrollReveal key={post.id} delay={0.1 + i * 0.06}>
-            <Card className="overflow-hidden">
+            <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
               <CardContent className="p-4 space-y-3">
                 {/* Header */}
                 <div className="flex items-center gap-3">
@@ -305,21 +350,46 @@ export default function Social() {
                   <GPSMap trace={(post as any).gpsTrace} />
                 )}
 
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleOpenActivity(post);
+                  }}
+                >
+                  Voir les détails de l'activité
+                </Button>
+
                 {/* Actions */}
                 <div className="flex items-center gap-1 pt-1 border-t border-border">
                   <Button
                     variant="ghost"
                     size="sm"
                     className={post.liked ? "text-red-500" : "text-muted-foreground"}
-                    onClick={() => toggleLike(post.id)}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      toggleLike(post.id);
+                    }}
                   >
                     <Heart className={`h-4 w-4 mr-1 ${post.liked ? "fill-current" : ""}`} />
                     {post.likes}
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <MessageCircle className="h-4 w-4 mr-1" /> {post.comments}
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-muted-foreground ml-auto">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto text-muted-foreground"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <Share2 className="h-4 w-4" />
                   </Button>
                 </div>

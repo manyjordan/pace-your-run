@@ -4,7 +4,29 @@ type GPSTrace = {
   time: number;
 };
 
-// Générer une "vue satellite" stylisée avec bruit Perlin-like
+function smoothstep(t: number): number {
+  return t * t * (3 - 2 * t);
+}
+
+function perlin2D(x: number, y: number, seed: number): number {
+  const xi = Math.floor(x);
+  const yi = Math.floor(y);
+  const xf = x - xi;
+  const yf = y - yi;
+
+  const u = smoothstep(xf);
+  const v = smoothstep(yf);
+
+  const n00 = Math.sin((xi + seed) * 12.9898 + (yi + seed) * 78.233) * 0.5 + 0.5;
+  const n10 = Math.sin((xi + 1 + seed) * 12.9898 + (yi + seed) * 78.233) * 0.5 + 0.5;
+  const n01 = Math.sin((xi + seed) * 12.9898 + (yi + 1 + seed) * 78.233) * 0.5 + 0.5;
+  const n11 = Math.sin((xi + 1 + seed) * 12.9898 + (yi + 1 + seed) * 78.233) * 0.5 + 0.5;
+
+  const nx0 = n00 * (1 - u) + n10 * u;
+  const nx1 = n01 * (1 - u) + n11 * u;
+  return nx0 * (1 - v) + nx1 * v;
+}
+
 function generateSatelliteTexture(width: number, height: number, seed: number) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -12,7 +34,6 @@ function generateSatelliteTexture(width: number, height: number, seed: number) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return "";
 
-  // Fond vert/bleu satellite
   const imageData = ctx.createImageData(width, height);
   const data = imageData.data;
 
@@ -20,30 +41,55 @@ function generateSatelliteTexture(width: number, height: number, seed: number) {
     const pixel = i / 4;
     const x = pixel % width;
     const y = Math.floor(pixel / width);
-    
-    // Bruit perlin-like
-    const noise = Math.sin((x + seed) * 0.05) * Math.sin((y + seed) * 0.05) * 0.5 + 0.5;
-    const streetNoise = Math.sin((x + y + seed) * 0.08) * 0.3 + 0.3;
-    
-    // Couleur satellite : vert/bleu/gris
-    if (noise > 0.6) {
-      // Zones vertes (parcs, herbe)
-      data[i] = 80 + noise * 30;      // R
-      data[i + 1] = 140 + noise * 40; // G
-      data[i + 2] = 60 + noise * 20;  // B
-    } else if (noise > 0.3) {
-      // Routes/bâtiments gris
-      const gray = 120 + streetNoise * 60;
-      data[i] = gray;
-      data[i + 1] = gray;
-      data[i + 2] = gray + 10;
+
+    const noise1 = perlin2D(x * 0.04, y * 0.04, seed);
+    const noise2 = perlin2D(x * 0.08, y * 0.08, seed + 1) * 0.5;
+    const noise3 = perlin2D(x * 0.15, y * 0.15, seed + 2) * 0.25;
+    const noise = noise1 + noise2 + noise3;
+
+    const roadPattern = Math.abs(Math.sin((x + y + seed) * 0.06)) * Math.abs(Math.cos((x - y + seed) * 0.08));
+    const buildingPattern = Math.abs(Math.sin((x * 0.12 + seed) * 0.5)) * Math.abs(Math.sin((y * 0.12 + seed) * 0.5));
+
+    let r = 0, g = 0, b = 0;
+
+    if (noise > 0.65) {
+      // Zones vertes denses (parcs, forêts)
+      r = 45 + noise * 35;
+      g = 110 + noise * 50;
+      b = 40 + noise * 25;
+    } else if (noise > 0.5) {
+      // Zones résidentielles/urbaines claires
+      const blend = (noise - 0.5) / 0.15;
+      const buildR = 160 + buildingPattern * 40;
+      const buildG = 150 + buildingPattern * 35;
+      const buildB = 140 + buildingPattern * 30;
+
+      r = buildR * blend + (100 + noise * 40) * (1 - blend);
+      g = buildG * blend + (120 + noise * 40) * (1 - blend);
+      b = buildB * blend + (100 + noise * 35) * (1 - blend);
+    } else if (noise > 0.35) {
+      // Routes asphaltées
+      const roadIntensity = roadPattern * 0.4 + 0.3;
+      const asphalt = 90 + roadIntensity * 40;
+      r = asphalt;
+      g = asphalt - 5;
+      b = asphalt - 8;
+    } else if (noise > 0.2) {
+      // Eau/zones aquatiques
+      r = 80 + noise * 40;
+      g = 140 + noise * 50;
+      b = 200 + noise * 40;
     } else {
-      // Eau/fond bleu
-      data[i] = 100 + noise * 20;
-      data[i + 1] = 150 + noise * 30;
-      data[i + 2] = 200 + noise * 40;
+      // Zones très sombres (eau profonde, ombres)
+      r = 60 + noise * 30;
+      g = 110 + noise * 40;
+      b = 160 + noise * 50;
     }
-    data[i + 3] = 255; // Alpha
+
+    data[i] = Math.max(0, Math.min(255, Math.round(r)));
+    data[i + 1] = Math.max(0, Math.min(255, Math.round(g)));
+    data[i + 2] = Math.max(0, Math.min(255, Math.round(b)));
+    data[i + 3] = 255;
   }
 
   ctx.putImageData(imageData, 0, 0);

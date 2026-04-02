@@ -3,7 +3,7 @@ import { Home, BarChart3, Calendar, Heart, Settings, Users, Play, ClipboardList 
 
 const navItems = [
   { to: "/", icon: Home, label: "Accueil" },
-  { to: "/social", icon: Users, label: "Communauté" },
+  { to: "/social", icon: Users, label: "Actu" },
   { to: "/run", icon: Play, label: "Course" },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
@@ -15,10 +15,10 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="min-h-screen bg-background">
       {/* Top header */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-accent/60 bg-accent text-accent-foreground shadow-[0_10px_30px_hsl(var(--accent)/0.18)] backdrop-blur-xl">
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--foreground)/0.12)]">
               <span className="text-sm font-black tracking-tighter text-accent-foreground">P</span>
             </div>
             <span className="text-lg font-bold tracking-tight">PACE</span>
@@ -33,8 +33,8 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                 className={({ isActive }) =>
                   `flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                     isActive
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-[hsl(var(--foreground)/0.14)] text-accent-foreground"
+                      : "text-accent-foreground/75 hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"
                   }`
                 }
               >
@@ -46,7 +46,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
 
           <NavLink
             to="/settings"
-            className="rounded-lg p-2 text-muted-foreground transition-colors hover:text-foreground"
+            className="rounded-lg p-2 text-accent-foreground/80 transition-colors hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"
           >
             <Settings className="h-5 w-5" />
           </NavLink>
@@ -57,8 +57,8 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <main className="container py-6 pb-24 md:pb-6">{children}</main>
 
       {/* Mobile bottom nav — 5 tabs */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/90 backdrop-blur-xl md:hidden">
-        <div className="flex items-center justify-around py-2 px-2">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-accent/30 bg-background/90 backdrop-blur-xl md:hidden">
+        <div className="grid grid-cols-5 items-end gap-1 px-2 py-2">
           {navItems.map((item) => {
             const isActive = location.pathname === item.to;
             const isRun = item.to === "/run";
@@ -68,7 +68,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className="flex flex-col items-center gap-0.5 px-3 py-1 -mt-5"
+                  className="flex flex-col items-center gap-0.5 py-1 -mt-5"
                 >
                   <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent/30">
                     <item.icon className="h-6 w-6" />
@@ -82,7 +82,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex flex-col items-center gap-0.5 px-3 py-1 text-xs transition-colors ${
+                className={`flex min-w-0 flex-col items-center gap-0.5 py-1 text-xs transition-colors ${
                   isActive ? "text-accent" : "text-muted-foreground"
                 }`}
               >

@@ -179,21 +179,6 @@ export default function Run() {
           </ScrollReveal>
         )}
 
-        {status === "idle" && elapsed === 0 && (
-          <ScrollReveal delay={0.1}>
-            <Card>
-              <CardContent className="p-4 space-y-3">
-                <h3 className="text-sm font-semibold">Prêt à courir ?</h3>
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <p>📍 GPS connecté — précision élevée</p>
-                  <p>⌚ Aucun appareil connecté</p>
-                  <p>🌤️ 14°C — conditions idéales</p>
-                </div>
-                <Button variant="outline" size="sm" className="w-full">Connecter un appareil</Button>
-              </CardContent>
-            </Card>
-          </ScrollReveal>
-        )}
       </div>
     </div>
   );
