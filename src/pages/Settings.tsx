@@ -231,11 +231,10 @@ const SettingsPage = () => {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      if (!session?.access_token) {
-        throw new Error("No session found");
+      if (!session) {
+        throw new Error("Session introuvable");
       }
 
-      // Call the delete-account Edge Function
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/delete-account`,
         {
@@ -244,11 +243,19 @@ const SettingsPage = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-        }
+        },
       );
 
       if (!response.ok) {
-        throw new Error("Failed to delete account");
+        const errorPayload = await response.json().catch(async () => {
+          const fallbackText = await response.text().catch(() => "");
+          return fallbackText ? { details: fallbackText } : null;
+        });
+        throw new Error(
+          errorPayload?.details ||
+            errorPayload?.error ||
+            "Failed to delete account",
+        );
       }
 
       toast({
@@ -256,16 +263,25 @@ const SettingsPage = () => {
         description: "Votre compte et toutes vos données ont été supprimés.",
       });
 
-      // Sign out and redirect to auth
-      await signOut();
+      setDeleteDialogOpen(false);
+
+      // Clear the local session after the server-side account deletion.
+      await supabase.auth.signOut({ scope: "local" }).catch((error) => {
+        console.warn("Local sign out after account deletion failed:", error);
+      });
+
       navigate("/auth", { replace: true });
     } catch (error) {
       console.error("Error deleting account:", error);
       toast({
         title: "Erreur",
-        description: "Impossible de supprimer le compte. Veuillez réessayer.",
+        description:
+          error instanceof Error
+            ? error.message
+            : "Impossible de supprimer le compte. Veuillez réessayer.",
         variant: "destructive",
       });
+    } finally {
       setIsDeleting(false);
     }
   };

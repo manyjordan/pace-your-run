@@ -135,13 +135,39 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
     payload.goal_type = data.goalType;
   }
 
+  // First try to get the existing profile
+  const { data: existing } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .maybeSingle();
+
+  // If profile doesn't exist, insert it first with minimal data
+  if (!existing) {
+    const { error: insertError } = await supabase
+      .from("profiles")
+      .insert({
+        id: userId,
+        created_at: new Date().toISOString(),
+        ...payload,
+      });
+    
+    if (insertError) throw insertError;
+  } else {
+    // Profile exists, do the update
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", userId);
+    
+    if (updateError) throw updateError;
+  }
+
+  // Fetch and return the updated profile
   const { data: profile, error } = await supabase
     .from("profiles")
-    .upsert(
-      payload,
-      { onConflict: "id" },
-    )
     .select("*")
+    .eq("id", userId)
     .single();
 
   if (error) throw error;

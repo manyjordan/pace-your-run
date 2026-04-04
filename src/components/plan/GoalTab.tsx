@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DistanceSelector } from "@/components/goal/DistanceSelector";
+import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Target, Scale, Route, Trophy, AlertCircle, Calendar as CalendarIcon, Zap } from "lucide-react";
@@ -14,8 +16,15 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, upsertProfile, getRuns } from "@/lib/database";
 import { selectPlan, detectLevel } from "@/lib/planSelector";
-import { getPlanById } from "@/lib/trainingPlans";
 import type { TrainingPlan } from "@/lib/trainingPlans";
+import {
+  calculateWeeksAvailable,
+  mapDistanceToTargetDistance,
+  mapRaceTypeToTargetDistance,
+  normalizeGoalData,
+  racePresetDistance,
+  validateRaceTargetTime,
+} from "@/lib/goalHelpers";
 
 type GoalType = "weight" | "race" | "distance";
 type RaceType = "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
@@ -51,15 +60,6 @@ const defaultData: ProfileGoalData = {
   distanceTargetDate: "",
   level: "beginner",
   selectedPlanId: undefined,
-};
-
-const racePresetDistance: Record<RaceType, string> = {
-  marathon: "42.195",
-  semi: "21.097",
-  "20k": "20",
-  "10k": "10",
-  "5k": "5",
-  other: "",
 };
 
 const goalOptions = [
@@ -139,6 +139,8 @@ export default function GoalTab() {
   const [detectedLevel, setDetectedLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner");
   const [selectedPlan, setSelectedPlan] = useState<TrainingPlan | null>(null);
   const [showPlanPreview, setShowPlanPreview] = useState(false);
+  const [showCustomDistance, setShowCustomDistance] = useState(false);
+  const [showCustomRaceDistance, setShowCustomRaceDistance] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -159,7 +161,8 @@ export default function GoalTab() {
         ]);
 
         const goalData = profile?.goal_data;
-        const newFormData = { ...defaultData, ...(goalData as Partial<ProfileGoalData>) };
+        const normalizedGoalData = normalizeGoalData(goalData as Partial<ProfileGoalData>);
+        const newFormData = { ...defaultData, ...(normalizedGoalData as Partial<ProfileGoalData>) };
 
         // Auto-detect level from running history
         const autoDetectedLevel = detectLevel(runs);
@@ -169,37 +172,33 @@ export default function GoalTab() {
         // Auto-select a plan based on goal data
         if (newFormData.availableDaysPerWeek) {
           const goalType = newFormData.goalType === "race" ? "race" : newFormData.goalType === "distance" ? "distance" : "weight";
-          
-          let targetDistance: "5k" | "10k" | "20k" | "semi" | "marathon" | undefined;
-          if (goalType === "race") {
-            const distMap: Record<RaceType, "5k" | "10k" | "20k" | "semi" | "marathon"> = {
-              "5k": "5k",
-              "10k": "10k",
-              "20k": "20k",
-              "semi": "semi",
-              "marathon": "marathon",
-              "other": "marathon",
-            };
-            targetDistance = distMap[newFormData.raceType];
-          } else if (goalType === "distance") {
-            const km = Number(newFormData.distanceKm);
-            if (km <= 5) targetDistance = "5k";
-            else if (km <= 10) targetDistance = "10k";
-            else if (km <= 20) targetDistance = "20k";
-            else targetDistance = "marathon";
-          }
+          const targetDistance =
+            goalType === "race"
+              ? mapRaceTypeToTargetDistance(newFormData.raceType)
+              : goalType === "distance"
+                ? mapDistanceToTargetDistance(Number(newFormData.distanceKm))
+                : undefined;
+          const weeksAvailable =
+            goalType === "race"
+              ? calculateWeeksAvailable(newFormData.raceTargetDate)
+              : goalType === "distance"
+                ? calculateWeeksAvailable(newFormData.distanceTargetDate)
+                : calculateWeeksAvailable(newFormData.weightTargetDate);
 
           const plan = selectPlan({
             goal: goalType,
             targetDistance,
             level: newFormData.level || "beginner",
             daysPerWeek: Number(newFormData.availableDaysPerWeek),
+            weeksAvailable,
           });
 
           newFormData.selectedPlanId = plan.id;
           setSelectedPlan(plan);
         }
 
+        setShowCustomDistance(Number(newFormData.distanceKm) > 0 && !["5", "10", "20", "21.097", "42.195"].includes(newFormData.distanceKm));
+        setShowCustomRaceDistance(newFormData.raceType === "other");
         setFormData(newFormData);
 
         if (goalData && typeof goalData === "object" && !Array.isArray(goalData)) {
@@ -248,6 +247,65 @@ export default function GoalTab() {
     return "Complétez votre objectif pour afficher un résumé.";
   }, [formData]);
 
+  const activeGoalDetails = useMemo(() => {
+    const details: Array<{ label: string; value: string }> = [];
+
+    if (formData.goalType === "weight") {
+      if (formData.weightKg) details.push({ label: "Poids actuel", value: `${formData.weightKg} kg` });
+      if (formData.targetWeightKg) details.push({ label: "Poids cible", value: `${formData.targetWeightKg} kg` });
+      if (formData.weightTargetDate) {
+        details.push({
+          label: "Date cible",
+          value: format(parse(formData.weightTargetDate, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr }),
+        });
+      }
+    }
+
+    if (formData.goalType === "race") {
+      if (formData.raceDistanceKm) details.push({ label: "Distance", value: `${formData.raceDistanceKm} km` });
+      if (formData.raceTargetTime) details.push({ label: "Temps cible", value: formData.raceTargetTime });
+      if (formData.raceTargetDate) {
+        details.push({
+          label: "Date de course",
+          value: format(parse(formData.raceTargetDate, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr }),
+        });
+      }
+    }
+
+    if (formData.goalType === "distance") {
+      if (formData.distanceKm) details.push({ label: "Distance cible", value: `${formData.distanceKm} km` });
+      if (formData.distanceTargetDate) {
+        details.push({
+          label: "Date cible",
+          value: format(parse(formData.distanceTargetDate, "yyyy-MM-dd", new Date()), "d MMMM yyyy", { locale: fr }),
+        });
+      }
+    }
+
+    if (formData.availableDaysPerWeek) {
+      details.push({ label: "Jours par semaine", value: `${formData.availableDaysPerWeek} jours` });
+    }
+
+    if (formData.level) {
+      details.push({
+        label: "Niveau",
+        value:
+          formData.level === "beginner"
+            ? "Débutant"
+            : formData.level === "intermediate"
+              ? "Intermédiaire"
+              : "Avancé",
+      });
+    }
+
+    return details;
+  }, [formData]);
+
+  const footerMessages = useMemo(() => {
+    if (saveError) return [saveError];
+    return warnings;
+  }, [saveError, warnings]);
+
   const updateField = <K extends keyof ProfileGoalData>(key: K, value: ProfileGoalData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setWarnings([]);
@@ -259,6 +317,12 @@ export default function GoalTab() {
     if (formData.goalType && formData.goalType !== newGoalType && savedAt) {
       setChangeWarning(true);
       setTimeout(() => setChangeWarning(false), 5000);
+    }
+    if (newGoalType !== "distance") {
+      setShowCustomDistance(false);
+    }
+    if (newGoalType !== "race") {
+      setShowCustomRaceDistance(false);
     }
     updateField("goalType", newGoalType);
   };
@@ -272,6 +336,7 @@ export default function GoalTab() {
         raceDistanceKm: presetKm || prev.raceDistanceKm,
       };
     });
+    setShowCustomRaceDistance(value === "other");
     setWarnings([]);
   };
 
@@ -301,6 +366,7 @@ export default function GoalTab() {
       const daysToRace = data.raceTargetDate ? Math.ceil((new Date(data.raceTargetDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
       const weeksToRace = Math.max(1, Math.ceil(daysToRace / 7));
       const raceKm = Number(data.raceDistanceKm) || 0;
+      const targetTimeError = validateRaceTargetTime(raceKm, data.raceTargetTime);
 
       if (raceKm >= 42 && weeksToRace < 8) {
         warns.push("⚠️ Un marathon en moins de 8 semaines n'est pas recommandé. Minimum 10-12 semaines de préparation.");
@@ -311,6 +377,9 @@ export default function GoalTab() {
       if (raceKm >= 10 && weeksToRace < 4) {
         warns.push("⚠️ Un 10 km en moins de 4 semaines laisse peu de temps. Minimum 5-6 semaines recommandées.");
       }
+      if (targetTimeError) {
+        warns.push("⚠️ Le temps cible renseigné semble aberrant.");
+      }
     }
 
     setWarnings(warns);
@@ -318,31 +387,25 @@ export default function GoalTab() {
     // Auto-generate and select plan if form is complete
     if (data.availableDaysPerWeek && data.level) {
       const goalType = data.goalType === "race" ? "race" : data.goalType === "distance" ? "distance" : "weight";
-      
-      let targetDistance: "5k" | "10k" | "20k" | "semi" | "marathon" | undefined;
-      if (goalType === "race") {
-        const distMap: Record<RaceType, "5k" | "10k" | "20k" | "semi" | "marathon"> = {
-          "5k": "5k",
-          "10k": "10k",
-          "20k": "20k",
-          "semi": "semi",
-          "marathon": "marathon",
-          "other": "marathon",
-        };
-        targetDistance = distMap[data.raceType];
-      } else if (goalType === "distance") {
-        const km = Number(data.distanceKm);
-        if (km <= 5) targetDistance = "5k";
-        else if (km <= 10) targetDistance = "10k";
-        else if (km <= 20) targetDistance = "20k";
-        else targetDistance = "marathon";
-      }
+      const targetDistance =
+        goalType === "race"
+          ? mapRaceTypeToTargetDistance(data.raceType)
+          : goalType === "distance"
+            ? mapDistanceToTargetDistance(Number(data.distanceKm))
+            : undefined;
+      const weeksAvailable =
+        goalType === "race"
+          ? calculateWeeksAvailable(data.raceTargetDate)
+          : goalType === "distance"
+            ? calculateWeeksAvailable(data.distanceTargetDate)
+            : calculateWeeksAvailable(data.weightTargetDate);
 
       const plan = selectPlan({
         goal: goalType,
         targetDistance,
         level: data.level,
         daysPerWeek: Number(data.availableDaysPerWeek),
+        weeksAvailable,
       });
 
       setSelectedPlan(plan);
@@ -356,11 +419,22 @@ export default function GoalTab() {
       return;
     }
 
+    if (formData.goalType === "race") {
+      const targetTimeError = validateRaceTargetTime(Number(formData.raceDistanceKm), formData.raceTargetTime);
+      if (targetTimeError) {
+        setSaveError("Le temps cible renseigné semble aberrant.");
+        return;
+      }
+    }
+
     try {
       setSaveError(null);
       // Add goalSavedAt timestamp when saving
       const dataToSave = {
         ...formData,
+        level: formData.level,
+        fitnessLevel: formData.level,
+        daysPerWeek: Number(formData.availableDaysPerWeek),
         goalSavedAt: new Date().toISOString(),
       };
       await upsertProfile(user.id, dataToSave);
@@ -379,15 +453,6 @@ export default function GoalTab() {
 
   return (
     <div className="space-y-4">
-      {saveError && (
-        <ScrollReveal>
-          <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-red-700 dark:text-red-300">{saveError}</p>
-          </div>
-        </ScrollReveal>
-      )}
-
       {changeWarning && (
         <ScrollReveal>
           <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
@@ -418,6 +483,15 @@ export default function GoalTab() {
             <CardContent className={`p-4 space-y-3 ${goalOptions.find(g => g.type === formData.goalType)?.bgColor || ""}`}>
               <div className="space-y-1">
                 <p className="text-sm font-bold">{activeGoalSummary}</p>
+                {activeGoalDetails.length > 0 && (
+                  <div className="space-y-1 pt-2">
+                    {activeGoalDetails.map((detail) => (
+                      <p key={`${detail.label}-${detail.value}`} className="text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{detail.label} :</span> {detail.value}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 <p className="text-xs text-muted-foreground">
                   Cliquez sur changer d'objectif pour revenir aux options poids, course et distance.
                 </p>
@@ -525,14 +599,6 @@ export default function GoalTab() {
         <ScrollReveal delay={0.08}>
           <Card>
             <CardContent className="p-4 space-y-3">
-              {warnings.length > 0 && (
-                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-2.5 flex gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0 flex-shrink-0" />
-                  <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
-                    {warnings.map((w, idx) => <p key={idx}>{w}</p>)}
-                  </div>
-                </div>
-              )}
               <div className="space-y-2">
                 <Label htmlFor="weightKg">Poids actuel (kg)</Label>
                 <Input
@@ -604,14 +670,6 @@ export default function GoalTab() {
         <ScrollReveal delay={0.08}>
           <Card>
             <CardContent className="p-4 space-y-3">
-              {warnings.length > 0 && (
-                <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-2.5 flex gap-2">
-                  <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0 flex-shrink-0" />
-                  <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
-                    {warnings.map((w, idx) => <p key={idx}>{w}</p>)}
-                  </div>
-                </div>
-              )}
               <div className="space-y-2">
                 <Label>Type de course</Label>
                 <Select value={formData.raceType} onValueChange={(value) => updateRaceType(value as RaceType)}>
@@ -628,28 +686,27 @@ export default function GoalTab() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="raceDistanceKm">Distance (km)</Label>
-                <Input
-                  id="raceDistanceKm"
-                  type="number"
-                  min="1"
-                  max="300"
-                  step="0.1"
-                  value={formData.raceDistanceKm}
-                  onChange={(e) => updateField("raceDistanceKm", e.target.value)}
-                  placeholder="Ex: 21.097"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="raceTargetTime">Temps cible (hh:mm)</Label>
-                <Input
-                  id="raceTargetTime"
-                  value={formData.raceTargetTime}
-                  onChange={(e) => updateField("raceTargetTime", e.target.value)}
-                  placeholder="Ex: 03:45"
-                />
-              </div>
+              <DistanceSelector
+                label="Distance (km)"
+                options={["5k", "10k", "20k", "semi", "marathon"]}
+                selectedValue={formData.raceType}
+                customValue={formData.raceType === "other" ? formData.raceDistanceKm : ""}
+                showCustom={showCustomRaceDistance}
+                onSelectPreset={(value) => updateRaceType(value as RaceType)}
+                onToggleCustom={() => {
+                  setShowCustomRaceDistance((current) => !current);
+                  updateRaceType("other");
+                }}
+                onCustomChange={(value) => {
+                  setFormData((prev) => ({ ...prev, raceType: "other", raceDistanceKm: value }));
+                  validateGoal({ ...formData, raceType: "other", raceDistanceKm: value });
+                }}
+              />
+              <GoalTimePicker
+                label="Temps cible"
+                value={formData.raceTargetTime || "00:45:00"}
+                onChange={(value) => updateField("raceTargetTime", value)}
+              />
               <GoalDatePicker
                 id="raceTargetDate"
                 label="Date de la course"
@@ -695,19 +752,44 @@ export default function GoalTab() {
         <ScrollReveal delay={0.08}>
           <Card>
             <CardContent className="p-4 space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="distanceKm">Distance cible (km)</Label>
-                <Input
-                  id="distanceKm"
-                  type="number"
-                  min="1"
-                  max="500"
-                  step="1"
-                  value={formData.distanceKm}
-                  onChange={(e) => updateField("distanceKm", e.target.value)}
-                  placeholder="Ex: 42"
-                />
-              </div>
+              <DistanceSelector
+                label="Distance cible"
+                options={["5k", "10k", "20k", "semi", "marathon"]}
+                selectedValue={
+                  showCustomDistance
+                    ? "other"
+                    : formData.distanceKm === "5"
+                      ? "5k"
+                      : formData.distanceKm === "10"
+                        ? "10k"
+                        : formData.distanceKm === "20"
+                          ? "20k"
+                          : formData.distanceKm === "21.097"
+                            ? "semi"
+                            : formData.distanceKm === "42.195"
+                              ? "marathon"
+                              : ""
+                }
+                customValue={showCustomDistance ? formData.distanceKm : ""}
+                showCustom={showCustomDistance}
+                onSelectPreset={(value) => {
+                  setShowCustomDistance(false);
+                  updateField(
+                    "distanceKm",
+                    value === "5k"
+                      ? "5"
+                      : value === "10k"
+                        ? "10"
+                        : value === "20k"
+                          ? "20"
+                          : value === "semi"
+                            ? "21.097"
+                            : "42.195",
+                  );
+                }}
+                onToggleCustom={() => setShowCustomDistance((current) => !current)}
+                onCustomChange={(value) => updateField("distanceKm", value)}
+              />
               <GoalDatePicker
                 id="distanceTargetDate"
                 label="Date cible"
@@ -782,6 +864,18 @@ export default function GoalTab() {
               </Card>
             </ScrollReveal>
           )}
+          {footerMessages.length > 0 && (
+            <ScrollReveal>
+              <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
+                  {footerMessages.map((message, idx) => (
+                    <p key={`${message}-${idx}`}>{message}</p>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+          )}
           <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
             <Target className="h-4 w-4 mr-2" />
             Sauvegarder profil et plan
@@ -789,10 +883,24 @@ export default function GoalTab() {
         </>
       )}
       {!(isDefining || isChanging) && (
-        <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
-          <Target className="h-4 w-4 mr-2" />
-          Sauvegarder profil et objectif
-        </Button>
+        <>
+          {footerMessages.length > 0 && (
+            <ScrollReveal>
+              <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
+                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+                <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
+                  {footerMessages.map((message, idx) => (
+                    <p key={`${message}-${idx}`}>{message}</p>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+          )}
+          <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
+            <Target className="h-4 w-4 mr-2" />
+            Sauvegarder profil et objectif
+          </Button>
+        </>
       )}
     </div>
   );

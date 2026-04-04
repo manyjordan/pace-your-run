@@ -12,6 +12,16 @@ export const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Missing Supabase environment variables" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Get the JWT from the Authorization header
     const authHeader = req.headers.get("authorization");
     if (!authHeader) {
@@ -25,8 +35,8 @@ export const handler = async (req: Request): Promise<Response> => {
 
     // Create Supabase admin client (with service role key)
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") || "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "",
+      supabaseUrl,
+      serviceRoleKey,
       {
         auth: {
           autoRefreshToken: false,
@@ -50,19 +60,8 @@ export const handler = async (req: Request): Promise<Response> => {
 
     const userId = user.id;
 
-    // Delete user's profile and all related data via cascading delete
-    // (deleting from profiles will cascade to runs, social_posts, post_likes, strava_tokens, training_plan_sessions due to FK constraints)
-    const { error: profileDeleteError } = await supabaseAdmin
-      .from("profiles")
-      .delete()
-      .eq("user_id", userId);
-
-    if (profileDeleteError) {
-      console.error("Error deleting profile:", profileDeleteError);
-      throw profileDeleteError;
-    }
-
-    // Delete the auth user (this will also cascade delete any remaining data)
+    // Delete the auth user. All rows referencing auth.users(id) with ON DELETE CASCADE
+    // are cleaned up automatically by Postgres.
     const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (authDeleteError) {

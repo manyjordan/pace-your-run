@@ -1740,9 +1740,9 @@ export const TRAINING_PLANS: TrainingPlan[] = [
     level: "beginner",
     daysPerWeek: 4,
     durationWeeks: 16,
-    summary: "Quatre sorties hebdomadaires privilégient la régularité : trois footings gérables en semaine et une longue du dimanche qui monte en douceur. Les progressions du mercredi restent modérées pour limiter les pics de fatigue.",
+    summary: "Quatre sorties hebdomadaires privilégient la régularité : trois footings gérables en semaine et une sortie longue du dimanche qui monte en douceur. Les progressions du mercredi restent modérées pour limiter les pics de fatigue.",
     equipmentTips: ["Sac à dos 5 l pour tester l’hydratation sur les longues > 2 h.","Bodyglide ou vaseline sur points de friction dès 15 km.","Casquette pour le soleil et la pluie fine."],
-    nutritionTips: ["Tous les 15 jours, mangez un repas test la veille de longue dominicale.","Sel de l’Himalaya ou bouillon léger si crampes en fin de longue.","Dormir une heure de plus la semaine du pic de volume."],
+    nutritionTips: ["Tous les 15 jours, mangez un repas test la veille de la sortie longue dominicale.","Sel de l’Himalaya ou bouillon léger si crampes en fin de sortie longue.","Dormir une heure de plus la semaine du pic de volume."],
     shoeTips: ["Chaussure daily trainer amortie pour 80 % du kilométrage.","Semelle orthopédique fixée avant 200 km sur la paire marathon."],
     weeklySchedule: [
     {
@@ -1931,9 +1931,9 @@ export const TRAINING_PLANS: TrainingPlan[] = [
     level: "intermediate",
     daysPerWeek: 4,
     durationWeeks: 16,
-    summary: "Le seuil du mercredi et les blocs marathon en fin de longue du dimanche préparent l’effort prolongé sans saturer les jambes chaque jour. Les semaines 4, 8 et 12 coupent le volume pour mieux absorber les pics.",
+    summary: "Le seuil du mercredi et les blocs marathon en fin de sortie longue du dimanche préparent l’effort prolongé sans saturer les jambes chaque jour. Les semaines 4, 8 et 12 coupent le volume pour mieux absorber les pics.",
     equipmentTips: ["Flasques 250 ml pour répéter la stratégie boisson du marathon.","Ceinture porte-gels pour les longues > 24 km.","Lunettes polarisantes si parcours en milieu ouvert."],
-    nutritionTips: ["1 gel toutes les 45′ sur la longue > 2 h 15.","Petit-déjeuner identique chaque dimanche de longue.","Réduire les fibres 36 h avant le test long ou la course."],
+    nutritionTips: ["1 gel toutes les 45′ sur la sortie longue > 2 h 15.","Petit-déjeuner identique chaque dimanche de sortie longue.","Réduire les fibres 36 h avant le test long ou la course."],
     shoeTips: ["Modèle avec bon retour d’énergie pour les blocs marathon.","Gardez une deuxième paire identique en secours si humidité."],
     weeklySchedule: [
     {
@@ -2329,8 +2329,8 @@ export const TRAINING_PLANS: TrainingPlan[] = [
     level: "advanced",
     daysPerWeek: 4,
     durationWeeks: 16,
-    summary: "Les 1000 m au seuil VO2 entretenent la vitesse pendant que la longue intègre des blocs marathon exigeants. La structure respecte un jour de récupération active après chaque séance nerveuse.",
-    equipmentTips: ["Podomètre ou capteur cadence pour analyser la fin de longue.","Rouleau dense pour quadriceps post-seuil.","GPS multi-segments pour les 40′ allure marathon."],
+    summary: "Les 1000 m au seuil VO2 entretiennent la vitesse pendant que la sortie longue intègre des blocs marathon exigeants. La structure respecte un jour de récupération active après chaque séance nerveuse.",
+    equipmentTips: ["Podomètre ou capteur de cadence pour analyser la fin de sortie longue.","Rouleau dense pour quadriceps post-seuil.","GPS multi-segments pour les 40′ à allure marathon."],
     nutritionTips: ["Gels avec caféine seulement si testés sur longue, jamais en première.","Repas fer + vitamine C pour l’hémoglobine sur gros volume.","Hydratation planifiée dès J-3 sur la semaine du marathon."],
     shoeTips: ["Paire compétition réservée aux blocs rapides et au marathon.","Évitez toute nouvelle chaussette le mois de la course."],
     weeklySchedule: [

@@ -3,14 +3,25 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Play, Clock, Map, Zap, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import type { Session } from "@/lib/trainingPlans";
 
-type Session = {
-  day: string;
-  type: string;
-  distanceKm: number;
-  pace: string;
-  color: string;
+const intensityColors: Record<string, string> = {
+  easy: "hsl(200, 80%, 55%)",
+  moderate: "hsl(200, 100%, 50%)",
+  tempo: "hsl(38, 92%, 50%)",
+  interval: "hsl(0, 72%, 51%)",
+  race: "hsl(270, 100%, 60%)",
 };
+
+function getPaceMinutes(pace: string) {
+  const normalizedPace = pace.replace("/km", "");
+  const [minutes, seconds] = normalizedPace.split(":").map(Number);
+  if (Number.isNaN(minutes) || Number.isNaN(seconds)) {
+    return null;
+  }
+
+  return minutes + seconds / 60;
+}
 
 const sessionGuides: Record<string, { description: string; structure: string; benefits: string[] }> = {
   "Intervalles (allure course)": {
@@ -73,10 +84,11 @@ const sessionGuides: Record<string, { description: string; structure: string; be
 export default function SessionDetail({ session, onClose }: { session: Session; onClose: () => void }) {
   const navigate = useNavigate();
   const guide = sessionGuides[session.type] || sessionGuides["Footing facile"];
+  const sessionColor = intensityColors[session.intensity] || intensityColors.easy;
 
   const handleLaunchRun = () => {
     sessionStorage.setItem("pace-session-context", JSON.stringify({
-      targetDistance: session.distanceKm,
+      targetDistance: session.distance,
       targetPace: session.pace,
       sessionType: session.type,
     }));
@@ -84,9 +96,8 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
     onClose();
   };
 
-  const paceNum = session.pace.split(":").map(Number);
-  const pacePerMinute = paceNum[0] + paceNum[1] / 60;
-  const estimatedTime = session.distanceKm * pacePerMinute;
+  const pacePerMinute = getPaceMinutes(session.pace);
+  const estimatedTime = pacePerMinute ? session.distance * pacePerMinute : session.duration;
   const hours = Math.floor(estimatedTime / 60);
   const mins = Math.round(estimatedTime % 60);
 
@@ -101,14 +112,14 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
       >
         <CardContent className="p-6 space-y-4">
           <div className="flex items-start gap-3 pb-4 border-b">
-            <div className="rounded-lg p-2" style={{ backgroundColor: session.color + "30" }}>
-              <Zap className="h-5 w-5" style={{ color: session.color }} />
+            <div className="rounded-lg p-2" style={{ backgroundColor: `${sessionColor}30` }}>
+              <Zap className="h-5 w-5" style={{ color: sessionColor }} />
             </div>
             <div className="flex-1">
               <h2 className="font-bold text-lg">{session.type}</h2>
               <p className="text-xs text-muted-foreground">{session.day}</p>
             </div>
-            <Badge>{session.distanceKm.toFixed(1)} km</Badge>
+            <Badge>{session.distance.toFixed(1)} km</Badge>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
@@ -116,7 +127,7 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
               <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
                 <Map className="h-4 w-4" />
               </div>
-              <p className="font-bold">{session.distanceKm.toFixed(1)}</p>
+              <p className="font-bold">{session.distance.toFixed(1)}</p>
               <p className="text-xs text-muted-foreground">km</p>
             </div>
             <div className="text-center p-3 bg-muted rounded-lg">

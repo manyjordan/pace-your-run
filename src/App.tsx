@@ -7,7 +7,8 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { SplashScreen } from "@/components/SplashScreen";
-import { useState, useEffect, lazy, Suspense } from "react";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useState, useEffect, lazy, Suspense, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import Auth from "./pages/Auth.tsx";
 import EmailConfirmation from "./pages/EmailConfirmation.tsx";
@@ -31,8 +32,15 @@ const HealthKitSync = lazy(() => import("./pages/HealthKitSync.tsx"));
 const queryClient = new QueryClient();
 
 const LazyFallback = () => (
-  <div className="flex items-center justify-center min-h-screen">
-    <Loader2 className="animate-spin h-6 w-6 text-accent" />
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+    <div className="flex flex-col items-center gap-3">
+      <div className="relative">
+        <div className="animate-spin">
+          <div className="h-8 w-8 rounded-full border-4 border-accent/20 border-t-accent" />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">Chargement...</p>
+    </div>
   </div>
 );
 
@@ -83,27 +91,29 @@ const App = () => {
     }
   }, []);
 
-  const handleSplashComplete = () => {
+  const handleSplashComplete = useCallback(() => {
     sessionStorage.setItem("splashShown", "true");
     setShowSplash(false);
-  };
+  }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          {showSplash ? (
-            <SplashScreen onComplete={handleSplashComplete} />
-          ) : (
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          )}
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <AuthProvider>
+            <Toaster />
+            <Sonner />
+            {showSplash ? (
+              <SplashScreen onComplete={handleSplashComplete} />
+            ) : (
+              <BrowserRouter>
+                <AppRoutes />
+              </BrowserRouter>
+            )}
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

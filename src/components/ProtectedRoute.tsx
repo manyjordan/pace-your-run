@@ -12,10 +12,13 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading: authLoading } = useAuth();
   const { needsOnboarding, loading: onboardingLoading, refresh } = useOnboarding();
   const location = useLocation();
+  const onboardingSkipped =
+    typeof window !== "undefined" && user
+      ? localStorage.getItem(`pace-onboarding-skipped:${user.id}`) === "true"
+      : false;
 
-  // Re-check onboarding status when location changes
   useEffect(() => {
-    if (!authLoading && refresh) {
+    if (!authLoading) {
       refresh();
     }
   }, [location.pathname, authLoading, refresh]);
@@ -23,7 +26,10 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   if (authLoading || onboardingLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-accent" />
+          <p className="text-sm text-muted-foreground">Chargement...</p>
+        </div>
       </div>
     );
   }
@@ -32,8 +38,14 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
     return <Navigate to="/auth" replace />;
   }
 
-  // If user needs onboarding and is not already on the onboarding page
-  if (needsOnboarding && location.pathname !== "/onboarding") {
+  // If user needs onboarding and is not already on the onboarding page or settings page
+  if (
+    !onboardingSkipped &&
+    needsOnboarding &&
+    location.pathname !== "/onboarding" &&
+    location.pathname !== "/settings" &&
+    location.pathname !== "/import"
+  ) {
     return <Navigate to="/onboarding" replace />;
   }
 

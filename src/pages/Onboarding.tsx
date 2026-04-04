@@ -1,16 +1,24 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, Footprints, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DistanceSelector } from "@/components/goal/DistanceSelector";
+import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { useAuth } from "@/contexts/AuthContext";
 import { upsertProfile } from "@/lib/database";
+import { sourceConfig } from "@/lib/importInstructions";
+import {
+  calculateWeeksAvailable,
+  mapDistanceToTargetDistance,
+  mapRaceTypeToTargetDistance,
+  validateRaceTargetTime,
+} from "@/lib/goalHelpers";
 import { selectPlan } from "@/lib/planSelector";
-import { getPlanById } from "@/lib/trainingPlans";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -48,7 +56,7 @@ const Onboarding = () => {
   }, [session, navigate]);
 
   const handleNext = () => {
-    if (step < 5) {
+    if (step < 6) {
       setStep(step + 1);
     }
   };
@@ -59,25 +67,26 @@ const Onboarding = () => {
     }
   };
 
-  const handleSkipOnboarding = async () => {
+  const persistOnboardingCompleted = async (payload?: Record<string, unknown>) => {
     if (!session?.user?.id) return;
 
+    await upsertProfile(session.user.id, {
+      onboarding_completed: true,
+      updated_at: new Date().toISOString(),
+      ...payload,
+    });
+
+    localStorage.setItem(`pace-onboarding-skipped:${session.user.id}`, "true");
+  };
+
+  const handleSkipOnboarding = async () => {
+    if (!session?.user?.id) {
+      return;
+    }
+
     try {
-      // On steps 1-4, skip directly to the summary (step 5)
-      if (step < 5) {
-        setStep(5);
-      } else {
-        // Mark onboarding as completed with minimal data
-        await upsertProfile(session.user.id, {
-          onboarding_completed: true,
-          updated_at: new Date().toISOString(),
-        });
-
-        // Add small delay to ensure DB update is replicated
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        navigate("/", { replace: true });
-      }
+      await persistOnboardingCompleted();
+      navigate("/", { replace: true });
     } catch (error) {
       console.error("Error skipping onboarding:", error);
     }
@@ -88,20 +97,37 @@ const Onboarding = () => {
 
     setIsLoading(true);
     try {
-      // Select plan based on collected data
+      const targetDistance =
+        data.goalType === "race"
+          ? mapRaceTypeToTargetDistance(data.raceType || "5k")
+          : data.goalType === "distance"
+            ? mapDistanceToTargetDistance(Number(data.raceDistance || 0))
+            : undefined;
+      const weeksAvailable =
+        data.goalType === "race"
+          ? calculateWeeksAvailable(data.raceTargetDate)
+          : calculateWeeksAvailable(undefined);
+
       const plan = selectPlan({
-        goalType: data.goalType || "distance",
+        goal: data.goalType || "distance",
         daysPerWeek: data.daysPerWeek || 3,
-        weeksAvailable: 12,
+        weeksAvailable,
         level: data.fitnessLevel || "beginner",
-        targetDistance: data.raceType || "5k",
+        targetDistance,
       });
 
       const goalData = {
         goalType: data.goalType,
+        goal_type: data.goalType,
+        level: data.fitnessLevel,
         fitnessLevel: data.fitnessLevel,
+        availableDaysPerWeek: String(data.daysPerWeek || 3),
         daysPerWeek: data.daysPerWeek,
-        ...(data.goalType === "distance" && { raceType: data.raceType, raceDistanceKm: data.raceDistance }),
+        ...(data.goalType === "distance" && {
+          raceType: data.raceType,
+          raceDistanceKm: data.raceDistance,
+          distanceKm: data.raceDistance,
+        }),
         ...(data.goalType === "race" && {
           raceType: data.raceType,
           raceDistanceKm: data.raceDistance,
@@ -112,19 +138,15 @@ const Onboarding = () => {
         goalSavedAt: new Date().toISOString(),
       };
 
-      await upsertProfile(session.user.id, {
+      await persistOnboardingCompleted({
         first_name: data.firstName,
         gender: data.gender,
         date_of_birth: data.dateOfBirth || null,
         goal_type: data.goalType,
         goal_data: goalData,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
       });
 
-      // Add small delay to ensure DB update is replicated
-      await new Promise(resolve => setTimeout(resolve, 500));
-
+      setIsLoading(false);
       navigate("/", { replace: true });
     } catch (error) {
       console.error("Onboarding error:", error);
@@ -137,20 +159,37 @@ const Onboarding = () => {
 
     setIsLoading(true);
     try {
-      // First, complete the onboarding
+      const targetDistance =
+        data.goalType === "race"
+          ? mapRaceTypeToTargetDistance(data.raceType || "5k")
+          : data.goalType === "distance"
+            ? mapDistanceToTargetDistance(Number(data.raceDistance || 0))
+            : undefined;
+      const weeksAvailable =
+        data.goalType === "race"
+          ? calculateWeeksAvailable(data.raceTargetDate)
+          : calculateWeeksAvailable(undefined);
+
       const plan = selectPlan({
-        goalType: data.goalType || "distance",
+        goal: data.goalType || "distance",
         daysPerWeek: data.daysPerWeek || 3,
-        weeksAvailable: 12,
+        weeksAvailable,
         level: data.fitnessLevel || "beginner",
-        targetDistance: data.raceType || "5k",
+        targetDistance,
       });
 
       const goalData = {
         goalType: data.goalType,
+        goal_type: data.goalType,
+        level: data.fitnessLevel,
         fitnessLevel: data.fitnessLevel,
+        availableDaysPerWeek: String(data.daysPerWeek || 3),
         daysPerWeek: data.daysPerWeek,
-        ...(data.goalType === "distance" && { raceType: data.raceType, raceDistanceKm: data.raceDistance }),
+        ...(data.goalType === "distance" && {
+          raceType: data.raceType,
+          raceDistanceKm: data.raceDistance,
+          distanceKm: data.raceDistance,
+        }),
         ...(data.goalType === "race" && {
           raceType: data.raceType,
           raceDistanceKm: data.raceDistance,
@@ -161,19 +200,15 @@ const Onboarding = () => {
         goalSavedAt: new Date().toISOString(),
       };
 
-      await upsertProfile(session.user.id, {
+      await persistOnboardingCompleted({
         first_name: data.firstName,
         gender: data.gender,
         date_of_birth: data.dateOfBirth || null,
         goal_type: data.goalType,
         goal_data: goalData,
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
       });
 
-      // Add small delay to ensure DB update is replicated
-      await new Promise(resolve => setTimeout(resolve, 500));
-
+      setIsLoading(false);
       // Then navigate to import
       navigate("/import", { replace: true });
     } catch (error) {
@@ -210,8 +245,8 @@ const Onboarding = () => {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="text-sm font-semibold text-muted-foreground">{step}/5</span>
-        {step < 5 && (
+        <span className="text-sm font-semibold text-muted-foreground">{step}/6</span>
+        {step < 6 && (
           <button
             onClick={handleSkipOnboarding}
             className="rounded-lg px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
@@ -219,14 +254,19 @@ const Onboarding = () => {
             Ignorer
           </button>
         )}
-        {step === 5 && (
-          <div className="w-12" /> /* Spacer for alignment */
+        {step === 6 && (
+          <button
+            onClick={handleSkipOnboarding}
+            className="rounded-lg px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
+          >
+            Passer
+          </button>
         )}
       </div>
 
       {/* Progress indicator dots */}
       <div className="flex justify-center gap-2 px-4 py-4">
-        {[1, 2, 3, 4, 5].map((dotStep) => (
+        {[1, 2, 3, 4, 5, 6].map((dotStep) => (
           <motion.div
             key={dotStep}
             className="h-1.5 rounded-full transition-all"
@@ -267,7 +307,7 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step2Profile data={data} setData={setData} onNext={handleNext} />
+              <Step2Import onNext={handleNext} />
             </motion.div>
           )}
 
@@ -282,7 +322,7 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step3Level data={data} setData={setData} onNext={handleNext} />
+              <Step2Profile data={data} setData={setData} onNext={handleNext} />
             </motion.div>
           )}
 
@@ -297,7 +337,7 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step4Goal data={data} setData={setData} onNext={handleNext} />
+              <Step3Level data={data} setData={setData} onNext={handleNext} />
             </motion.div>
           )}
 
@@ -305,6 +345,21 @@ const Onboarding = () => {
             <motion.div
               key="step5"
               custom={step > 5 ? 1 : -1}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="space-y-6 py-8"
+            >
+              <Step4Goal data={data} setData={setData} onNext={handleNext} />
+            </motion.div>
+          )}
+
+          {step === 6 && (
+            <motion.div
+              key="step6"
+              custom={step > 6 ? 1 : -1}
               variants={slideVariants}
               initial="enter"
               animate="center"
@@ -421,9 +476,9 @@ function OnboardingDatePicker({
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="w-auto rounded-lg border-border bg-card p-0 shadow-md"
+          className="z-[70] w-auto rounded-lg border-border bg-card p-0 shadow-md"
         >
-          <Calendar
+          <CalendarComponent
             mode="single"
             selected={selectedDate}
             onSelect={(date) => {
@@ -447,260 +502,142 @@ function OnboardingDatePicker({
   );
 }
 
-/* Step 2 — Import Data (OPTIONAL) */
-function Step2Import({
-  onNext,
-  importedCount,
-  setImportedCount,
-}: {
-  onNext: () => void;
-  importedCount: number;
-  setImportedCount: (count: number) => void;
-}) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [isImporting, setIsImporting] = useState(false);
-  const [selectedSource, setSelectedSource] = useState<ImportSource | null>(null);
-  const [expandedSource, setExpandedSource] = useState<ImportSource | null>(null);
-  const { session } = useAuth();
+/* Step 2 — Import Guide */
+function Step2Import({ onNext }: { onNext: () => void }) {
+  const [selectedSource, setSelectedSource] = useState<"strava" | "garmin" | "nike" | "adidas">("strava");
 
-  const sourceKeys = (["strava", "nike", "garmin", "apple"] as const);
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(true);
-  };
-
-  const handleDragLeave = () => {
-    setIsDragging(false);
-  };
-
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    await processFiles(files);
-  };
-
-  const handleFileInput = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    await processFiles(files);
-  };
-
-  const processFiles = async (files: File[]) => {
-    if (!session?.user?.id || files.length === 0) return;
-
-    setIsImporting(true);
-    try {
-      let importedCount = 0;
-
-      for (const file of files) {
-        try {
-          const fileName = file.name.toLowerCase();
-
-          // Handle different file types
-          if (fileName.endsWith(".zip")) {
-            // Strava zip import
-            const zip = new JSZip();
-            const loaded = await zip.loadAsync(file);
-
-            for (const filePath in loaded.files) {
-              if (filePath.endsWith(".gpx")) {
-                const gpxText = await loaded.files[filePath].async("text");
-                const runs = parseGpxText(gpxText);
-                for (const run of runs) {
-                  await saveRun(session.user.id, {
-                    title: run.name,
-                    distance_km: run.distance,
-                    duration_seconds: run.duration,
-                    elevation_gain: run.elevation,
-                    gps_trace: run.gpsTrace,
-                    average_heartrate: run.heartRate,
-                    started_at: run.startedAt,
-                  });
-                  importedCount++;
-                }
-              }
-            }
-          } else if (fileName.endsWith(".gpx")) {
-            // GPX import
-            const gpxText = await file.text();
-            const runs = parseGpxText(gpxText);
-            for (const run of runs) {
-              await saveRun(session.user.id, {
-                title: run.name,
-                distance_km: run.distance,
-                duration_seconds: run.duration,
-                elevation_gain: run.elevation,
-                gps_trace: run.gpsTrace,
-                average_heartrate: run.heartRate,
-                started_at: run.startedAt,
-              });
-              importedCount++;
-            }
-          } else if (fileName.endsWith(".fit")) {
-            // FIT import
-            const arrayBuffer = await file.arrayBuffer();
-            const runs = parseFitArrayBuffer(arrayBuffer);
-            for (const run of runs) {
-              await saveRun(session.user.id, {
-                title: run.name,
-                distance_km: run.distance,
-                duration_seconds: run.duration,
-                elevation_gain: run.elevation,
-                gps_trace: run.gpsTrace,
-                average_heartrate: run.heartRate,
-                started_at: run.startedAt,
-              });
-              importedCount++;
-            }
-          } else if (fileName.endsWith(".xml")) {
-            // Apple Health import
-            const xmlText = await file.text();
-            const runs = parseAppleHealthXml(xmlText);
-            for (const run of runs) {
-              await saveRun(session.user.id, {
-                title: run.name,
-                distance_km: run.distance,
-                duration_seconds: run.duration,
-                elevation_gain: run.elevation,
-                gps_trace: run.gpsTrace,
-                average_heartrate: run.heartRate,
-                started_at: run.startedAt,
-              });
-              importedCount++;
-            }
-          }
-        } catch (error) {
-          console.error(`Error importing ${file.name}:`, error);
-        }
-      }
-
-      setImportedCount(importedCount);
-    } finally {
-      setIsImporting(false);
+  const guides: Record<
+    "strava" | "garmin" | "nike" | "adidas",
+    {
+      label: string;
+      description: string;
+      icon: React.ComponentType<{ className?: string }>;
+      instructions: Array<{ title: string; description: string }>;
     }
+  > = {
+    strava: {
+      label: sourceConfig.strava.label,
+      description: "Téléchargez votre archive complète depuis Strava.",
+      icon: sourceConfig.strava.icon,
+      instructions: sourceConfig.strava.instructions,
+    },
+    garmin: {
+      label: sourceConfig.garmin.label,
+      description: "Exportez une activité ou un fichier depuis Garmin Connect.",
+      icon: sourceConfig.garmin.icon,
+      instructions: sourceConfig.garmin.instructions,
+    },
+    nike: {
+      label: sourceConfig.nike.label,
+      description: "Récupérez votre export Nike Run Club en quelques étapes.",
+      icon: sourceConfig.nike.icon,
+      instructions: sourceConfig.nike.instructions,
+    },
+    adidas: {
+      label: "Adidas Running",
+      description: "Récupérez vos courses depuis l'application Adidas Running.",
+      icon: Footprints,
+      instructions: [
+        {
+          title: "Ouvrez Adidas Running",
+          description: "Depuis votre profil, allez dans les réglages ou la section données personnelles.",
+        },
+        {
+          title: "Demandez l'export de vos données",
+          description: "Recherchez l'option d'export ou de téléchargement de vos activités.",
+        },
+        {
+          title: "Importez le fichier ensuite dans Pace",
+          description: "Une fois le fichier reçu, vous pourrez l'importer plus tard depuis la page Importer.",
+        },
+      ],
+    },
   };
+
+  const activeGuide = guides[selectedSource];
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold">Importer votre historique (optionnel)</h2>
+        <h2 className="text-2xl font-bold">Comment récupérer votre historique</h2>
         <p className="mt-2 text-sm text-muted-foreground">
-          Vos données existantes vous aideront à affiner votre plan d'entraînement
+          Choisissez votre application pour voir comment télécharger vos courses. Vous pourrez les importer plus tard depuis la page Importer.
         </p>
       </div>
 
-      {/* Sources with expandable instructions */}
-      <div className="space-y-2">
-        <p className="text-sm font-semibold">Comment retrouver vos données ?</p>
-        {sourceKeys.map((source) => {
-          const config = sourceConfig[source];
-          const isExpanded = expandedSource === source;
+      <div className="grid grid-cols-2 gap-3">
+        {Object.entries(guides).map(([key, guide]) => {
+          const Icon = guide.icon;
+          const isActive = selectedSource === key;
 
           return (
-            <div key={source} className="rounded-lg border border-border bg-card/50">
-              <button
-                onClick={() => setExpandedSource(isExpanded ? null : source)}
-                className="w-full flex items-center justify-between p-3 transition-colors hover:bg-muted/30"
-              >
-                <div className="flex items-center gap-3 text-left flex-1">
-                  <config.icon className="h-5 w-5 text-accent" />
-                  <div>
-                    <p className="font-semibold text-sm">{config.label}</p>
-                    <p className="text-xs text-muted-foreground">{config.description}</p>
-                  </div>
+            <button
+              key={key}
+              type="button"
+              onClick={() => setSelectedSource(key as "strava" | "garmin" | "nike" | "adidas")}
+              className={`rounded-xl border p-4 text-left transition-all ${
+                isActive ? "border-accent bg-accent/10 shadow-[0_0_0_2px_hsl(var(--accent))]" : "border-border hover:border-accent/50"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
+                  <Icon className="h-5 w-5 text-accent" />
                 </div>
-                <ChevronDown
-                  className={`h-4 w-4 text-muted-foreground transition-transform ${isExpanded ? "rotate-180" : ""}`}
-                />
-              </button>
-
-              {isExpanded && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="overflow-hidden border-t border-border"
-                >
-                  <div className="space-y-3 p-3 bg-muted/10">
-                    {config.instructions.map((instruction, idx) => (
-                      <div key={idx} className="flex gap-3">
-                        <div className="flex items-start gap-3">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-accent/20 text-xs font-bold text-accent flex-shrink-0">
-                            {idx + 1}
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold">{instruction.title}</p>
-                            <p className="text-xs text-muted-foreground">{instruction.description}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </motion.div>
-              )}
-            </div>
+                <div>
+                  <p className="font-semibold">{guide.label}</p>
+                  <p className="text-xs text-muted-foreground">{guide.description}</p>
+                </div>
+              </div>
+            </button>
           );
         })}
       </div>
 
-      {/* Upload zone */}
-      <div className="space-y-3">
-        <p className="text-sm font-semibold">Importer vos fichiers</p>
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          className={`rounded-lg border-2 border-dashed p-8 text-center transition-colors ${
-            isDragging ? "border-accent bg-accent/10" : "border-border"
-          }`}
-        >
-          <Upload className="mx-auto h-8 w-8 text-muted-foreground" />
-          <p className="mt-3 font-semibold">Déposez vos fichiers ici</p>
-          <p className="text-sm text-muted-foreground">ou</p>
-          <Label htmlFor="fileInput" className="mt-3 inline-block cursor-pointer text-accent hover:underline">
-            parcourez votre appareil
-          </Label>
-          <input
-            id="fileInput"
-            type="file"
-            multiple
-            accept=".gpx,.fit,.xml,.zip"
-            onChange={handleFileInput}
-            disabled={isImporting}
-            className="hidden"
-          />
+      <div className="rounded-xl border border-border bg-card/50 p-4">
+        <div className="mb-4 flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
+            <activeGuide.icon className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <p className="font-semibold">{activeGuide.label}</p>
+            <p className="text-sm text-muted-foreground">Étapes recommandées</p>
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {activeGuide.instructions.map((instruction, index) => (
+            <div key={instruction.title} className="flex items-start gap-3 rounded-lg bg-background/60 p-3">
+              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent/20 text-xs font-bold text-accent">
+                {index + 1}
+              </div>
+              <div>
+                <p className="font-semibold">{instruction.title}</p>
+                <p className="text-sm text-muted-foreground">{instruction.description}</p>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
-      {importedCount > 0 && (
-        <div className="rounded-lg bg-green-500/10 p-3 text-sm text-green-700">
-          ✓ {importedCount} activité{importedCount > 1 ? "s" : ""} importée{importedCount > 1 ? "s" : ""} avec succès
-        </div>
-      )}
+      <Button asChild variant="outline" className="w-full">
+        <Link to="/import">
+          {selectedSource === "strava"
+            ? "Importer le fichier ZIP ici"
+            : selectedSource === "garmin"
+              ? "Importer mon fichier ici"
+              : selectedSource === "nike"
+                ? "Importer mon fichier GPX ici"
+                : "Ouvrir l'import de fichier"}
+        </Link>
+      </Button>
 
-      <div className="flex gap-3">
-        <Button
-          onClick={onNext}
-          disabled={isImporting}
-          variant="outline"
-          className="flex-1"
-        >
-          {isImporting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Import en cours...
-            </>
-          ) : (
-            "Passer cette étape"
-          )}
-        </Button>
-        <Button
-          onClick={onNext}
-          disabled={isImporting}
-          className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
-        >
-          Suivant
+      <div className="space-y-3">
+        <p className="text-center text-sm text-muted-foreground">
+          Vous pouvez passer à l'étape suivante sans importer de données.
+        </p>
+        <Button onClick={onNext} className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
+          Passer à l'étape suivante sans importer de données
+          <ChevronRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
@@ -860,6 +797,15 @@ function Step4Goal({
   setData: (data: OnboardingData) => void;
   onNext: () => void;
 }) {
+  const [showCustomDistance, setShowCustomDistance] = useState(
+    data.goalType === "distance" && data.raceType === "other",
+  );
+  const [showCustomRaceDistance, setShowCustomRaceDistance] = useState(
+    data.goalType === "race" && data.raceType === "other",
+  );
+  const raceDistanceKm = Number(data.raceDistance || 0);
+  const targetTimeError =
+    data.goalType === "race" ? validateRaceTargetTime(raceDistanceKm, data.raceTargetTime || "") : null;
   const goals = [
     {
       id: "weight",
@@ -908,78 +854,70 @@ function Step4Goal({
       {/* Distance selector */}
       {data.goalType === "distance" && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-          <Label>Distance cible</Label>
-          <div className="grid grid-cols-2 gap-2">
-            {(["5k", "10k", "20k", "semi", "marathon"] as const).map((dist) => (
-              <motion.button
-                key={dist}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setData({ ...data, raceType: dist, raceDistance: undefined })}
-                className={`rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all ${
-                  data.raceType === dist && data.raceDistance === undefined
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-border text-muted-foreground hover:border-accent/50"
-                }`}
-              >
-                {dist.toUpperCase()}
-              </motion.button>
-            ))}
-          </div>
-          
-          {/* Custom distance option */}
-          <div className="space-y-2">
-            <Label htmlFor="customDistance">Ou choisir une distance personnalisée</Label>
-            <Input
-              id="customDistance"
-              type="number"
-              placeholder="ex: 30 km"
-              value={data.raceDistance && data.raceType === "other" ? data.raceDistance : ""}
-              onChange={(e) => setData({ ...data, raceType: "other" as any, raceDistance: e.target.value })}
-              className="border-border"
-            />
-            {data.raceDistance && data.raceType === "other" && (
-              <p className="text-xs text-accent">Distance personnalisée: {data.raceDistance} km</p>
-            )}
-          </div>
+          <DistanceSelector
+            label="Distance cible"
+            options={["5k", "10k", "20k", "semi", "marathon"]}
+            selectedValue={data.raceType || ""}
+            customValue={data.raceType === "other" ? data.raceDistance || "" : ""}
+            showCustom={showCustomDistance}
+            onSelectPreset={(value) => {
+              setShowCustomDistance(false);
+              setData({
+                ...data,
+                raceType: value as OnboardingData["raceType"],
+                raceDistance:
+                  value === "5k"
+                    ? "5"
+                    : value === "10k"
+                      ? "10"
+                      : value === "20k"
+                        ? "20"
+                        : value === "semi"
+                          ? "21.097"
+                          : "42.195",
+              });
+            }}
+            onToggleCustom={() => {
+              setShowCustomDistance((current) => !current);
+              setData({ ...data, raceType: "other", raceDistance: data.raceDistance });
+            }}
+            onCustomChange={(value) => setData({ ...data, raceType: "other", raceDistance: value })}
+          />
         </motion.div>
       )}
 
       {/* Race selector */}
       {data.goalType === "race" && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-          <Label>Distance de la course</Label>
-          <div className="grid grid-cols-2 gap-2 mb-4">
-            {(["5k", "10k", "20k", "semi", "marathon"] as const).map((dist) => (
-              <motion.button
-                key={dist}
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setData({ ...data, raceType: dist, raceDistance: undefined })}
-                className={`rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all ${
-                  data.raceType === dist && data.raceDistance === undefined
-                    ? "border-accent bg-accent/10 text-accent"
-                    : "border-border text-muted-foreground hover:border-accent/50"
-                }`}
-              >
-                {dist.toUpperCase()}
-              </motion.button>
-            ))}
-          </div>
-
-          {/* Custom race distance option */}
-          <div className="space-y-2">
-            <Label htmlFor="customRaceDistance">Ou choisir une distance personnalisée</Label>
-            <Input
-              id="customRaceDistance"
-              type="number"
-              placeholder="ex: 30 km"
-              value={data.raceDistance && data.raceType === "other" ? data.raceDistance : ""}
-              onChange={(e) => setData({ ...data, raceType: "other" as any, raceDistance: e.target.value })}
-              className="border-border"
-            />
-            {data.raceDistance && data.raceType === "other" && (
-              <p className="text-xs text-accent">Distance personnalisée: {data.raceDistance} km</p>
-            )}
-          </div>
+          <DistanceSelector
+            label="Distance de la course"
+            options={["5k", "10k", "20k", "semi", "marathon"]}
+            selectedValue={data.raceType || ""}
+            customValue={data.raceType === "other" ? data.raceDistance || "" : ""}
+            showCustom={showCustomRaceDistance}
+            onSelectPreset={(value) => {
+              setShowCustomRaceDistance(false);
+              setData({
+                ...data,
+                raceType: value as OnboardingData["raceType"],
+                raceDistance:
+                  value === "5k"
+                    ? "5"
+                    : value === "10k"
+                      ? "10"
+                      : value === "20k"
+                        ? "20"
+                        : value === "semi"
+                          ? "21.097"
+                          : "42.195",
+              });
+            }}
+            onToggleCustom={() => {
+              setShowCustomRaceDistance((current) => !current);
+              setData({ ...data, raceType: "other", raceDistance: data.raceDistance });
+            }}
+            onCustomChange={(value) => setData({ ...data, raceType: "other", raceDistance: value })}
+          />
 
           <OnboardingDatePicker
             id="raceDate"
@@ -989,24 +927,24 @@ function Step4Goal({
           />
 
           <div className="space-y-3">
-            <Label htmlFor="raceTime">Objectif de temps (mm:ss)</Label>
-            <Input
-              id="raceTime"
-              type="text"
-              placeholder="ex: 45:30"
-              value={data.raceTargetTime || ""}
-              onChange={(e) => setData({ ...data, raceTargetTime: e.target.value })}
-              className="border-border"
-              required
+            <GoalTimePicker
+              label="Objectif de temps"
+              value={data.raceTargetTime || "00:45:00"}
+              onChange={(time) => setData({ ...data, raceTargetTime: time })}
             />
             <p className="text-xs text-muted-foreground">Ce temps sera utilisé pour personnaliser votre plan d'entraînement</p>
+            {targetTimeError ? <p className="text-xs text-destructive">{targetTimeError}</p> : null}
           </div>
         </motion.div>
       )}
 
       <Button
         onClick={onNext}
-        disabled={!data.goalType || (data.goalType !== "weight" && !data.raceType) || (data.goalType === "race" && !data.raceTargetTime)}
+        disabled={
+          !data.goalType ||
+          (data.goalType !== "weight" && !data.raceType) ||
+          (data.goalType === "race" && (!data.raceTargetTime || Boolean(targetTimeError)))
+        }
         className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
       >
         Suivant

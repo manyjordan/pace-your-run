@@ -4,11 +4,9 @@ import { Activity, List, TrendingUp, Heart, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, getRuns } from "@/lib/database";
-import { getPlanById } from "@/lib/trainingPlans";
+import { getProfile, getRuns, type RunRow } from "@/lib/database";
+import { normalizeGoalData } from "@/lib/goalHelpers";
 import {
-  connectStrava,
-  getLatestActivity,
   type StravaActivity,
 } from "@/lib/strava";
 import { ActivityDetail } from "@/components/ActivityDetail";
@@ -42,9 +40,9 @@ const Dashboard = () => {
   const { session } = useAuth();
   const [activities, setActivities] = useState<StravaActivity[]>([]);
   const [athleteName, setAthleteName] = useState("Coureur");
-  const [stravaConnected, setStravaConnected] = useState(false);
   const [userGoal, setUserGoal] = useState<ProfileGoalData | null>(null);
   const [runCount, setRunCount] = useState(0);
+  const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [selectedActivityForDetail, setSelectedActivityForDetail] = useState<StravaActivity | null>(null);
 
   const handleCloseActivityDetail = () => {
@@ -61,8 +59,6 @@ const Dashboard = () => {
         });
         const data = await response.json();
 
-        setStravaConnected(Boolean(data?.connected));
-
         if (data?.athlete) {
           const fullName = `${data.athlete.firstname ?? ""} ${data.athlete.lastname ?? ""}`.trim();
           if (fullName) {
@@ -74,7 +70,6 @@ const Dashboard = () => {
           setActivities(data.activities as StravaActivity[]);
         }
       } catch {
-        setStravaConnected(false);
         setActivities([]);
       }
     };
@@ -93,10 +88,12 @@ const Dashboard = () => {
         ]);
 
         setRunCount(runs.length);
+        setRecentRuns(runs);
+        if (profile?.first_name?.trim()) {
+          setAthleteName(profile.first_name.trim());
+        }
         if (profile?.goal_data && typeof profile.goal_data === "object" && !Array.isArray(profile.goal_data)) {
-          setUserGoal({
-            ...profile.goal_data,
-          } as ProfileGoalData);
+          setUserGoal(normalizeGoalData(profile.goal_data as ProfileGoalData) as ProfileGoalData);
           return;
         }
 
@@ -104,6 +101,7 @@ const Dashboard = () => {
       } catch {
         setUserGoal(null);
         setRunCount(0);
+        setRecentRuns([]);
       }
     };
 
@@ -113,11 +111,9 @@ const Dashboard = () => {
 
     void loadUserGoal();
 
-    if (session) {
-      const jwt = session.access_token;
-      void loadStravaActivities(jwt);
+    if (session?.access_token) {
+      void loadStravaActivities(session.access_token);
     } else {
-      setStravaConnected(false);
       setActivities([]);
     }
 
@@ -127,7 +123,7 @@ const Dashboard = () => {
       window.removeEventListener("pace-goal-updated", handleGoalUpdate);
       window.removeEventListener("pace-runs-updated", handleGoalUpdate);
     };
-  }, [session]);
+  }, [session?.access_token, session?.user?.id]);
 
   const runningActivities = useMemo(
     () => activities.filter(isRunActivity),
@@ -150,13 +146,6 @@ const Dashboard = () => {
     [metricCards, userGoal],
   );
 
-  const stravaAuthUrl = useMemo(() => {
-    if (!session) return "";
-    return connectStrava(session.access_token);
-  }, [session]);
-
-  const latestActivity = useMemo(() => getLatestActivity(runningActivities), [runningActivities]);
-
   return (
     <div className="space-y-6">
       {selectedActivityForDetail && (
@@ -169,29 +158,24 @@ const Dashboard = () => {
 
       <ScrollReveal>
         <div className="rounded-2xl border border-accent/70 bg-accent px-5 py-5 text-accent-foreground shadow-[0_18px_44px_hsl(var(--accent)/0.2)]">
-          <div className="flex flex-col gap-1">
-            {stravaConnected ? (
-              <>
-                <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                  Bonjour, <span className="text-accent-foreground">{athleteName}</span>
-                </h1>
-                <p className="text-sm text-accent-foreground/80">{weeklyInsight}</p>
-              </>
-            ) : (
-              <>
-                <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                  Bonjour, connecte ton strava pour avoir toutes les informations ici
-                </h1>
-                <div className="mt-3">
-                  <a
-                    href={stravaAuthUrl}
-                    className="inline-flex items-center justify-center rounded-lg border border-accent-foreground/20 bg-accent-foreground px-3 py-2 text-xs font-semibold text-accent transition-opacity hover:opacity-90"
-                  >
-                    Connecter mon compte Strava
-                  </a>
-                </div>
-              </>
-            )}
+          <div className="flex flex-col gap-3">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+                Bonjour <span className="text-accent-foreground">{athleteName}</span>
+              </h1>
+              <p className="mt-1 text-sm text-accent-foreground/80">{weeklyInsight}</p>
+            </div>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-accent-foreground/80">
+                Importez votre historique pour enrichir vos stats, vos dernières activités et vos futurs plans.
+              </p>
+              <Link
+                to="/import"
+                className="inline-flex items-center justify-center rounded-lg border border-accent-foreground/20 bg-accent-foreground px-3 py-2 text-xs font-semibold text-accent transition-opacity hover:opacity-90"
+              >
+                Importer mon historique
+              </Link>
+            </div>
           </div>
         </div>
       </ScrollReveal>
@@ -248,11 +232,8 @@ const Dashboard = () => {
 
         <TabsContent value="dashboard">
           <DashboardSection
-            metricCards={metricCards}
-            latestActivity={latestActivity}
+            recentRuns={recentRuns}
             userGoal={userGoal}
-            activities={runningActivities}
-            onOpenActivityDetail={setSelectedActivityForDetail}
             filteredMetrics={filteredMetrics}
           />
         </TabsContent>

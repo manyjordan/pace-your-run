@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getWeekSessions, toggleSessionCompleted } from "@/lib/database";
+import { normalizeGoalData } from "@/lib/goalHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
 import SessionDetail from "./SessionDetail";
 import type { TrainingPlan, Session } from "@/lib/trainingPlans";
@@ -46,6 +47,60 @@ const intensityLabels: Record<string, string> = {
   race: "Course",
 };
 
+function getSessionBadge(session: Session) {
+  const type = session.type.toLowerCase();
+  const description = session.description.toLowerCase();
+
+  if (type.includes("récup")) {
+    return {
+      label: "Récup",
+      color: intensityColors.easy,
+    };
+  }
+
+  if (type.includes("longue")) {
+    return {
+      label: description.includes("allure marathon") || session.intensity === "moderate" ? "Spécifique" : "Longue",
+      color: description.includes("allure marathon") || session.intensity === "moderate"
+        ? intensityColors.moderate
+        : intensityColors.easy,
+    };
+  }
+
+  if (type.includes("facile")) {
+    return {
+      label: "Endurance",
+      color: intensityColors.easy,
+    };
+  }
+
+  if (type.includes("seuil")) {
+    return {
+      label: "Seuil",
+      color: intensityColors.tempo,
+    };
+  }
+
+  if (type.includes("tempo")) {
+    return {
+      label: "Tempo",
+      color: intensityColors.tempo,
+    };
+  }
+
+  if (type.includes("interval")) {
+    return {
+      label: "Intervalles",
+      color: intensityColors.interval,
+    };
+  }
+
+  return {
+    label: intensityLabels[session.intensity] || "Séance",
+    color: intensityColors[session.intensity] || intensityColors.easy,
+  };
+}
+
 const defaultProfile: ProfileGoalData = {
   goalType: "weight",
   availableDaysPerWeek: "3",
@@ -85,7 +140,10 @@ export default function TrainingTab() {
         const goalData = profileRow?.goal_data;
 
         if (goalData && typeof goalData === "object" && !Array.isArray(goalData)) {
-          const newProfile = { ...defaultProfile, ...(goalData as Partial<ProfileGoalData>) };
+          const newProfile = {
+            ...defaultProfile,
+            ...(normalizeGoalData(goalData as Partial<ProfileGoalData>) as Partial<ProfileGoalData>),
+          };
           setProfile(newProfile);
 
           // Load the selected plan
@@ -157,6 +215,44 @@ export default function TrainingTab() {
   const progressPercentage = useMemo(() => {
     if (!selectedPlan) return 0;
     return Math.round((currentWeek / selectedPlan.durationWeeks) * 100);
+  }, [selectedPlan, currentWeek]);
+
+  const groupedPhaseOverview = useMemo(() => {
+    if (!selectedPlan) return [];
+
+    const totalWeeks = selectedPlan.durationWeeks;
+    const taperWeeks = totalWeeks >= 12 ? 2 : 1;
+    const picWeek = Math.max(totalWeeks - taperWeeks, 1);
+    const taperStart = Math.min(picWeek + 1, totalWeeks);
+    const buildEnd = Math.max(picWeek - 1, 1);
+    const baseEnd = totalWeeks >= 8 ? Math.max(2, Math.round(totalWeeks * 0.35)) : 0;
+
+    const rawPhases = [
+      baseEnd > 0
+        ? { label: "Base", startWeek: 1, endWeek: Math.min(baseEnd, buildEnd) }
+        : null,
+      {
+        label: "Build",
+        startWeek: baseEnd > 0 ? Math.min(baseEnd + 1, buildEnd) : 1,
+        endWeek: buildEnd,
+      },
+      totalWeeks > 1 ? { label: "Pic", startWeek: picWeek, endWeek: picWeek } : null,
+      { label: "Affûtage", startWeek: taperStart, endWeek: totalWeeks },
+    ].filter((phase): phase is { label: string; startWeek: number; endWeek: number } =>
+      Boolean(phase && phase.startWeek <= phase.endWeek),
+    );
+
+    return rawPhases.map((phase) => {
+      const weeks = selectedPlan.weeklySchedule.filter(
+        (week) => week.week >= phase.startWeek && week.week <= phase.endWeek,
+      );
+
+      return {
+        ...phase,
+        isCurrent: currentWeek >= phase.startWeek && currentWeek <= phase.endWeek,
+        focuses: [...new Set(weeks.map((week) => week.focus))].slice(0, 3),
+      };
+    });
   }, [selectedPlan, currentWeek]);
 
   const nextWeek = () => {
@@ -267,6 +363,37 @@ export default function TrainingTab() {
         </div>
       </ScrollReveal>
 
+      <ScrollReveal>
+        <div className="rounded-xl border border-border bg-card p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-semibold">Étapes du plan</h2>
+            <Badge variant="outline" className="text-[10px]">
+              {groupedPhaseOverview.length} phases
+            </Badge>
+          </div>
+          <div className="grid gap-2 md:grid-cols-2">
+            {groupedPhaseOverview.map((phase) => (
+              <div
+                key={`${phase.label}-${phase.startWeek}-${phase.endWeek}`}
+                className={`rounded-lg border p-3 ${phase.isCurrent ? "border-accent bg-accent/10" : "border-border bg-muted/20"}`}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold">
+                    {phase.startWeek === phase.endWeek
+                      ? `Semaine ${phase.startWeek}`
+                      : `Semaines ${phase.startWeek}-${phase.endWeek}`}
+                  </p>
+                  <Badge variant="outline" className="text-[10px]">
+                    {phase.label}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">{phase.focuses.join(" · ")}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </ScrollReveal>
+
       {/* Semaine actuelle */}
       <ScrollReveal>
         <div className="rounded-xl border border-border bg-card p-5">
@@ -285,11 +412,20 @@ export default function TrainingTab() {
             {currentWeekData.sessions.map((session, i) => {
               const isCompleted = isSessionCompleted(session);
               const isToggling = completingSession === `${session.day}-${session.type}`;
+              const sessionBadge = getSessionBadge(session);
               
               return (
                 <ScrollReveal key={`${currentWeek}-${i}`} delay={i * 0.05}>
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     onClick={() => setSelectedSession(session)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedSession(session);
+                      }
+                    }}
                     className="w-full flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50 cursor-pointer"
                   >
                     <button
@@ -313,17 +449,17 @@ export default function TrainingTab() {
                     <div className="w-12 text-xs font-semibold text-muted-foreground">{session.day}</div>
                     <div className="flex-1 text-left">
                       <p className={`text-sm font-semibold ${isCompleted ? "line-through text-muted-foreground" : ""}`}>{session.type}</p>
-                      <p className="text-xs text-muted-foreground">{session.distance.toFixed(1)} km · {session.pace}/km · {session.duration} min</p>
+                      <p className="text-xs text-muted-foreground">{session.distance.toFixed(1)} km · {session.pace} · {session.duration} min</p>
                     </div>
                     <Badge
                       variant="outline"
                       className="text-[10px]"
-                      style={{ color: intensityColors[session.intensity] || intensityColors["easy"], borderColor: intensityColors[session.intensity] || intensityColors["easy"] }}
+                      style={{ color: sessionBadge.color, borderColor: sessionBadge.color }}
                     >
-                      {intensityLabels[session.intensity] || "Facile"}
+                      {sessionBadge.label}
                     </Badge>
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
+                  </div>
                 </ScrollReveal>
               );
             })}

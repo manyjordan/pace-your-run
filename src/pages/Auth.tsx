@@ -35,6 +35,8 @@ const Auth = () => {
 
       if (error) throw error;
 
+      // Wait for session to be established
+      await new Promise(resolve => setTimeout(resolve, 500));
       navigate("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to sign in");

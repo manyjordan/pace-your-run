@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { activityToCommunityPost, type StravaActivity } from "@/lib/strava";
 import { ActivityPostCard } from "@/components/ActivityPostCard";
@@ -26,7 +27,10 @@ export const ActivitySection = ({
   if (activityPosts.length === 0) {
     return (
       <div className="rounded-xl border border-accent/20 bg-card p-5 text-sm text-muted-foreground">
-        Aucune activité Strava trouvée.
+        Aucune activité trouvée, si tu as de l'historique réalisée sur d'autres applications ou supports,{" "}
+        <Link to="/import" className="font-medium text-accent underline underline-offset-4">
+          importe les données. Clique ici pour savoir comment faire
+        </Link>
       </div>
     );
   }
