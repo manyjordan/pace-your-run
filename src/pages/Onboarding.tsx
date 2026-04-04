@@ -65,6 +65,25 @@ const Onboarding = () => {
     }
   };
 
+  const handleSkipOnboarding = async () => {
+    if (!session?.user?.id) return;
+
+    try {
+      // Mark onboarding as completed with minimal data
+      await upsertProfile(session.user.id, {
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Add small delay to ensure DB update is replicated
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      navigate("/", { replace: true });
+    } catch (error) {
+      console.error("Error skipping onboarding:", error);
+    }
+  };
+
   const handleComplete = async () => {
     if (!session?.user?.id) return;
 
@@ -137,13 +156,18 @@ const Onboarding = () => {
       <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm">
         <button
           onClick={handleBack}
-          disabled={step === 1 || isLoading}
+          disabled={step === 1}
           className="rounded-lg p-2 text-accent disabled:opacity-50"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
         <span className="text-sm font-semibold text-muted-foreground">{step}/6</span>
-        <div className="w-10" />
+        <button
+          onClick={handleSkipOnboarding}
+          className="rounded-lg px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
+        >
+          Ignorer
+        </button>
       </div>
 
       {/* Progress indicator dots */}
@@ -276,7 +300,7 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
       <div className="space-y-4">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
-            <span className="text-lg font-bold text-accent">✓</span>
+            <span className="text-lg font-bold text-accent">•</span>
           </div>
           <div className="text-left">
             <p className="font-semibold">Plans d'entraînement adaptés à votre niveau</p>
@@ -286,7 +310,7 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
 
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
-            <span className="text-lg font-bold text-accent">📊</span>
+            <span className="text-lg font-bold text-accent">•</span>
           </div>
           <div className="text-left">
             <p className="font-semibold">Suivez vos performances en temps réel</p>
@@ -296,7 +320,7 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
 
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
-            <span className="text-lg font-bold text-accent">👥</span>
+            <span className="text-lg font-bold text-accent">•</span>
           </div>
           <div className="text-left">
             <p className="font-semibold">Rejoignez une communauté de coureurs</p>
@@ -306,7 +330,7 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
 
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20">
-            <span className="text-lg font-bold text-accent">📥</span>
+            <span className="text-lg font-bold text-accent">•</span>
           </div>
           <div className="text-left">
             <p className="font-semibold">Importez votre historique existant</p>
@@ -690,8 +714,7 @@ function Step3Profile({
                   : "border-border hover:border-accent/50"
               }`}
             >
-              <div className="text-3xl">{gender === "homme" ? "👨" : "👩"}</div>
-              <p className="mt-2 font-semibold capitalize">{gender}</p>
+              <p className="font-semibold capitalize">{gender}</p>
             </motion.button>
           ))}
         </div>

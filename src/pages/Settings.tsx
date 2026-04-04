@@ -29,8 +29,9 @@ const settingsGroups = [
     title: "Appareils connectés",
     icon: Watch,
     items: [
+      { label: "Apple Santé & Apple Watch", status: "", connected: true, isHealthKit: true },
+      { label: "Capteur cardiaque Bluetooth", status: "", connected: true, isBluetooth: true },
       { label: "Garmin Connect", status: "Connecté", connected: true },
-      { label: "Apple Watch", status: "Non connecté", connected: false },
       { label: "Synchronisation Strava", status: "Connecté", connected: true },
     ],
   },
@@ -178,6 +179,38 @@ const SettingsPage = () => {
                         <span className="text-xs text-muted-foreground">{item.status}</span>
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
+                    </button>
+                  );
+                }
+
+                if (item.isHealthKit) {
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => navigate("/healthkit")}
+                      className="w-full flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <span className="text-sm">{item.label}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  );
+                }
+
+                if (item.isBluetooth) {
+                  return (
+                    <button
+                      key={item.label}
+                      onClick={() => {
+                        // Open BLE connect flow - can be implemented as a modal or action
+                        toast({
+                          title: "Capteur cardiaque Bluetooth",
+                          description: "Cherche et connecte un capteur cardiaque disponible",
+                        });
+                      }}
+                      className="w-full flex items-center justify-between rounded-lg p-3 transition-colors hover:bg-muted/50"
+                    >
+                      <span className="text-sm">{item.label}</span>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </button>
                   );
                 }

@@ -20,6 +20,7 @@ import Plan from "./pages/Plan.tsx";
 import Health from "./pages/Health.tsx";
 import ImportPage from "./pages/Import.tsx";
 import SettingsPage from "./pages/Settings.tsx";
+import HealthKitSync from "./pages/HealthKitSync.tsx";
 import StravaCallback from "./pages/StravaCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
@@ -45,6 +46,7 @@ function AppRoutes() {
                 <Route path="/plan" element={<Plan />} />
                 <Route path="/health" element={<Health />} />
                 <Route path="/import" element={<ImportPage />} />
+                <Route path="/healthkit" element={<HealthKitSync />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/auth/strava/callback" element={<StravaCallback />} />
                 <Route path="*" element={<NotFound />} />
