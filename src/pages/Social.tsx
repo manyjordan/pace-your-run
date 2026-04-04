@@ -6,11 +6,26 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Heart, MessageCircle, Share2, MapPin, Clock, Zap, Trophy, Image as ImageIcon, Send, Search, UserPlus } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  Heart,
+  MessageCircle,
+  Share2,
+  MapPin,
+  Clock,
+  Zap,
+  Trophy,
+  Image as ImageIcon,
+  Send,
+  Search,
+  UserPlus,
+  Users,
+  AlertTriangle,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import GPSMap from "@/components/GPSMap";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPublicPosts, toggleLike as togglePostLike, type PublicPostRecord, type RunRow } from "@/lib/database";
+import { useNavigate } from "react-router-dom";
 import {
   formatDuration,
   formatPace,
@@ -130,65 +145,7 @@ function mapPublicPostToFeedPost(post: PublicPostRecord): FeedPost {
   };
 }
 
-const feedPosts: FeedPost[] = [
-  {
-    activityId: 1,
-    id: 1,
-    user: "Léa Martin",
-    initials: "LM",
-    time: "Il y a 2h",
-    type: "run" as const,
-    title: "Sortie tempo au bord du canal 🏃‍♀️",
-    description: "Super session ce matin ! 12 km à 4:45/km en moyenne. Les jambes étaient légères après deux jours de repos.",
-    stats: { distance: "12.3 km", pace: "4:45 /km", duration: "58:27", elevation: "+45 m" },
-    likes: 24,
-    comments: 6,
-    liked: false,
-  },
-  {
-    activityId: 2,
-    id: 2,
-    user: "Thomas Dubois",
-    initials: "TD",
-    time: "Il y a 4h",
-    type: "race" as const,
-    title: "Semi-marathon de Lyon 🏅",
-    description: "PR cassé ! 1h28:12 — objectif sub-1h30 atteint. Merci à tous pour le soutien pendant la prépa !",
-    stats: { distance: "21.1 km", pace: "4:11 /km", duration: "1:28:12", elevation: "+120 m" },
-    likes: 87,
-    comments: 23,
-    liked: true,
-  },
-  {
-    activityId: 3,
-    id: 3,
-    user: "Marie Lefevre",
-    initials: "ML",
-    time: "Il y a 6h",
-    type: "run" as const,
-    title: "Récup active en forêt 🌲",
-    description: "Petite sortie tranquille à 6:00/km. Parfait pour la récup après les fracs de mardi.",
-    stats: { distance: "7.8 km", pace: "6:02 /km", duration: "47:05", elevation: "+85 m" },
-    likes: 12,
-    comments: 3,
-    liked: false,
-  },
-  {
-    activityId: 4,
-    id: 4,
-    user: "Antoine Moreau",
-    initials: "AM",
-    time: "Il y a 8h",
-    type: "run" as const,
-    title: "Intervalles 10x400m 💨",
-    description: "Session difficile mais bien exécutée. 400m entre 1:18 et 1:22, récup 200m trot.",
-    stats: { distance: "9.2 km", pace: "4:30 /km", duration: "41:24", elevation: "+12 m" },
-    likes: 31,
-    comments: 8,
-    liked: false,
-  },
-];
-
+// TODO: replace with real user search from Supabase
 const friendsSeed = [
   { id: 1, name: "Camille Bernard", initials: "CB", discipline: "10 km", following: false },
   { id: 2, name: "Nicolas Petit", initials: "NP", discipline: "Semi-marathon", following: false },
@@ -198,6 +155,7 @@ const friendsSeed = [
 
 export default function Social() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [activities, setActivities] = useState<StravaActivity[]>([]);
   const [newPost, setNewPost] = useState("");
@@ -274,37 +232,30 @@ export default function Social() {
     f.name.toLowerCase().includes(friendQuery.toLowerCase()),
   );
 
+  const loadCommunityPosts = useCallback(async () => {
+    setIsLoadingPosts(true);
+    setPostsError(null);
+
+    try {
+      const publicPosts = await getPublicPosts();
+      const mappedPosts = publicPosts.map(mapPublicPostToFeedPost).map(ensurePostTrace);
+
+      setPosts(mappedPosts);
+      setActivities(
+        publicPosts
+          .filter((post) => post.run)
+          .map((post) => runToActivity(post.run as RunRow, hashStringToNumber(post.run?.id ?? post.id))),
+      );
+    } catch {
+      setActivities([]);
+      setPosts([]);
+      setPostsError("Impossible de charger le fil d'actualité. Vérifiez votre connexion.");
+    } finally {
+      setIsLoadingPosts(false);
+    }
+  }, []);
+
   useEffect(() => {
-    const loadCommunityPosts = async () => {
-      setIsLoadingPosts(true);
-      setPostsError(null);
-
-      try {
-        const publicPosts = await getPublicPosts();
-
-        if (publicPosts.length === 0) {
-          const fallbackPosts = feedPosts.map(ensurePostTrace);
-          setPosts(fallbackPosts);
-          setActivities(fallbackPosts.map((post) => buildActivityFromPost(post)));
-          return;
-        }
-
-        const mappedPosts = publicPosts.map(mapPublicPostToFeedPost).map(ensurePostTrace);
-        setPosts(mappedPosts);
-        setActivities(
-          publicPosts
-            .filter((post) => post.run)
-            .map((post) => runToActivity(post.run as RunRow, hashStringToNumber(post.run?.id ?? post.id))),
-        );
-      } catch {
-        setActivities([]);
-        setPosts([]);
-        setPostsError("Impossible de charger le fil social pour le moment.");
-      } finally {
-        setIsLoadingPosts(false);
-      }
-    };
-
     void loadCommunityPosts();
     const handleReload = () => {
       void loadCommunityPosts();
@@ -314,7 +265,7 @@ export default function Social() {
     return () => {
       window.removeEventListener("pace-community-updated", handleReload);
     };
-  }, []);
+  }, [loadCommunityPosts]);
 
   return (
     <div className="space-y-6">
@@ -349,12 +300,6 @@ export default function Social() {
       </ScrollReveal>
 
       <div className="space-y-4">
-        {postsError && (
-          <ScrollReveal delay={0.04}>
-            <p className="text-sm text-destructive">{postsError}</p>
-          </ScrollReveal>
-        )}
-
         {showFriendSearch && (
           <ScrollReveal delay={0.04}>
             <Card>
@@ -455,7 +400,49 @@ export default function Social() {
                 </Card>
               </ScrollReveal>
             ))
-          : posts.map((post, i) => (
+          : postsError ? (
+              <ScrollReveal delay={0.1}>
+                <Card className="border-destructive/30 bg-destructive/5">
+                  <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                      <AlertTriangle className="h-6 w-6" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-semibold">Impossible de charger le fil d&apos;actualité. Vérifiez votre connexion.</h3>
+                    </div>
+                    <Button
+                      variant="outline"
+                      className="border-[hsl(var(--accent))] text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/10"
+                      onClick={() => void loadCommunityPosts()}
+                    >
+                      Réessayer
+                    </Button>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            ) : posts.length === 0 ? (
+              <ScrollReveal delay={0.1}>
+                <Card className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
+                  <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]">
+                      <Users className="h-7 w-7" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="font-semibold">Aucune activité pour l&apos;instant</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Les courses de vos abonnés apparaîtront ici. Commencez par enregistrer votre première course !
+                      </p>
+                    </div>
+                    <Button
+                      className="bg-[hsl(var(--accent))] text-accent-foreground hover:bg-[hsl(var(--accent))]/90"
+                      onClick={() => navigate("/run")}
+                    >
+                      Enregistrer une course
+                    </Button>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            ) : posts.map((post, i) => (
               <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
                 <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
                   <CardContent className="p-4 space-y-3">

@@ -1,7 +1,9 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
+import GPSMap from "@/components/GPSMap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, Bluetooth, Loader2, X,
 } from "lucide-react";
@@ -84,6 +86,8 @@ export default function Run() {
     bluetoothDevice && bluetoothDevice.length > 15
       ? `${bluetoothDevice.slice(0, 15)}…`
       : bluetoothDevice;
+  const isRunActive = status === "running" || status === "paused";
+  const hasLiveGpsTrace = gpsTrace.length > 0;
 
   // GPS accuracy indicator color
   const getAccuracyColor = (accuracy: number | null) => {
@@ -451,6 +455,42 @@ export default function Run() {
           </ScrollReveal>
         )}
 
+        {isRunActive && (
+          <ScrollReveal delay={0.045}>
+            {hasLiveGpsTrace ? (
+              <Card className="border-accent/30">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold">Carte en direct</p>
+                      <p className="text-xs text-muted-foreground">Votre tracé GPS se met à jour en temps réel</p>
+                    </div>
+                    <Badge variant="outline" className="border-accent/40 text-accent">
+                      {status === "running" ? "En direct" : "En pause"}
+                    </Badge>
+                  </div>
+                  <GPSMap trace={gpsTrace} isLive height={220} />
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-accent/30">
+                <CardContent className="flex h-[220px] flex-col items-center justify-center gap-4 p-4">
+                  <div className="relative flex h-14 w-14 items-center justify-center">
+                    <span className="absolute h-14 w-14 animate-ping rounded-full bg-accent/20" />
+                    <span className="relative h-5 w-5 rounded-full bg-accent" />
+                  </div>
+                  <div className="space-y-1 text-center">
+                    <p className="text-sm font-semibold">Acquisition du signal GPS...</p>
+                    <p className="text-xs text-muted-foreground">
+                      Attendez les premiers points GPS pour afficher la carte en direct.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </ScrollReveal>
+        )}
+
         <ScrollReveal delay={0.05}>
           <Card className="border-accent/30">
             <CardContent className="p-6 flex flex-col items-center space-y-6">
@@ -480,8 +520,27 @@ export default function Run() {
                   <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />
                     Distance
-                    {status === "running" && (
-                      <div className={`w-2 h-2 rounded-full ${getAccuracyColor(gpsAccuracy)}`} />
+                    {isRunActive && (
+                      <TooltipProvider delayDuration={150}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center"
+                              aria-label={
+                                gpsAccuracy !== null
+                                  ? `Précision GPS : ${Math.round(gpsAccuracy)} m`
+                                  : "Précision GPS indisponible"
+                              }
+                            >
+                              <span className={`h-2 w-2 rounded-full ${getAccuracyColor(gpsAccuracy)}`} />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Précision GPS : {gpsAccuracy !== null ? `${Math.round(gpsAccuracy)}m` : "--"}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )}
                   </div>
                   <div className="text-xl font-bold tabular-nums">{distance.toFixed(2)}</div>
@@ -549,6 +608,11 @@ export default function Run() {
                     <p className="text-lg font-bold">{runSummary.averageHeartRate ?? "--"} bpm</p>
                   </div>
                 </div>
+                {runSummary.gpsTrace.length > 2 && (
+                  <div className="space-y-2">
+                    <GPSMap trace={runSummary.gpsTrace} height={180} />
+                  </div>
+                )}
                 {runSummary.gpsTrace.length > 0 && (
                   <div className="pt-2 border-t border-border/50">
                     <p className="text-xs text-muted-foreground">Points GPS enregistrés: {runSummary.gpsTrace.length}</p>

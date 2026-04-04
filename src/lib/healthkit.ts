@@ -1,37 +1,52 @@
 import { Capacitor } from "@capacitor/core";
 import type { ImportedRun } from "@/lib/parsers/gpxParser";
 
-// Only import HealthKit on native iOS
-let HealthKit: any = null;
-if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
-  try {
-    HealthKit = require("@perfood/capacitor-healthkit").HealthKit;
-  } catch (e) {
-    console.warn("HealthKit module not available");
-  }
-}
-
 // Track if HealthKit observer is active
 let isObserving = false;
 let heartRateCallback: ((bpm: number) => void) | null = null;
+let HealthKit: any = null;
+
+/**
+ * Lazy load HealthKit module only when needed
+ */
+async function getHealthKit(): Promise<any> {
+  if (HealthKit !== null) {
+    return HealthKit;
+  }
+
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") {
+    return null;
+  }
+
+  try {
+    // Dynamically import only on native iOS
+    const module = await import("@perfood/capacitor-healthkit");
+    HealthKit = module.HealthKit;
+    return HealthKit;
+  } catch (e) {
+    console.warn("HealthKit module not available:", e);
+    return null;
+  }
+}
 
 /**
  * Check if HealthKit is available (iOS native only)
  */
 export function isHealthKitAvailable(): boolean {
-  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios" && HealthKit !== null;
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
 }
 
 /**
  * Request HealthKit permissions for running data and heart rate
  */
 export async function requestHealthKitPermissions(): Promise<boolean> {
-  if (!isHealthKitAvailable() || !HealthKit) {
+  const hk = await getHealthKit();
+  if (!hk) {
     return false;
   }
 
   try {
-    const result = await HealthKit.requestAuthorization({
+    const result = await hk.requestAuthorization({
       permissions: {
         read: [
           "HKWorkoutTypeIdentifier",
@@ -53,7 +68,8 @@ export async function requestHealthKitPermissions(): Promise<boolean> {
  * Fetch recent running workouts from HealthKit
  */
 export async function fetchRecentRuns(limit: number = 200): Promise<ImportedRun[]> {
-  if (!isHealthKitAvailable() || !HealthKit) {
+  const hk = await getHealthKit();
+  if (!hk) {
     return [];
   }
 
@@ -61,7 +77,7 @@ export async function fetchRecentRuns(limit: number = 200): Promise<ImportedRun[
     const now = new Date();
     const oneYearAgo = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
 
-    const result = await HealthKit.getWorkoutSamples({
+    const result = await hk.getWorkoutSamples({
       startDate: oneYearAgo,
       endDate: now,
       limit: limit,
@@ -110,7 +126,8 @@ export async function fetchRecentRuns(limit: number = 200): Promise<ImportedRun[
  * Start observing live heart rate from Apple Watch
  */
 export async function startLiveHeartRate(callback: (bpm: number) => void): Promise<void> {
-  if (!isHealthKitAvailable() || !HealthKit || isObserving) {
+  const hk = await getHealthKit();
+  if (!hk || isObserving) {
     return;
   }
 
@@ -119,7 +136,7 @@ export async function startLiveHeartRate(callback: (bpm: number) => void): Promi
     isObserving = true;
 
     // Start observing heart rate changes
-    await HealthKit.monitorHeartRateSamples({
+    await hk.monitorHeartRateSamples({
       interval: 1000,
       onSampleReceived: (sample: any) => {
         if (heartRateCallback && sample.value) {
@@ -143,12 +160,13 @@ export async function startLiveHeartRate(callback: (bpm: number) => void): Promi
  * Stop observing live heart rate
  */
 export async function stopLiveHeartRate(): Promise<void> {
-  if (!isHealthKitAvailable() || !HealthKit || !isObserving) {
+  const hk = await getHealthKit();
+  if (!hk || !isObserving) {
     return;
   }
 
   try {
-    await HealthKit.stopHeartRateObservation();
+    await hk.stopHeartRateObservation();
     isObserving = false;
     heartRateCallback = null;
   } catch (error) {
@@ -162,12 +180,13 @@ export async function stopLiveHeartRate(): Promise<void> {
  * Check if HealthKit permissions are granted
  */
 export async function isHealthKitAuthorized(): Promise<boolean> {
-  if (!isHealthKitAvailable() || !HealthKit) {
+  const hk = await getHealthKit();
+  if (!hk) {
     return false;
   }
 
   try {
-    const result = await HealthKit.getAuthorizationStatus({
+    const result = await hk.getAuthorizationStatus({
       permissions: {
         read: [
           "HKWorkoutTypeIdentifier",

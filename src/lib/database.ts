@@ -21,6 +21,7 @@ export type ProfileRow = {
   gender?: string | null;
   date_of_birth?: string | null;
   first_name?: string | null;
+  last_name?: string | null;
 };
 
 export type RunGpsPoint = {
@@ -106,15 +107,38 @@ export async function getProfile(userId: string) {
 export async function upsertProfile(userId: string, data: Record<string, unknown>) {
   await requireCurrentUserId(userId);
 
+  const payload: Record<string, unknown> = {
+    id: userId,
+    updated_at:
+      typeof data.updated_at === "string"
+        ? data.updated_at
+        : new Date().toISOString(),
+  };
+
+  if ("first_name" in data) payload.first_name = data.first_name ?? null;
+  if ("full_name" in data) payload.full_name = data.full_name ?? null;
+  if ("gender" in data) payload.gender = data.gender ?? null;
+  if ("date_of_birth" in data) payload.date_of_birth = data.date_of_birth ?? null;
+  if ("onboarding_completed" in data) payload.onboarding_completed = data.onboarding_completed ?? false;
+  if ("avatar_url" in data) payload.avatar_url = data.avatar_url ?? null;
+  if ("username" in data) payload.username = data.username ?? null;
+
+  if ("goal_data" in data) {
+    payload.goal_data = (data.goal_data ?? null) as Json;
+  } else if (typeof data.goalType === "string") {
+    payload.goal_data = data as Json;
+  }
+
+  if ("goal_type" in data) {
+    payload.goal_type = data.goal_type ?? null;
+  } else if (typeof data.goalType === "string") {
+    payload.goal_type = data.goalType;
+  }
+
   const { data: profile, error } = await supabase
     .from("profiles")
     .upsert(
-      {
-        id: userId,
-        goal_data: data as Json,
-        goal_type: typeof data.goalType === "string" ? data.goalType : null,
-        updated_at: new Date().toISOString(),
-      },
+      payload,
       { onConflict: "id" },
     )
     .select("*")

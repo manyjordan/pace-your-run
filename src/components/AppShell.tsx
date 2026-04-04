@@ -1,12 +1,20 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
+import { Heart, Home, ClipboardList, Play, Settings, Users, User } from "lucide-react";
 
-const navItems = [
+const desktopNavItems = [
   { to: "/", icon: Home, label: "Accueil" },
   { to: "/social", icon: Users, label: "Actu" },
   { to: "/run", icon: Play, label: "Course" },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
+];
+
+const mobileNavItems = [
+  { to: "/", icon: Home, label: "Accueil" },
+  { to: "/social", icon: Users, label: "Social" },
+  { to: "/run", icon: Play, label: "Course", isPrimary: true },
+  { to: "/plan", icon: ClipboardList, label: "Plan" },
+  { to: "/profile", icon: User, label: "Profil" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
@@ -28,7 +36,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
 
           {/* Desktop nav */}
           <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => (
+            {desktopNavItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -63,9 +71,14 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       {/* Mobile bottom nav — 5 tabs */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-accent/30 bg-background/90 backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-5 items-end gap-1 px-2 py-2">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.to;
-            const isRun = item.to === "/run";
+          {mobileNavItems.map((item) => {
+            const isActive =
+              item.to === "/profile"
+                ? location.pathname.startsWith("/profile")
+                : item.to === "/"
+                  ? location.pathname === "/"
+                  : location.pathname.startsWith(item.to);
+            const isRun = item.isPrimary;
 
             if (isRun) {
               return (

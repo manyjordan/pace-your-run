@@ -1,23 +1,18 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, Loader2, Upload, ChevronDown } from "lucide-react";
+import { ChevronLeft, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/contexts/AuthContext";
-import { upsertProfile, saveRun } from "@/lib/database";
-import { selectPlan, detectLevel } from "@/lib/planSelector";
+import { upsertProfile } from "@/lib/database";
+import { selectPlan } from "@/lib/planSelector";
 import { getPlanById } from "@/lib/trainingPlans";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { parseGpxText } from "@/lib/parsers/gpxParser";
-import { parseFitArrayBuffer } from "@/lib/parsers/fitParser";
-import { parseAppleHealthXml } from "@/lib/parsers/appleHealthParser";
-import { sourceConfig, type ImportSource } from "@/lib/importInstructions";
-import JSZip from "jszip";
 
 type OnboardingData = {
   firstName: string;
@@ -37,7 +32,6 @@ const Onboarding = () => {
   const { session } = useAuth();
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [importedRunsCount, setImportedRunsCount] = useState(0);
   const [data, setData] = useState<OnboardingData>({
     firstName: "",
     gender: null,
@@ -54,7 +48,7 @@ const Onboarding = () => {
   }, [session, navigate]);
 
   const handleNext = () => {
-    if (step < 6) {
+    if (step < 5) {
       setStep(step + 1);
     }
   };
@@ -69,16 +63,21 @@ const Onboarding = () => {
     if (!session?.user?.id) return;
 
     try {
-      // Mark onboarding as completed with minimal data
-      await upsertProfile(session.user.id, {
-        onboarding_completed: true,
-        updated_at: new Date().toISOString(),
-      });
+      // On steps 1-4, skip directly to the summary (step 5)
+      if (step < 5) {
+        setStep(5);
+      } else {
+        // Mark onboarding as completed with minimal data
+        await upsertProfile(session.user.id, {
+          onboarding_completed: true,
+          updated_at: new Date().toISOString(),
+        });
 
-      // Add small delay to ensure DB update is replicated
-      await new Promise(resolve => setTimeout(resolve, 500));
+        // Add small delay to ensure DB update is replicated
+        await new Promise(resolve => setTimeout(resolve, 500));
 
-      navigate("/", { replace: true });
+        navigate("/", { replace: true });
+      }
     } catch (error) {
       console.error("Error skipping onboarding:", error);
     }
@@ -133,6 +132,56 @@ const Onboarding = () => {
     }
   };
 
+  const handleCompleteAndNavigateToImport = async () => {
+    if (!session?.user?.id) return;
+
+    setIsLoading(true);
+    try {
+      // First, complete the onboarding
+      const plan = selectPlan({
+        goalType: data.goalType || "distance",
+        daysPerWeek: data.daysPerWeek || 3,
+        weeksAvailable: 12,
+        level: data.fitnessLevel || "beginner",
+        targetDistance: data.raceType || "5k",
+      });
+
+      const goalData = {
+        goalType: data.goalType,
+        fitnessLevel: data.fitnessLevel,
+        daysPerWeek: data.daysPerWeek,
+        ...(data.goalType === "distance" && { raceType: data.raceType, raceDistanceKm: data.raceDistance }),
+        ...(data.goalType === "race" && {
+          raceType: data.raceType,
+          raceDistanceKm: data.raceDistance,
+          raceTargetDate: data.raceTargetDate,
+          raceTargetTime: data.raceTargetTime,
+        }),
+        selectedPlanId: plan.id,
+        goalSavedAt: new Date().toISOString(),
+      };
+
+      await upsertProfile(session.user.id, {
+        first_name: data.firstName,
+        gender: data.gender,
+        date_of_birth: data.dateOfBirth || null,
+        goal_type: data.goalType,
+        goal_data: goalData,
+        onboarding_completed: true,
+        updated_at: new Date().toISOString(),
+      });
+
+      // Add small delay to ensure DB update is replicated
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Then navigate to import
+      navigate("/import", { replace: true });
+    } catch (error) {
+      console.error("Onboarding error:", error);
+      setIsLoading(false);
+    }
+  };
+
   const slideVariants = {
     enter: (direction: number) => ({
       x: direction > 0 ? 1000 : -1000,
@@ -161,18 +210,23 @@ const Onboarding = () => {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="text-sm font-semibold text-muted-foreground">{step}/6</span>
-        <button
-          onClick={handleSkipOnboarding}
-          className="rounded-lg px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
-        >
-          Ignorer
-        </button>
+        <span className="text-sm font-semibold text-muted-foreground">{step}/5</span>
+        {step < 5 && (
+          <button
+            onClick={handleSkipOnboarding}
+            className="rounded-lg px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
+          >
+            Ignorer
+          </button>
+        )}
+        {step === 5 && (
+          <div className="w-12" /> /* Spacer for alignment */
+        )}
       </div>
 
       {/* Progress indicator dots */}
       <div className="flex justify-center gap-2 px-4 py-4">
-        {[1, 2, 3, 4, 5, 6].map((dotStep) => (
+        {[1, 2, 3, 4, 5].map((dotStep) => (
           <motion.div
             key={dotStep}
             className="h-1.5 rounded-full transition-all"
@@ -213,13 +267,7 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step2Import
-                onNext={() => {
-                  handleNext();
-                }}
-                importedCount={importedRunsCount}
-                setImportedCount={setImportedRunsCount}
-              />
+              <Step2Profile data={data} setData={setData} onNext={handleNext} />
             </motion.div>
           )}
 
@@ -234,7 +282,7 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step3Profile data={data} setData={setData} onNext={handleNext} />
+              <Step3Level data={data} setData={setData} onNext={handleNext} />
             </motion.div>
           )}
 
@@ -249,7 +297,7 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step4Level data={data} setData={setData} onNext={handleNext} />
+              <Step4Goal data={data} setData={setData} onNext={handleNext} />
             </motion.div>
           )}
 
@@ -264,22 +312,13 @@ const Onboarding = () => {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="space-y-6 py-8"
             >
-              <Step5Goal data={data} setData={setData} onNext={handleNext} />
-            </motion.div>
-          )}
-
-          {step === 6 && (
-            <motion.div
-              key="step6"
-              custom={step > 6 ? 1 : -1}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="space-y-6 py-8"
-            >
-              <Step6DaysPerWeek data={data} setData={setData} isLoading={isLoading} onComplete={handleComplete} />
+              <Step5Summary 
+                data={data} 
+                setData={setData} 
+                isLoading={isLoading} 
+                onComplete={handleComplete}
+                onCompleteAndImport={handleCompleteAndNavigateToImport}
+              />
             </motion.div>
           )}
         </AnimatePresence>
@@ -338,6 +377,8 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
           </div>
         </div>
       </div>
+
+      <p className="text-xs text-muted-foreground text-center">Rejoignez des milliers de coureurs qui progressent chaque jour</p>
 
       <Button onClick={onNext} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 md:w-auto">
         Commencer
@@ -666,8 +707,8 @@ function Step2Import({
   );
 }
 
-/* Step 3 — Profile */
-function Step3Profile({
+/* Step 2 — Profile */
+function Step2Profile({
   data,
   setData,
   onNext,
@@ -735,8 +776,8 @@ function Step3Profile({
   );
 }
 
-/* Step 4 — Level */
-function Step4Level({
+/* Step 3 — Level */
+function Step3Level({
   data,
   setData,
   onNext,
@@ -746,14 +787,24 @@ function Step4Level({
   onNext: () => void;
 }) {
   const levels = [
-    { id: "beginner", title: "Débutant", desc: "Je cours occasionnellement ou je débute", range: "0-20 km/sem" },
+    { 
+      id: "beginner", 
+      title: "Débutant", 
+      desc: "Je cours moins de 20 km par semaine ou je débute",
+      example: "Ex: 2-3 sorties de 30 min"
+    },
     {
       id: "intermediate",
       title: "Intermédiaire",
-      desc: "Je cours régulièrement, 2-4 fois par semaine",
-      range: "20-50 km/sem",
+      desc: "Je cours régulièrement 20-50 km par semaine",
+      example: "Ex: 4 sorties, dont une longue sortie",
     },
-    { id: "advanced", title: "Avancé", desc: "Je cours plus de 50km par semaine", range: "50+ km/sem" },
+    { 
+      id: "advanced", 
+      title: "Avancé", 
+      desc: "Je cours plus de 50km par semaine",
+      example: "Ex: 5-6 sorties avec intervalles"
+    },
   ];
 
   return (
@@ -781,7 +832,7 @@ function Step4Level({
               <div className="flex-1">
                 <p className="font-semibold">{level.title}</p>
                 <p className="text-sm text-muted-foreground">{level.desc}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{level.range}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{level.example}</p>
               </div>
             </div>
           </motion.button>
@@ -799,8 +850,8 @@ function Step4Level({
   );
 }
 
-/* Step 5 — Goal */
-function Step5Goal({
+/* Step 4 — Goal */
+function Step4Goal({
   data,
   setData,
   onNext,
@@ -964,17 +1015,19 @@ function Step5Goal({
   );
 }
 
-/* Step 6 — Days Per Week */
-function Step6DaysPerWeek({
+/* Step 5 — Ready Summary */
+function Step5Summary({
   data,
   setData,
   isLoading,
   onComplete,
+  onCompleteAndImport,
 }: {
   data: OnboardingData;
   setData: (data: OnboardingData) => void;
   isLoading: boolean;
   onComplete: () => void;
+  onCompleteAndImport: () => void;
 }) {
   const days = [
     { id: 2, title: "2 jours", desc: "Idéal pour débuter en douceur" },
@@ -983,52 +1036,135 @@ function Step6DaysPerWeek({
     { id: 5, title: "5 jours", desc: "Pour les coureurs expérimentés" },
   ];
 
+  // Check if we need to select days per week first
+  if (!data.daysPerWeek) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold">Combien de jours par semaine pouvez-vous courir ?</h2>
+        </div>
+
+        <div className="space-y-3">
+          {days.map((day) => (
+            <motion.button
+              key={day.id}
+              whileTap={{ scale: 0.97 }}
+              onClick={() => setData({ ...data, daysPerWeek: day.id })}
+              disabled={isLoading}
+              className={`w-full rounded-lg border-2 p-4 text-left transition-all disabled:opacity-50 ${
+                data.daysPerWeek === day.id
+                  ? "border-accent bg-accent/10 shadow-[0_0_0_2px_hsl(var(--accent))]"
+                  : "border-border hover:border-accent/50"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20 text-sm font-bold text-accent">
+                  {day.id}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold">{day.title}</p>
+                  <p className="text-sm text-muted-foreground">{day.desc}</p>
+                </div>
+              </div>
+            </motion.button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Show the summary once days are selected
+  const goalLabels: Record<string, string> = {
+    weight: "Perte de poids",
+    distance: `Courir ${data.raceDistance || data.raceType?.toUpperCase()}`,
+    race: `Préparer ${data.raceDistance ? `une ${data.raceDistance}km` : `une ${data.raceType?.toUpperCase()}`}`,
+  };
+
+  const levelLabels: Record<string, string> = {
+    beginner: "Débutant",
+    intermediate: "Intermédiaire",
+    advanced: "Avancé",
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">Combien de jours par semaine pouvez-vous courir ?</h2>
+      <div className="text-center">
+        <h2 className="text-3xl font-bold">Vous êtes prêt ! 🎉</h2>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Voici un résumé de votre configuration
+        </p>
+      </div>
+
+      <div className="space-y-3 rounded-xl border border-accent/20 bg-card/50 p-4">
+        {/* Goal */}
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-accent/10 p-2">
+            <Zap className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Objectif</p>
+            <p className="font-semibold">{goalLabels[data.goalType || "distance"]}</p>
+          </div>
+        </div>
+
+        {/* Level */}
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-accent/10 p-2">
+            <TrendingUp className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Niveau</p>
+            <p className="font-semibold">{levelLabels[data.fitnessLevel || "beginner"]}</p>
+          </div>
+        </div>
+
+        {/* Days per week */}
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-accent/10 p-2">
+            <Calendar className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Entraînement</p>
+            <p className="font-semibold">{data.daysPerWeek} jours par semaine</p>
+          </div>
+        </div>
+
+        {/* Training sessions per week (estimation) */}
+        <div className="flex items-center gap-3">
+          <div className="rounded-lg bg-accent/10 p-2">
+            <Calendar className="h-5 w-5 text-accent" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Plan personnalisé</p>
+            <p className="font-semibold">Généré selon votre profil</p>
+          </div>
+        </div>
       </div>
 
       <div className="space-y-3">
-        {days.map((day) => (
-          <motion.button
-            key={day.id}
-            whileTap={{ scale: 0.97 }}
-            onClick={() => setData({ ...data, daysPerWeek: day.id })}
-            disabled={isLoading}
-            className={`w-full rounded-lg border-2 p-4 text-left transition-all disabled:opacity-50 ${
-              data.daysPerWeek === day.id
-                ? "border-accent bg-accent/10 shadow-[0_0_0_2px_hsl(var(--accent))]"
-                : "border-border hover:border-accent/50"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20 text-sm font-bold text-accent">
-                {day.id}
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold">{day.title}</p>
-                <p className="text-sm text-muted-foreground">{day.desc}</p>
-              </div>
-            </div>
-          </motion.button>
-        ))}
-      </div>
+        <Button
+          onClick={onComplete}
+          disabled={isLoading}
+          className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Création de votre plan personnalisé...
+            </>
+          ) : (
+            "Commencer l'aventure"
+          )}
+        </Button>
 
-      <Button
-        onClick={onComplete}
-        disabled={!data.daysPerWeek || isLoading}
-        className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Création de votre plan personnalisé...
-          </>
-        ) : (
-          "Créer mon plan"
-        )}
-      </Button>
+        <button
+          onClick={onCompleteAndImport}
+          disabled={isLoading}
+          className="w-full text-sm text-accent hover:text-accent/80 transition-colors"
+        >
+          Importer mon historique de courses →
+        </button>
+      </div>
     </div>
   );
 }
