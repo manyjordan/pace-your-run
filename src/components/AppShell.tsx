@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, BarChart3, Calendar, Heart, Settings, Users, Play, ClipboardList } from "lucide-react";
+import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
 
 const navItems = [
   { to: "/", icon: Home, label: "Accueil" },
@@ -18,9 +18,11 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       <header className="sticky top-0 z-50 border-b border-accent/60 bg-accent text-accent-foreground shadow-[0_10px_30px_hsl(var(--accent)/0.18)] backdrop-blur-xl">
         <div className="container flex h-14 items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[hsl(var(--foreground)/0.12)]">
-              <span className="text-sm font-black tracking-tighter text-accent-foreground">P</span>
-            </div>
+            <img
+              src="/logo-icon.png"
+              alt="Pace"
+              className="h-8 w-8 rounded-lg object-cover header-logo"
+            />
             <span className="text-lg font-bold tracking-tight">PACE</span>
           </div>
 
@@ -44,12 +46,14 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
             ))}
           </nav>
 
-          <NavLink
-            to="/settings"
-            className="rounded-lg p-2 text-accent-foreground/80 transition-colors hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"
-          >
-            <Settings className="h-5 w-5" />
-          </NavLink>
+          <div className="flex items-center gap-1">
+            <NavLink
+              to="/settings"
+              className="rounded-lg p-2 text-accent-foreground/80 transition-colors hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"
+            >
+              <Settings className="h-5 w-5" />
+            </NavLink>
+          </div>
         </div>
       </header>
 

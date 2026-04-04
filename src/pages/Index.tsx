@@ -9,10 +9,15 @@ import {
   XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList,
 } from "recharts";
 import { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { getProfile, getRuns } from "@/lib/database";
+import { getPlanById } from "@/lib/trainingPlans";
 import {
   activityToCommunityPost,
   buildAcwrSeries,
   buildVo2Series,
+  connectStrava,
   formatDistance,
   formatDuration,
   formatHoursAndMinutes,
@@ -32,6 +37,8 @@ type ProfileGoalData = {
   raceTargetTime: string;
   distanceKm?: string;
   targetWeightKg?: string;
+  selectedPlanId?: string;
+  goalSavedAt?: string;
 };
 
 const upcomingSessions = [
@@ -113,6 +120,69 @@ function DashboardSection({
     "Dénivelé par semaine": "3m",
   });
 
+  // Compute upcoming sessions from the training plan
+  const computedUpcomingSessions = useMemo(() => {
+    const profileWithPlan = userGoal as (ProfileGoalData & { selectedPlanId?: string; goalSavedAt?: string }) | null;
+
+    if (!profileWithPlan?.selectedPlanId) {
+      return upcomingSessions;
+    }
+
+    try {
+      const plan = getPlanById(profileWithPlan.selectedPlanId);
+      if (!plan) return upcomingSessions;
+
+      // Calculate current week
+      let currentWeek = 1;
+      if (profileWithPlan.goalSavedAt) {
+        const savedDate = new Date(profileWithPlan.goalSavedAt);
+        const now = new Date();
+        const weeksDiff = Math.floor((now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+        currentWeek = Math.min(Math.max(1, weeksDiff + 1), plan.durationWeeks);
+      }
+
+      const currentWeekData = plan.weeklySchedule.find((w) => w.week === currentWeek);
+      if (!currentWeekData) return upcomingSessions;
+
+      // Convert sessions to UpcomingSession format, showing only future sessions
+      const now = new Date();
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const daysMap: Record<string, number> = {
+        Lun: 1,
+        Mar: 2,
+        Mer: 3,
+        Jeu: 4,
+        Ven: 5,
+        Sam: 6,
+        Dim: 0,
+      };
+
+      const intensityColors: Record<string, string> = {
+        easy: "hsl(200, 80%, 55%)",
+        moderate: "hsl(200, 100%, 50%)",
+        tempo: "hsl(38, 92%, 50%)",
+        interval: "hsl(0, 72%, 51%)",
+        race: "hsl(270, 100%, 60%)",
+      };
+
+      return currentWeekData.sessions
+        .filter((session) => {
+          const sessionDay = daysMap[session.day] || 0;
+          if (dayOfWeek === 0) return true; // Sunday, show all
+          return sessionDay >= dayOfWeek;
+        })
+        .map((session, idx) => ({
+          type: session.type,
+          distance: `${session.distance.toFixed(1)}km`,
+          pace: session.pace,
+          day: session.day,
+          color: intensityColors[session.intensity] || intensityColors["easy"],
+        })) as UpcomingSession[];
+    } catch {
+      return upcomingSessions;
+    }
+  }, [userGoal]);
+
   const getFilteredMetrics = () => {
     return metricCards.map((metric) => {
       const granularity = granularities[metric.title];
@@ -121,7 +191,7 @@ function DashboardSection({
     });
   };
 
-  const filteredMetrics = useMemo(() => getFilteredMetrics(), [granularities, periods, activities]);
+  const filteredMetrics = useMemo(() => getFilteredMetrics(), [granularities, periods, activities, metricCards]);
 
   const latestActivityCalories = latestActivity ? Math.round((latestActivity.distance / 1000) * 62) : 1050;
 
@@ -212,7 +282,7 @@ function DashboardSection({
                           : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                     >
-                      {p === "1m" ? "1m" : p === "3m" ? "3m" : p === "1y" ? "1y" : "All"}
+                      {p === "1m" ? "1m" : p === "3m" ? "3m" : p === "1y" ? "1a" : "Tout"}
                     </button>
                   ))}
                 </div>
@@ -309,8 +379,8 @@ function DashboardSection({
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </div>
             <div className="space-y-3">
-              {upcomingSessions.map((session) => (
-                <div key={session.type} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
+              {computedUpcomingSessions.map((session) => (
+                <div key={`${session.day}-${session.type}`} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
                   <div className="h-10 w-1 rounded-full" style={{ backgroundColor: session.color }} />
                   <div className="flex-1">
                     <p className="text-sm font-semibold">{session.type}</p>
@@ -416,7 +486,7 @@ function PerformanceSection({
                         : "bg-muted text-muted-foreground hover:bg-muted/80"
                     }`}
                   >
-                    {period === "1m" ? "1m" : period === "3m" ? "3m" : period === "1y" ? "1y" : "All"}
+                    {period === "1m" ? "1m" : period === "3m" ? "3m" : period === "1y" ? "1a" : "Tout"}
                   </button>
                 ))}
               </div>
@@ -562,19 +632,25 @@ function ActivityTabSection({
 
 /* ── Main Page ── */
 const Dashboard = () => {
+  const { session } = useAuth();
   const [activities, setActivities] = useState<StravaActivity[]>([]);
   const [athleteName, setAthleteName] = useState("Coureur");
   const [stravaConnected, setStravaConnected] = useState(false);
   const [userGoal, setUserGoal] = useState<ProfileGoalData | null>(null);
+  const [runCount, setRunCount] = useState(0);
   const [selectedActivityForDetail, setSelectedActivityForDetail] = useState<StravaActivity | null>(null);
   const handleCloseActivityDetail = () => {
     setSelectedActivityForDetail(null);
   };
 
   useEffect(() => {
-    const loadStravaActivities = async () => {
+    const loadStravaActivities = async (jwt: string) => {
       try {
-        const response = await fetch("/api/strava/activities?all_history=1&per_page=100");
+        const response = await fetch("/functions/v1/strava-activities", {
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
         const data = await response.json();
 
         setStravaConnected(Boolean(data?.connected));
@@ -595,30 +671,56 @@ const Dashboard = () => {
       }
     };
 
-    const loadUserGoal = () => {
+    const loadUserGoal = async () => {
+      if (!session?.user.id) {
+        setUserGoal(null);
+        setRunCount(0);
+        return;
+      }
+
       try {
-        const raw = window.localStorage.getItem("pace-user-profile-goal");
-        if (raw) {
-          const parsed = JSON.parse(raw) as ProfileGoalData;
-          setUserGoal(parsed);
+        const [profile, runs] = await Promise.all([
+          getProfile(session.user.id),
+          getRuns(session.user.id),
+        ]);
+
+        setRunCount(runs.length);
+        if (profile?.goal_data && typeof profile.goal_data === "object" && !Array.isArray(profile.goal_data)) {
+          setUserGoal({
+            ...profile.goal_data,
+          } as ProfileGoalData);
+          return;
         }
+
+        setUserGoal(null);
       } catch {
         setUserGoal(null);
+        setRunCount(0);
       }
     };
 
-    void loadStravaActivities();
-    loadUserGoal();
-
     const handleGoalUpdate = () => {
-      loadUserGoal();
+      void loadUserGoal();
     };
+
+    void loadUserGoal();
+
+    // Load Strava activities if session is available
+    if (session) {
+      const jwt = session.access_token;
+      void loadStravaActivities(jwt);
+    } else {
+      setStravaConnected(false);
+      setActivities([]);
+    }
 
     window.addEventListener("pace-goal-updated", handleGoalUpdate);
+    window.addEventListener("pace-runs-updated", handleGoalUpdate);
     return () => {
       window.removeEventListener("pace-goal-updated", handleGoalUpdate);
+      window.removeEventListener("pace-runs-updated", handleGoalUpdate);
     };
-  }, []);
+  }, [session]);
 
   const runningActivities = useMemo(
     () => activities.filter(isRunActivity),
@@ -638,10 +740,9 @@ const Dashboard = () => {
     [metricCards, userGoal],
   );
   const stravaAuthUrl = useMemo(() => {
-    const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-    const redirectUri = `${window.location.origin}/api/auth/callback`;
-    return `https://www.strava.com/oauth/authorize?client_id=${clientId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=activity:read_all`;
-  }, []);
+    if (!session) return "";
+    return connectStrava(session.access_token);
+  }, [session]);
 
   const latestActivity = useMemo(() => getLatestActivity(runningActivities), [runningActivities]);
 
@@ -683,6 +784,27 @@ const Dashboard = () => {
           </div>
         </div>
       </ScrollReveal>
+
+      {runCount < 3 && (
+        <ScrollReveal delay={0.02}>
+          <div className="rounded-2xl border border-accent/30 bg-card px-5 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div>
+                <p className="text-sm font-semibold">Importez votre historique de courses pour voir vos statistiques</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  GPX, FIT, archive Strava ou export Apple Health : tout est analyse localement dans le navigateur.
+                </p>
+              </div>
+              <Link
+                to="/import"
+                className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground transition-opacity hover:opacity-90"
+              >
+                Importer mon historique
+              </Link>
+            </div>
+          </div>
+        </ScrollReveal>
+      )}
 
       <Tabs defaultValue="dashboard" className="space-y-6">
         <ScrollReveal delay={0.05}>

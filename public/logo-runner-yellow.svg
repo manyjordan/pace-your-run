@@ -1,0 +1,27 @@
+<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="200" height="200" fill="#d4a927" rx="40"/>
+  
+  <!-- Head -->
+  <circle cx="100" cy="45" r="18" fill="white"/>
+  
+  <!-- Body -->
+  <path d="M 100 65 L 95 95 L 105 95 Z" fill="white"/>
+  
+  <!-- Left arm (angled) -->
+  <line x1="95" y1="75" x2="70" y2="60" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Right arm (angled) -->
+  <line x1="105" y1="75" x2="130" y2="60" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  
+  <!-- Left leg (extended) -->
+  <path d="M 95 95 Q 85 130 75 160" stroke="white" stroke-width="8" stroke-linecap="round" fill="none"/>
+  
+  <!-- Right leg (angled) -->
+  <path d="M 105 95 Q 115 130 125 160" stroke="white" stroke-width="8" stroke-linecap="round" fill="none"/>
+  
+  <!-- Motion lines left -->
+  <line x1="30" y1="90" x2="55" y2="95" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="25" y1="110" x2="50" y2="115" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+  <line x1="28" y1="130" x2="53" y2="135" stroke="white" stroke-width="5" stroke-linecap="round" opacity="0.8"/>
+</svg>

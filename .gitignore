@@ -13,6 +13,10 @@ dist-ssr
 *.local
 .strava-session.local.json
 
+# Apple Sign In
+AuthKey_*.p8
+generate-apple-secret.mjs
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

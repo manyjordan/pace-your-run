@@ -7,10 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, Scale, Route, Trophy, AlertCircle, Calendar as CalendarIcon } from "lucide-react";
+import { Target, Scale, Route, Trophy, AlertCircle, Calendar as CalendarIcon, Zap } from "lucide-react";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getProfile, upsertProfile, getRuns } from "@/lib/database";
+import { selectPlan, detectLevel } from "@/lib/planSelector";
+import { getPlanById } from "@/lib/trainingPlans";
+import type { TrainingPlan } from "@/lib/trainingPlans";
 
 type GoalType = "weight" | "race" | "distance";
 type RaceType = "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
@@ -27,9 +32,10 @@ type ProfileGoalData = {
   raceTargetDate: string;
   distanceKm: string;
   distanceTargetDate: string;
+  level?: "beginner" | "intermediate" | "advanced";
+  selectedPlanId?: string;
+  goalSavedAt?: string;
 };
-
-const STORAGE_KEY = "pace-user-profile-goal";
 
 const defaultData: ProfileGoalData = {
   weightKg: "",
@@ -43,6 +49,8 @@ const defaultData: ProfileGoalData = {
   raceTargetDate: "",
   distanceKm: "",
   distanceTargetDate: "",
+  level: "beginner",
+  selectedPlanId: undefined,
 };
 
 const racePresetDistance: Record<RaceType, string> = {
@@ -119,23 +127,101 @@ function GoalDatePicker({
 }
 
 export default function GoalTab() {
-  const hasStoredGoal =
-    typeof window !== "undefined" && Boolean(window.localStorage.getItem(STORAGE_KEY));
-  const [formData, setFormData] = useState<ProfileGoalData>(() => {
-    if (typeof window === "undefined") return defaultData;
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultData;
-    try {
-      return { ...defaultData, ...JSON.parse(raw) as ProfileGoalData };
-    } catch {
-      return defaultData;
-    }
-  });
-  const [savedAt, setSavedAt] = useState<string | null>(() => (hasStoredGoal ? "Enregistré" : null));
+  const { user } = useAuth();
+  const [formData, setFormData] = useState<ProfileGoalData>(defaultData);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [changeWarning, setChangeWarning] = useState<boolean>(false);
-  const [isDefining, setIsDefining] = useState<boolean>(() => !hasStoredGoal);
+  const [isDefining, setIsDefining] = useState<boolean>(true);
   const [isChanging, setIsChanging] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [detectedLevel, setDetectedLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner");
+  const [selectedPlan, setSelectedPlan] = useState<TrainingPlan | null>(null);
+  const [showPlanPreview, setShowPlanPreview] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!user) {
+        setFormData(defaultData);
+        setSavedAt(null);
+        setIsDefining(true);
+        setIsChanging(false);
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Load profile and runs to detect level
+        const [profile, runs] = await Promise.all([
+          getProfile(user.id),
+          getRuns(user.id),
+        ]);
+
+        const goalData = profile?.goal_data;
+        const newFormData = { ...defaultData, ...(goalData as Partial<ProfileGoalData>) };
+
+        // Auto-detect level from running history
+        const autoDetectedLevel = detectLevel(runs);
+        newFormData.level = newFormData.level || autoDetectedLevel;
+        setDetectedLevel(autoDetectedLevel);
+
+        // Auto-select a plan based on goal data
+        if (newFormData.availableDaysPerWeek) {
+          const goalType = newFormData.goalType === "race" ? "race" : newFormData.goalType === "distance" ? "distance" : "weight";
+          
+          let targetDistance: "5k" | "10k" | "20k" | "semi" | "marathon" | undefined;
+          if (goalType === "race") {
+            const distMap: Record<RaceType, "5k" | "10k" | "20k" | "semi" | "marathon"> = {
+              "5k": "5k",
+              "10k": "10k",
+              "20k": "20k",
+              "semi": "semi",
+              "marathon": "marathon",
+              "other": "marathon",
+            };
+            targetDistance = distMap[newFormData.raceType];
+          } else if (goalType === "distance") {
+            const km = Number(newFormData.distanceKm);
+            if (km <= 5) targetDistance = "5k";
+            else if (km <= 10) targetDistance = "10k";
+            else if (km <= 20) targetDistance = "20k";
+            else targetDistance = "marathon";
+          }
+
+          const plan = selectPlan({
+            goal: goalType,
+            targetDistance,
+            level: newFormData.level || "beginner",
+            daysPerWeek: Number(newFormData.availableDaysPerWeek),
+          });
+
+          newFormData.selectedPlanId = plan.id;
+          setSelectedPlan(plan);
+        }
+
+        setFormData(newFormData);
+
+        if (goalData && typeof goalData === "object" && !Array.isArray(goalData)) {
+          setSavedAt("Enregistré");
+          setIsDefining(false);
+          setIsChanging(false);
+        } else {
+          setSavedAt(null);
+          setIsDefining(true);
+          setIsChanging(false);
+        }
+      } catch {
+        setFormData(defaultData);
+        setSavedAt(null);
+        setIsDefining(true);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    void loadProfile();
+  }, [user]);
 
   const activeGoalSummary = useMemo(() => {
     if (formData.goalType === "weight" && formData.targetWeightKg) {
@@ -165,6 +251,7 @@ export default function GoalTab() {
   const updateField = <K extends keyof ProfileGoalData>(key: K, value: ProfileGoalData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setWarnings([]);
+    setSaveError(null);
     validateGoal({ ...formData, [key]: value });
   };
 
@@ -227,18 +314,80 @@ export default function GoalTab() {
     }
 
     setWarnings(warns);
+
+    // Auto-generate and select plan if form is complete
+    if (data.availableDaysPerWeek && data.level) {
+      const goalType = data.goalType === "race" ? "race" : data.goalType === "distance" ? "distance" : "weight";
+      
+      let targetDistance: "5k" | "10k" | "20k" | "semi" | "marathon" | undefined;
+      if (goalType === "race") {
+        const distMap: Record<RaceType, "5k" | "10k" | "20k" | "semi" | "marathon"> = {
+          "5k": "5k",
+          "10k": "10k",
+          "20k": "20k",
+          "semi": "semi",
+          "marathon": "marathon",
+          "other": "marathon",
+        };
+        targetDistance = distMap[data.raceType];
+      } else if (goalType === "distance") {
+        const km = Number(data.distanceKm);
+        if (km <= 5) targetDistance = "5k";
+        else if (km <= 10) targetDistance = "10k";
+        else if (km <= 20) targetDistance = "20k";
+        else targetDistance = "marathon";
+      }
+
+      const plan = selectPlan({
+        goal: goalType,
+        targetDistance,
+        level: data.level,
+        daysPerWeek: Number(data.availableDaysPerWeek),
+      });
+
+      setSelectedPlan(plan);
+      setFormData(prev => ({ ...prev, selectedPlanId: plan.id }));
+    }
   };
 
-  const saveProfileGoal = () => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(formData));
-    window.dispatchEvent(new Event("pace-goal-updated"));
-    setSavedAt(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
-    setIsDefining(false);
-    setIsChanging(false);
+  const saveProfileGoal = async () => {
+    if (!user) {
+      setSaveError("Impossible d'enregistrer le profil pour le moment.");
+      return;
+    }
+
+    try {
+      setSaveError(null);
+      // Add goalSavedAt timestamp when saving
+      const dataToSave = {
+        ...formData,
+        goalSavedAt: new Date().toISOString(),
+      };
+      await upsertProfile(user.id, dataToSave);
+      window.dispatchEvent(new Event("pace-goal-updated"));
+      setSavedAt(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
+      setIsDefining(false);
+      setIsChanging(false);
+    } catch {
+      setSaveError("Impossible d'enregistrer le profil pour le moment.");
+    }
   };
+
+  if (isLoading) {
+    return <div className="space-y-4" />;
+  }
 
   return (
     <div className="space-y-4">
+      {saveError && (
+        <ScrollReveal>
+          <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700 dark:text-red-300">{saveError}</p>
+          </div>
+        </ScrollReveal>
+      )}
+
       {changeWarning && (
         <ScrollReveal>
           <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
@@ -418,16 +567,33 @@ export default function GoalTab() {
               />
               <div className="space-y-2">
                 <Label htmlFor="availableDaysWeight">Nombre de jours disponibles par semaine pour aller courir</Label>
-                <Input
-                  id="availableDaysWeight"
-                  type="number"
-                  min="1"
-                  max="7"
-                  step="1"
-                  value={formData.availableDaysPerWeek}
-                  onChange={(e) => updateField("availableDaysPerWeek", e.target.value)}
-                  placeholder="Ex: 4"
-                />
+                <Select value={formData.availableDaysPerWeek} onValueChange={(value) => updateField("availableDaysPerWeek", value)}>
+                  <SelectTrigger id="availableDaysWeight">
+                    <SelectValue placeholder="Choisir le nombre de jours" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 jours</SelectItem>
+                    <SelectItem value="3">3 jours</SelectItem>
+                    <SelectItem value="4">4 jours</SelectItem>
+                    <SelectItem value="5">5 jours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="levelWeight">Votre niveau</Label>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Niveau détecté : <strong>{detectedLevel === "beginner" ? "Débutant" : detectedLevel === "intermediate" ? "Intermédiaire" : "Avancé"}</strong></p>
+                  <Select value={formData.level || "beginner"} onValueChange={(value) => updateField("level", value as "beginner" | "intermediate" | "advanced")}>
+                    <SelectTrigger id="levelWeight">
+                      <SelectValue placeholder="Choisir votre niveau" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Débutant - Moins de 20km/semaine</SelectItem>
+                      <SelectItem value="intermediate">Intermédiaire - 20-50km/semaine</SelectItem>
+                      <SelectItem value="advanced">Avancé - Plus de 50km/semaine</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -492,16 +658,33 @@ export default function GoalTab() {
               />
               <div className="space-y-2">
                 <Label htmlFor="availableDaysRace">Nombre de jours disponibles par semaine pour aller courir</Label>
-                <Input
-                  id="availableDaysRace"
-                  type="number"
-                  min="1"
-                  max="7"
-                  step="1"
-                  value={formData.availableDaysPerWeek}
-                  onChange={(e) => updateField("availableDaysPerWeek", e.target.value)}
-                  placeholder="Ex: 4"
-                />
+                <Select value={formData.availableDaysPerWeek} onValueChange={(value) => updateField("availableDaysPerWeek", value)}>
+                  <SelectTrigger id="availableDaysRace">
+                    <SelectValue placeholder="Choisir le nombre de jours" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 jours</SelectItem>
+                    <SelectItem value="3">3 jours</SelectItem>
+                    <SelectItem value="4">4 jours</SelectItem>
+                    <SelectItem value="5">5 jours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="levelRace">Votre niveau</Label>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Niveau détecté : <strong>{detectedLevel === "beginner" ? "Débutant" : detectedLevel === "intermediate" ? "Intermédiaire" : "Avancé"}</strong></p>
+                  <Select value={formData.level || "beginner"} onValueChange={(value) => updateField("level", value as "beginner" | "intermediate" | "advanced")}>
+                    <SelectTrigger id="levelRace">
+                      <SelectValue placeholder="Choisir votre niveau" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Débutant - Moins de 20km/semaine</SelectItem>
+                      <SelectItem value="intermediate">Intermédiaire - 20-50km/semaine</SelectItem>
+                      <SelectItem value="advanced">Avancé - Plus de 50km/semaine</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -533,16 +716,33 @@ export default function GoalTab() {
               />
               <div className="space-y-2">
                 <Label htmlFor="availableDaysDistance">Nombre de jours disponibles par semaine pour aller courir</Label>
-                <Input
-                  id="availableDaysDistance"
-                  type="number"
-                  min="1"
-                  max="7"
-                  step="1"
-                  value={formData.availableDaysPerWeek}
-                  onChange={(e) => updateField("availableDaysPerWeek", e.target.value)}
-                  placeholder="Ex: 4"
-                />
+                <Select value={formData.availableDaysPerWeek} onValueChange={(value) => updateField("availableDaysPerWeek", value)}>
+                  <SelectTrigger id="availableDaysDistance">
+                    <SelectValue placeholder="Choisir le nombre de jours" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2 jours</SelectItem>
+                    <SelectItem value="3">3 jours</SelectItem>
+                    <SelectItem value="4">4 jours</SelectItem>
+                    <SelectItem value="5">5 jours</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="levelDistance">Votre niveau</Label>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">Niveau détecté : <strong>{detectedLevel === "beginner" ? "Débutant" : detectedLevel === "intermediate" ? "Intermédiaire" : "Avancé"}</strong></p>
+                  <Select value={formData.level || "beginner"} onValueChange={(value) => updateField("level", value as "beginner" | "intermediate" | "advanced")}>
+                    <SelectTrigger id="levelDistance">
+                      <SelectValue placeholder="Choisir votre niveau" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Débutant - Moins de 20km/semaine</SelectItem>
+                      <SelectItem value="intermediate">Intermédiaire - 20-50km/semaine</SelectItem>
+                      <SelectItem value="advanced">Avancé - Plus de 50km/semaine</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -550,6 +750,45 @@ export default function GoalTab() {
       )}
 
       {(isDefining || isChanging) && (
+        <>
+          {selectedPlan && (
+            <ScrollReveal>
+              <Card className="border-accent/30 bg-accent/5">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-accent flex items-center gap-2">
+                        <Zap className="h-4 w-4" />
+                        Plan sélectionné
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">{selectedPlan.name}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg bg-card p-2">
+                      <p className="text-xs text-muted-foreground">Durée</p>
+                      <p className="text-sm font-bold text-accent">{selectedPlan.durationWeeks}w</p>
+                    </div>
+                    <div className="rounded-lg bg-card p-2">
+                      <p className="text-xs text-muted-foreground">Séances</p>
+                      <p className="text-sm font-bold text-accent">{selectedPlan.daysPerWeek}j/sem</p>
+                    </div>
+                    <div className="rounded-lg bg-card p-2">
+                      <p className="text-xs text-muted-foreground">Niveau</p>
+                      <p className="text-sm font-bold text-accent capitalize">{selectedPlan.level === "beginner" ? "Début" : selectedPlan.level === "intermediate" ? "Inter" : "Avancé"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          )}
+          <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
+            <Target className="h-4 w-4 mr-2" />
+            Sauvegarder profil et plan
+          </Button>
+        </>
+      )}
+      {!(isDefining || isChanging) && (
         <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
           <Target className="h-4 w-4 mr-2" />
           Sauvegarder profil et objectif

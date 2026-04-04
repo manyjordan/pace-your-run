@@ -9,7 +9,10 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
     proxy: {
-      "/api": "http://localhost:3000",
+      "/functions/v1": {
+        target: "http://localhost:54321",
+        changeOrigin: true,
+      },
     },
     hmr: {
       overlay: false,

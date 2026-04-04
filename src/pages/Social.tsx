@@ -5,12 +5,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Heart, MessageCircle, Share2, MapPin, Clock, Zap, Trophy, Image as ImageIcon, Send, Search, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import GPSMap from "@/components/GPSMap";
+import { useAuth } from "@/contexts/AuthContext";
+import { getPublicPosts, toggleLike as togglePostLike, type PublicPostRecord, type RunRow } from "@/lib/database";
 import {
-  COMMUNITY_POSTS_KEY,
-  activityToCommunityPost,
+  formatDuration,
+  formatPace,
+  formatRelativeTime,
+  getInitials,
   type CommunityPost,
   type StravaActivity,
 } from "@/lib/strava";
@@ -33,8 +38,101 @@ function ensurePostTrace(post: CommunityPost): CommunityPost {
   return { ...post, gpsTrace: buildFallbackTrace(post.id) };
 }
 
-const feedPosts: CommunityPost[] = [
+type FeedPost = CommunityPost & {
+  activityId: number;
+  dbId?: string;
+};
+
+function hashStringToNumber(value: string) {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash << 5) - hash + value.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash);
+}
+
+function parseGpsTrace(trace: unknown): CommunityPost["gpsTrace"] | undefined {
+  if (!Array.isArray(trace)) return undefined;
+
+  const points = trace.filter((point): point is { lat: number; lng: number; time: number } => {
+    return (
+      typeof point === "object" &&
+      point !== null &&
+      typeof (point as { lat?: unknown }).lat === "number" &&
+      typeof (point as { lng?: unknown }).lng === "number" &&
+      typeof (point as { time?: unknown }).time === "number"
+    );
+  });
+
+  return points.length ? points : undefined;
+}
+
+function inferPostType(title: string, description: string) {
+  const label = `${title} ${description}`.toLowerCase();
+  if (
+    label.includes("marathon") ||
+    label.includes("semi") ||
+    label.includes("race") ||
+    label.includes("course") ||
+    label.includes("10k") ||
+    label.includes("10 km") ||
+    label.includes("5k") ||
+    label.includes("5 km")
+  ) {
+    return "race" as const;
+  }
+
+  return "run" as const;
+}
+
+function runToActivity(run: RunRow, activityId: number): StravaActivity {
+  return {
+    id: activityId,
+    name: run.title ?? "Activité",
+    distance: run.distance_km * 1000,
+    moving_time: run.duration_seconds,
+    elapsed_time: run.duration_seconds,
+    total_elevation_gain: run.elevation_gain ?? 0,
+    start_date: run.started_at ?? run.created_at ?? new Date().toISOString(),
+    type: run.run_type ?? "Run",
+  };
+}
+
+function mapPublicPostToFeedPost(post: PublicPostRecord): FeedPost {
+  const displayName =
+    post.profile?.username ||
+    post.profile?.full_name ||
+    "Coureur";
+  const activityId = hashStringToNumber(post.run?.id ?? post.id);
+  const run = post.run;
+
+  return {
+    activityId,
+    dbId: post.id,
+    id: activityId,
+    user: displayName,
+    initials: getInitials(displayName),
+    time: formatRelativeTime(post.created_at ?? new Date().toISOString()),
+    type: inferPostType(post.title ?? "", post.description ?? ""),
+    title: post.title ?? run?.title ?? "Nouvelle activité",
+    description: post.description ?? "Activité partagée",
+    stats: {
+      distance: `${(run?.distance_km ?? 0).toFixed(2)} km`,
+      pace: run ? formatPace(run.distance_km * 1000, run.duration_seconds) : "--:-- /km",
+      duration: run ? formatDuration(run.duration_seconds) : "00:00",
+      elevation: `+${Math.round(run?.elevation_gain ?? 0)} m`,
+    },
+    gpsTrace: parseGpsTrace(run?.gps_trace),
+    likes: post.likes_count ?? 0,
+    comments: 0,
+    liked: post.likedByMe,
+  };
+}
+
+const feedPosts: FeedPost[] = [
   {
+    activityId: 1,
     id: 1,
     user: "Léa Martin",
     initials: "LM",
@@ -48,6 +146,7 @@ const feedPosts: CommunityPost[] = [
     liked: false,
   },
   {
+    activityId: 2,
     id: 2,
     user: "Thomas Dubois",
     initials: "TD",
@@ -61,6 +160,7 @@ const feedPosts: CommunityPost[] = [
     liked: true,
   },
   {
+    activityId: 3,
     id: 3,
     user: "Marie Lefevre",
     initials: "ML",
@@ -74,6 +174,7 @@ const feedPosts: CommunityPost[] = [
     liked: false,
   },
   {
+    activityId: 4,
     id: 4,
     user: "Antoine Moreau",
     initials: "AM",
@@ -96,7 +197,8 @@ const friendsSeed = [
 ];
 
 export default function Social() {
-  const [posts, setPosts] = useState(feedPosts);
+  const { user } = useAuth();
+  const [posts, setPosts] = useState<FeedPost[]>([]);
   const [activities, setActivities] = useState<StravaActivity[]>([]);
   const [newPost, setNewPost] = useState("");
   const [showFriendSearch, setShowFriendSearch] = useState(false);
@@ -104,8 +206,11 @@ export default function Social() {
   const [friends, setFriends] = useState(friendsSeed);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<CommunityPost["gpsTrace"] | undefined>(undefined);
+  const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [postsError, setPostsError] = useState<string | null>(null);
+  const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
 
-  const buildActivityFromPost = (post: CommunityPost): StravaActivity => {
+  const buildActivityFromPost = (post: FeedPost): StravaActivity => {
     const parseDistance = Number.parseFloat(post.stats.distance.replace(",", "."));
     const [hoursOrMinutes = "0", minutesOrSeconds = "0", seconds = "0"] = post.stats.duration.split(":");
     const durationSeconds =
@@ -116,7 +221,7 @@ export default function Social() {
         : Number.parseInt(hoursOrMinutes, 10) * 60 + Number.parseInt(minutesOrSeconds, 10);
 
     return {
-      id: post.id,
+      id: post.activityId,
       name: post.title,
       distance: Number.isFinite(parseDistance) ? parseDistance * 1000 : 0,
       moving_time: durationSeconds,
@@ -126,16 +231,39 @@ export default function Social() {
     };
   };
 
-  const handleOpenActivity = (post: CommunityPost) => {
-    const matched = activities.find((activity) => activity.id === post.id);
+  const handleOpenActivity = (post: FeedPost) => {
+    const matched = activities.find((activity) => activity.id === post.activityId);
     setSelectedActivity(matched ?? buildActivityFromPost(post));
     setSelectedTrace(post.gpsTrace);
   };
 
-  const toggleLike = (id: number) => {
-    setPosts(posts.map(p =>
-      p.id === id ? { ...p, liked: !p.liked, likes: p.liked ? p.likes - 1 : p.likes + 1 } : p
-    ));
+  const handleToggleLike = async (post: FeedPost) => {
+    if (!user) return;
+
+    if (!post.dbId) {
+      setPosts((current) =>
+        current.map((item) =>
+          item.activityId === post.activityId
+            ? { ...item, liked: !item.liked, likes: item.liked ? item.likes - 1 : item.likes + 1 }
+            : item,
+        ),
+      );
+      return;
+    }
+
+    try {
+      setLikeBusyId(post.dbId);
+      const result = await togglePostLike(post.dbId, user.id);
+      setPosts((current) =>
+        current.map((item) =>
+          item.dbId === post.dbId ? { ...item, liked: result.liked, likes: result.likesCount } : item,
+        ),
+      );
+    } catch {
+      setPostsError("Impossible de mettre à jour le like pour le moment.");
+    } finally {
+      setLikeBusyId(null);
+    }
   };
 
   const toggleFollow = (id: number) => {
@@ -148,26 +276,32 @@ export default function Social() {
 
   useEffect(() => {
     const loadCommunityPosts = async () => {
+      setIsLoadingPosts(true);
+      setPostsError(null);
+
       try {
-        const raw = window.localStorage.getItem(COMMUNITY_POSTS_KEY);
-        const generatedPosts = raw ? JSON.parse(raw) as CommunityPost[] : [];
+        const publicPosts = await getPublicPosts();
 
-        const response = await fetch("/api/strava/activities?per_page=20");
-        const data = await response.json();
-        const athleteName = data?.athlete
-          ? `${data.athlete.firstname ?? ""} ${data.athlete.lastname ?? ""}`.trim()
-          : "Strava";
-        const importedPosts = Array.isArray(data?.activities)
-          ? (data.activities as StravaActivity[]).map((activity) => activityToCommunityPost(activity, athleteName))
-          : [];
-        setActivities(Array.isArray(data?.activities) ? (data.activities as StravaActivity[]) : []);
+        if (publicPosts.length === 0) {
+          const fallbackPosts = feedPosts.map(ensurePostTrace);
+          setPosts(fallbackPosts);
+          setActivities(fallbackPosts.map((post) => buildActivityFromPost(post)));
+          return;
+        }
 
-        const merged = [...importedPosts, ...generatedPosts, ...feedPosts].map(ensurePostTrace);
-        const deduped = Array.from(new Map(merged.map((post) => [post.id, post])).values());
-        setPosts(deduped);
+        const mappedPosts = publicPosts.map(mapPublicPostToFeedPost).map(ensurePostTrace);
+        setPosts(mappedPosts);
+        setActivities(
+          publicPosts
+            .filter((post) => post.run)
+            .map((post) => runToActivity(post.run as RunRow, hashStringToNumber(post.run?.id ?? post.id))),
+        );
       } catch {
         setActivities([]);
-        setPosts(feedPosts.map(ensurePostTrace));
+        setPosts([]);
+        setPostsError("Impossible de charger le fil social pour le moment.");
+      } finally {
+        setIsLoadingPosts(false);
       }
     };
 
@@ -176,10 +310,8 @@ export default function Social() {
       void loadCommunityPosts();
     };
 
-    window.addEventListener("storage", handleReload);
     window.addEventListener("pace-community-updated", handleReload);
     return () => {
-      window.removeEventListener("storage", handleReload);
       window.removeEventListener("pace-community-updated", handleReload);
     };
   }, []);
@@ -217,6 +349,12 @@ export default function Social() {
       </ScrollReveal>
 
       <div className="space-y-4">
+        {postsError && (
+          <ScrollReveal delay={0.04}>
+            <p className="text-sm text-destructive">{postsError}</p>
+          </ScrollReveal>
+        )}
+
         {showFriendSearch && (
           <ScrollReveal delay={0.04}>
             <Card>
@@ -289,114 +427,142 @@ export default function Social() {
         </ScrollReveal>
 
         {/* Posts */}
-        {posts.map((post, i) => (
-          <ScrollReveal key={post.id} delay={0.1 + i * 0.06}>
-            <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
-              <CardContent className="p-4 space-y-3">
-                {/* Header */}
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-secondary text-secondary-foreground text-xs font-bold">
-                      {post.initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm">{post.user}</span>
-                      {post.type === "race" && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          <Trophy className="h-3 w-3 mr-0.5" /> Course
-                        </Badge>
-                      )}
+        {isLoadingPosts
+          ? Array.from({ length: 3 }, (_, i) => (
+              <ScrollReveal key={`skeleton-${i}`} delay={0.1 + i * 0.06}>
+                <Card className="overflow-hidden">
+                  <CardContent className="p-4 space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-20" />
+                      </div>
                     </div>
-                    <span className="text-xs text-muted-foreground">{post.time}</span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div>
-                  <h3 className="font-semibold text-sm">{post.title}</h3>
-                  <p className="text-sm text-muted-foreground mt-1">{post.description}</p>
-                </div>
-
-                {/* Stats strip */}
-                <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                      <MapPin className="h-3 w-3" /> Dist.
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-56" />
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-5/6" />
                     </div>
-                    <div className="text-sm font-bold mt-0.5">{post.stats.distance}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                      <Zap className="h-3 w-3" /> Allure
+                    <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
                     </div>
-                    <div className="text-sm font-bold mt-0.5">{post.stats.pace}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                      <Clock className="h-3 w-3" /> Durée
+                    <Skeleton className="h-10 w-full" />
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            ))
+          : posts.map((post, i) => (
+              <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
+                <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
+                  <CardContent className="p-4 space-y-3">
+                    {/* Header */}
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs font-bold">
+                          {post.initials}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm">{post.user}</span>
+                          {post.type === "race" && (
+                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                              <Trophy className="h-3 w-3 mr-0.5" /> Course
+                            </Badge>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{post.time}</span>
+                      </div>
                     </div>
-                    <div className="text-sm font-bold mt-0.5">{post.stats.duration}</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xs text-muted-foreground">D+</div>
-                    <div className="text-sm font-bold mt-0.5">{post.stats.elevation}</div>
-                  </div>
-                </div>
 
-                {/* GPS Trace Map */}
-                {"gpsTrace" in post && Array.isArray((post as any).gpsTrace) && (post as any).gpsTrace.length > 0 && (
-                  <GPSMap trace={(post as any).gpsTrace} />
-                )}
+                    {/* Content */}
+                    <div>
+                      <h3 className="font-semibold text-sm">{post.title}</h3>
+                      <p className="text-sm text-muted-foreground mt-1">{post.description}</p>
+                    </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleOpenActivity(post);
-                  }}
-                >
-                  Voir les détails de l'activité
-                </Button>
+                    {/* Stats strip */}
+                    <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                          <MapPin className="h-3 w-3" /> Dist.
+                        </div>
+                        <div className="text-sm font-bold mt-0.5">{post.stats.distance}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                          <Zap className="h-3 w-3" /> Allure
+                        </div>
+                        <div className="text-sm font-bold mt-0.5">{post.stats.pace}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
+                          <Clock className="h-3 w-3" /> Durée
+                        </div>
+                        <div className="text-sm font-bold mt-0.5">{post.stats.duration}</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-xs text-muted-foreground">D+</div>
+                        <div className="text-sm font-bold mt-0.5">{post.stats.elevation}</div>
+                      </div>
+                    </div>
 
-                {/* Actions */}
-                <div className="flex items-center gap-1 pt-1 border-t border-border">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={post.liked ? "text-red-500" : "text-muted-foreground"}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      toggleLike(post.id);
-                    }}
-                  >
-                    <Heart className={`h-4 w-4 mr-1 ${post.liked ? "fill-current" : ""}`} />
-                    {post.likes}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-muted-foreground"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <MessageCircle className="h-4 w-4 mr-1" /> {post.comments}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto text-muted-foreground"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <Share2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </ScrollReveal>
-        ))}
+                    {post.gpsTrace && post.gpsTrace.length > 0 && (
+                      <GPSMap trace={post.gpsTrace} />
+                    )}
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        handleOpenActivity(post);
+                      }}
+                    >
+                      Voir les détails de l'activité
+                    </Button>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-1 pt-1 border-t border-border">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={likeBusyId === post.dbId}
+                        className={post.liked ? "text-red-500" : "text-muted-foreground"}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleToggleLike(post);
+                        }}
+                      >
+                        <Heart className={`h-4 w-4 mr-1 ${post.liked ? "fill-current" : ""}`} />
+                        {post.likes}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-muted-foreground"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-1" /> {post.comments}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="ml-auto text-muted-foreground"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <Share2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            ))}
       </div>
     </div>
   );

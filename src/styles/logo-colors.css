@@ -1,0 +1,38 @@
+/* Color filter utility to convert green logos to yellow */
+
+/* Hue-rotate filter to convert green (#84cc16) to yellow (#d4a927) */
+.logo-yellow-filter {
+  filter: hue-rotate(-30deg) saturate(1.1);
+}
+
+/* For inline SVG or background images */
+.logo-icon-yellow {
+  filter: hue-rotate(-30deg) saturate(1.1) brightness(1.05);
+}
+
+/* Alternative: Pure color mapping using CSS filters */
+.logo-green-to-yellow {
+  /* Lime green (#84cc16 / hsl(80, 100%, 50%)) to Yellow (#d4a927 / hsl(45, 97%, 54%)) */
+  /* Rotation needed: 80° to 45° = -35° */
+  filter: hue-rotate(-35deg) saturate(0.95);
+}
+
+/* For specific logo elements */
+img.app-logo {
+  filter: hue-rotate(-35deg) saturate(0.95);
+}
+
+/* Splash screen logo */
+img.splash-logo {
+  filter: hue-rotate(-35deg) saturate(0.95);
+}
+
+/* Header logo */
+img.header-logo {
+  filter: hue-rotate(-35deg) saturate(0.95);
+}
+
+/* App icons */
+img.app-icon {
+  filter: hue-rotate(-35deg) saturate(0.95);
+}

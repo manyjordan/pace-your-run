@@ -46,6 +46,34 @@ export type StravaActivity = {
   }>;
 };
 
+export type StravaSession = {
+  access_token: string;
+  refresh_token: string;
+  expires_at: number;
+  athlete: {
+    id: number;
+    username: string;
+    firstname: string;
+    lastname: string;
+    profile: string;
+  };
+};
+
+export function connectStrava(jwtToken: string): string {
+  const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
+  const redirectUri = `${window.location.origin}/functions/v1/strava-auth`;
+  
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: "code",
+    redirect_uri: redirectUri,
+    scope: "activity:read_all",
+    state: jwtToken,
+  });
+
+  return `https://www.strava.com/oauth/authorize?${params.toString()}`;
+}
+
 export function formatDuration(seconds: number) {
   const safeSeconds = Math.max(0, Math.round(seconds));
   const hours = Math.floor(safeSeconds / 3600);
