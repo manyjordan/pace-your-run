@@ -104,78 +104,55 @@ const SettingsPage = () => {
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      if (!session) {
-        throw new Error("Session introuvable");
+      const { data: refreshData, error: refreshError } =
+        await supabase.auth.refreshSession();
+
+      if (refreshError || !refreshData.session) {
+        throw new Error("Session expirée. Reconnectez-vous puis réessayez.");
       }
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseAnonKey) {
-        throw new Error("Configuration Supabase manquante");
-      }
-
-      const {
-        data: { session: freshSession },
-        error: refreshError,
-      } = await supabase.auth.refreshSession();
-
-      if (refreshError || !freshSession) {
-        throw new Error("Session expirée. Reconnectez-vous puis réessayez.");
-      }
 
       const response = await fetch(
         `${supabaseUrl}/functions/v1/delete-account`,
         {
           method: "POST",
           headers: {
-            Accept: "application/json",
             "Content-Type": "application/json",
-            Authorization: `Bearer ${freshSession.access_token}`,
-            apikey: supabaseAnonKey,
+            "Authorization": `Bearer ${refreshData.session.access_token}`,
+            "apikey": supabaseAnonKey,
           },
-        },
+          body: JSON.stringify({ userId: refreshData.session.user.id }),
+        }
       );
 
       if (!response.ok) {
-        const errorPayload = await response.json().catch(async () => {
-          const fallbackText = await response.text().catch(() => "");
-          return fallbackText ? { details: fallbackText } : null;
-        });
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(
-          errorPayload?.details ||
-            errorPayload?.error ||
-            "Failed to delete account",
+          errorData.details || errorData.error || `Erreur ${response.status}`
         );
       }
-
-      await response.json().catch(() => null);
 
       toast({
         title: "Compte supprimé",
         description: "Votre compte et toutes vos données ont été supprimés.",
       });
 
-      setDeleteDialogOpen(false);
-
-      // Clear the local session after the server-side account deletion.
-      await supabase.auth.signOut({ scope: "local" }).catch((error) => {
-        console.warn("Local sign out after account deletion failed:", error);
-      });
-
+      await supabase.auth.signOut({ scope: "local" });
       navigate("/auth", { replace: true });
     } catch (error) {
-      console.error("Error deleting account:", error);
       toast({
         title: "Erreur",
         description:
           error instanceof Error
             ? error.message
-            : "Impossible de supprimer le compte. Veuillez réessayer.",
+            : "Impossible de supprimer le compte.",
         variant: "destructive",
       });
     } finally {
       setIsDeleting(false);
+      setDeleteDialogOpen(false);
     }
   };
 

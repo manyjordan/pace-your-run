@@ -17,7 +17,6 @@ import Plan from "./pages/Plan.tsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
 import TermsOfUse from "./pages/TermsOfUse.tsx";
 import SettingsPage from "./pages/Settings.tsx";
-import StravaCallback from "./pages/StravaCallback.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 // Lazy load heavy pages
@@ -66,7 +65,6 @@ function AppRoutes() {
                   <Route path="/import" element={<ImportPage />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
                   <Route path="/settings" element={<SettingsPage />} />
-                  <Route path="/auth/strava/callback" element={<StravaCallback />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

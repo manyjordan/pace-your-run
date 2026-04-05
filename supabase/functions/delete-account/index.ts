@@ -178,7 +178,6 @@ export const handler = async (req: Request): Promise<Response> => {
     await deleteForumData();
     await cleanupTable("training_plan_sessions", "user_id", userId);
     await cleanupTable("runs", "user_id", userId);
-    await cleanupTable("strava_tokens", "user_id", userId);
     await cleanupTable("profiles", "id", userId);
 
     // Delete the auth user. All rows referencing auth.users(id) with ON DELETE CASCADE

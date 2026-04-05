@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { TrendingUp, AlertTriangle, Award } from "lucide-react";
-import { buildVo2Series, buildAcwrSeries, getPersonalRecords, type StravaActivity } from "@/lib/strava";
+import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
+import type { RunRow } from "@/lib/database";
+import { getStartOfWeek } from "@/lib/dashboardHelpers";
+import { formatDistance, formatDuration, formatPace } from "@/lib/strava";
 
 const tooltipStyle = {
   background: "hsl(var(--card))",
@@ -28,37 +30,112 @@ function CompactYearTick({
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text
-        x={0}
-        y={10}
-        textAnchor="middle"
-        fill="hsl(var(--foreground))"
-        fontSize={9}
-        fontWeight={600}
-      >
+      <text x={0} y={10} textAnchor="middle" fill="hsl(var(--foreground))" fontSize={9} fontWeight={600}>
         {payload.value}
       </text>
     </g>
   );
 }
 
-export const PerformanceSection = ({
-  activities,
-}: {
-  activities: StravaActivity[];
-}) => {
-  const [vo2Granularity, setVo2Granularity] = useState<"week" | "month">("week");
-  const [vo2Period, setVo2Period] = useState<"1m" | "3m" | "1y" | "all">("3m");
+const WEEKS_BACK = 12;
 
-  const vo2Series = useMemo(
-    () => buildVo2Series(activities, vo2Granularity, vo2Period),
-    [activities, vo2Granularity, vo2Period],
-  );
-  const acwrSeries = useMemo(() => buildAcwrSeries(activities), [activities]);
-  const prs = useMemo(() => getPersonalRecords(activities), [activities]);
+function weekBuckets(runs: RunRow[]) {
+  const now = new Date();
+  const currentWeekStart = getStartOfWeek(now);
+  const labels: string[] = [];
+  const starts: Date[] = [];
 
-  const currentVo2 = [...vo2Series].reverse().find((item) => item.value > 0)?.value ?? 0;
-  const currentAcwr = acwrSeries[acwrSeries.length - 1]?.value ?? 0;
+  for (let i = WEEKS_BACK - 1; i >= 0; i -= 1) {
+    const start = new Date(currentWeekStart);
+    start.setDate(currentWeekStart.getDate() - i * 7);
+    starts.push(start);
+    const d = start.getDate();
+    const m = start.getMonth() + 1;
+    labels.push(`${d}/${m}`);
+  }
+
+  const distanceKm = new Array(WEEKS_BACK).fill(0);
+  const paceWeightedNum = new Array(WEEKS_BACK).fill(0);
+  const paceWeightedDen = new Array(WEEKS_BACK).fill(0);
+
+  for (const run of runs) {
+    const raw = run.started_at ?? run.created_at;
+    if (!raw) continue;
+    const runDate = new Date(raw);
+    const runWeekStart = getStartOfWeek(runDate);
+    const index = starts.findIndex((s) => s.getTime() === runWeekStart.getTime());
+    if (index < 0) continue;
+
+    distanceKm[index] += run.distance_km;
+    if (run.distance_km > 0 && run.duration_seconds > 0) {
+      paceWeightedNum[index] += run.duration_seconds;
+      paceWeightedDen[index] += run.distance_km;
+    }
+  }
+
+  const paceSeries = labels.map((week, i) => {
+    const den = paceWeightedDen[i];
+    const paceSecondsPerKm = den > 0 ? paceWeightedNum[i] / den : 0;
+    return {
+      week,
+      value: paceSecondsPerKm,
+      showTick: i % 2 === 0,
+      paceLabel: den > 0 ? formatPace(den * 1000, paceWeightedNum[i]) : "",
+    };
+  });
+
+  const distanceSeries = labels.map((week, i) => ({
+    week,
+    value: Math.round(distanceKm[i] * 10) / 10,
+    showTick: i % 2 === 0,
+  }));
+
+  return { paceSeries, distanceSeries };
+}
+
+export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
+  const { paceSeries, distanceSeries } = useMemo(() => weekBuckets(runs), [runs]);
+
+  const stats = useMemo(() => {
+    if (runs.length === 0) {
+      return {
+        totalKm: 0,
+        totalDuration: 0,
+        runCount: 0,
+        longestKm: 0,
+        bestPaceLabel: "—",
+        avgPaceLabel: "—",
+      };
+    }
+
+    const totalKm = runs.reduce((s, r) => s + r.distance_km, 0);
+    const totalDuration = runs.reduce((s, r) => s + r.duration_seconds, 0);
+    const longestKm = Math.max(...runs.map((r) => r.distance_km), 0);
+    const withPace = runs.filter((r) => r.distance_km > 0.05 && r.duration_seconds > 0);
+    let bestPaceLabel = "—";
+    let bestSecPerKm = Number.POSITIVE_INFINITY;
+    for (const r of withPace) {
+      const sec = r.duration_seconds / r.distance_km;
+      if (sec < bestSecPerKm) {
+        bestSecPerKm = sec;
+        bestPaceLabel = formatPace(r.distance_km * 1000, r.duration_seconds);
+      }
+    }
+    const avgPaceLabel =
+      totalKm > 0.01 ? formatPace(totalKm * 1000, totalDuration) : "—";
+
+    return {
+      totalKm,
+      totalDuration,
+      runCount: runs.length,
+      longestKm,
+      bestPaceLabel,
+      avgPaceLabel,
+    };
+  }, [runs]);
+
+  const lastPace = [...paceSeries].reverse().find((p) => p.value > 0);
+  const lastDistance = [...distanceSeries].reverse().find((d) => d.value > 0);
 
   return (
     <div className="space-y-6">
@@ -68,74 +145,37 @@ export const PerformanceSection = ({
             <div>
               <div className="flex items-center gap-2">
                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">Tendance VO2 max</h2>
+                <h2 className="text-sm font-semibold">Allure moyenne par semaine</h2>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Estimation dérivée de l'allure moyenne et de la durée de chaque, puis agrégée sur la période choisie.
+                Moyenne pondérée des sorties enregistrées dans l&apos;app sur les 12 dernières semaines.
               </p>
             </div>
             <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-semibold leading-4 text-lime">
-              {currentVo2 > 0 ? `${currentVo2.toFixed(1)} ml/kg/min` : "Aucune donnée"}
+              {lastPace?.paceLabel || "Aucune donnée"}
             </span>
-          </div>
-          <div className="mb-4 flex flex-wrap gap-2">
-            <div className="space-y-1">
-              <p className="text-[10px] font-medium text-muted-foreground">Granularité des données</p>
-              <div className="flex gap-1">
-                {(["week", "month"] as const).map((granularity) => (
-                  <button
-                    key={granularity}
-                    onClick={() => setVo2Granularity(granularity)}
-                    className={`rounded px-2 py-1 text-xs font-medium transition ${
-                      vo2Granularity === granularity
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {granularity === "week" ? "Sem" : "Mois"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="space-y-1">
-              <p className="text-[10px] font-medium text-muted-foreground">Historique des données</p>
-              <div className="flex gap-1">
-                {(["1m", "3m", "1y", "all"] as const).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setVo2Period(period)}
-                    className={`rounded px-2 py-1 text-xs font-medium transition ${
-                      vo2Period === period
-                        ? "bg-accent text-accent-foreground"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {period === "1m" ? "1m" : period === "3m" ? "3m" : period === "1y" ? "1a" : "Tout"}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
           <div className="mb-4">
-            <span className="text-3xl font-bold tabular-nums">
-              {currentVo2 > 0 ? currentVo2.toFixed(1) : "--"}
-            </span>
-            <p className="mt-1 text-xs text-muted-foreground">Dernière estimation fiable</p>
+            <span className="text-3xl font-bold tabular-nums">{lastPace?.paceLabel ?? "—"}</span>
+            <p className="mt-1 text-xs text-muted-foreground">Dernière semaine avec course</p>
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={vo2Series} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+              <BarChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
                 <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactYearTick />} interval={0} />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} ml/kg/min`, "VO2 max estimée"]}
+                  formatter={(_value, _name, props) => {
+                    const p = props?.payload as { paceLabel?: string } | undefined;
+                    return [p?.paceLabel || "—", "Allure moy."];
+                  }}
                 />
                 <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
                   <LabelList
-                    dataKey="value"
+                    dataKey="paceLabel"
                     position="top"
-                    formatter={(value: number) => (Number(value) === 0 ? "" : `${Math.round(Number(value))}`)}
+                    formatter={(value: string) => (value ? value.replace(" /km", "") : "")}
                     fill="hsl(var(--foreground))"
                     fontSize={10}
                     fontWeight={700}
@@ -152,40 +192,38 @@ export const PerformanceSection = ({
           <div className="mb-4 flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                <h2 className="text-sm font-semibold">Ratio charge aiguë : Chronique</h2>
+                <Route className="h-4 w-4 text-muted-foreground" />
+                <h2 className="text-sm font-semibold">Volume hebdomadaire</h2>
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Estimation basée sur la durée, modulée par la fréquence cardiaque moyenne quand elle est disponible, puis comparée à la moyenne des 4 semaines précédentes.
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Kilomètres cumulés par semaine (12 dernières semaines).</p>
             </div>
             <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-semibold leading-4 text-lime">
-              {currentAcwr > 0 ? currentAcwr.toFixed(2) : "Aucune donnée"}
+              {lastDistance != null && lastDistance.value > 0 ? `${lastDistance.value} km` : "Aucune donnée"}
             </span>
           </div>
           <div className="mb-4">
             <span className="text-3xl font-bold tabular-nums">
-              {currentAcwr > 0 ? currentAcwr.toFixed(2) : "--"}
+              {lastDistance != null && lastDistance.value > 0 ? `${lastDistance.value} km` : "—"}
             </span>
-            <p className="mt-1 text-xs text-muted-foreground">Zone idéale : 0.80 à 1.30</p>
+            <p className="mt-1 text-xs text-muted-foreground">Dernière semaine avec volume</p>
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={acwrSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+              <AreaChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
                 <defs>
-                  <linearGradient id="acwrGrad" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="distGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.24} />
                     <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactYearTick />} interval={0} />
-                <YAxis hide domain={[0, 2]} />
+                <YAxis hide />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  formatter={(value) => [`${Number(value).toFixed(2).replace(".", ",")}`, "Ratio charge aiguë : Chronique"]}
+                  formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} km`, "Distance"]}
                 />
-                <Area type="monotone" dataKey="value" stroke="hsl(var(--accent))" strokeWidth={2.5} fill="url(#acwrGrad)" />
+                <Area type="monotone" dataKey="value" stroke="hsl(var(--accent))" strokeWidth={2.5} fill="url(#distGrad)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -194,20 +232,43 @@ export const PerformanceSection = ({
 
       <ScrollReveal>
         <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4 flex items-center gap-2"><Award className="h-4 w-4 text-lime" /><h2 className="text-sm font-semibold">Records personnels</h2></div>
-          <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-            {prs.map((pr, i) => (
-              <ScrollReveal key={pr.event} delay={i * 0.06}>
-                <div className="rounded-lg border border-border p-4 transition-shadow hover:shadow-md">
-                  <p className="text-xs font-medium text-muted-foreground">{pr.event}</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums">{pr.time}</p>
-                  <div className="mt-2 flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">{pr.date}</span>
-                    <span className="flex items-center gap-0.5 font-semibold text-lime">{pr.improvement}</span>
-                  </div>
-                </div>
-              </ScrollReveal>
-            ))}
+          <div className="mb-4 flex items-center gap-2">
+            <Award className="h-4 w-4 text-lime" />
+            <h2 className="text-sm font-semibold">Synthèse sur vos courses</h2>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <BarChart3 className="h-3.5 w-3.5" />
+                Sorties enregistrées
+              </div>
+              <p className="mt-2 text-2xl font-bold tabular-nums">{stats.runCount}</p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Route className="h-3.5 w-3.5" />
+                Distance cumulée
+              </div>
+              <p className="mt-2 text-2xl font-bold tabular-nums">{formatDistance(stats.totalKm * 1000)}</p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <TrendingUp className="h-3.5 w-3.5" />
+                Plus longue sortie
+              </div>
+              <p className="mt-2 text-2xl font-bold tabular-nums">
+                {stats.longestKm > 0 ? `${stats.longestKm.toFixed(1)} km` : "—"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                <Award className="h-3.5 w-3.5" />
+                Meilleure allure moyenne
+              </div>
+              <p className="mt-2 text-2xl font-bold tabular-nums">{stats.bestPaceLabel}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Allure globale moyenne : {stats.avgPaceLabel}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Temps total : {formatDuration(stats.totalDuration)}</p>
+            </div>
           </div>
         </div>
       </ScrollReveal>

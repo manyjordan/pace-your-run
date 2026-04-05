@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { BarChart3, Clock, Heart, Mountain, Route, TrendingUp, X } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import GPSMap from "@/components/GPSMap";
 import {
-  buildTraceFromActivity,
   formatDistance,
   formatDuration,
   formatPace,
@@ -16,14 +15,6 @@ type ActivityDetailProps = {
   onClose: () => void;
   allActivities?: StravaActivity[];
   fallbackTrace?: GPSTracePoint[];
-};
-
-type DetailStreams = {
-  time?: { data: number[] };
-  distance?: { data: number[] };
-  heartrate?: { data: number[] };
-  velocity_smooth?: { data: number[] };
-  altitude?: { data: number[] };
 };
 
 function formatClockLabel(seconds: number) {
@@ -107,66 +98,82 @@ function formatTrendComment({
   return "Sortie cohérente avec ta charge récente. Continue à empiler les kilomètres avec régularité, c'est ce qui fera la différence sur la durée.";
 }
 
+function decodePolyline(polyline: string): Array<{ lat: number; lng: number }> {
+  const coordinates: Array<{ lat: number; lng: number }> = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < polyline.length) {
+    let shift = 0;
+    let result = 0;
+    let byte = 0;
+
+    do {
+      byte = polyline.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLat = result & 1 ? ~(result >> 1) : result >> 1;
+    lat += deltaLat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = polyline.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20);
+
+    const deltaLng = result & 1 ? ~(result >> 1) : result >> 1;
+    lng += deltaLng;
+
+    coordinates.push({
+      lat: lat / 1e5,
+      lng: lng / 1e5,
+    });
+  }
+
+  return coordinates;
+}
+
+function buildTraceFromActivityPolyline(activity: StravaActivity): GPSTracePoint[] | undefined {
+  const polyline = activity.map?.summary_polyline;
+  if (!polyline) return undefined;
+
+  const points = decodePolyline(polyline);
+  if (points.length === 0) return undefined;
+
+  const startedAt = new Date(activity.start_date).getTime();
+  const stepMs =
+    points.length > 1 ? Math.max(1000, Math.round((activity.moving_time * 1000) / points.length)) : 1000;
+
+  return points.map((point, index) => ({
+    lat: point.lat,
+    lng: point.lng,
+    time: startedAt + index * stepMs,
+  }));
+}
+
 export function ActivityDetail({
   activity,
   onClose,
   allActivities = [],
   fallbackTrace,
 }: ActivityDetailProps) {
-  const [detail, setDetail] = useState<{
-    activity: StravaActivity | null;
-    streams: DetailStreams | null;
-    loading: boolean;
-  }>({
-    activity: null,
-    streams: null,
-    loading: true,
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadDetails = async () => {
-      try {
-        setDetail({ activity: null, streams: null, loading: true });
-        const response = await fetch(`/api/strava/activities/${activity.id}/details`);
-        const data = await response.json();
-
-        if (!cancelled) {
-          setDetail({
-            activity: (data?.activity as StravaActivity | null) ?? null,
-            streams: (data?.streams as DetailStreams | null) ?? null,
-            loading: false,
-          });
-        }
-      } catch {
-        if (!cancelled) {
-          setDetail({
-            activity: null,
-            streams: null,
-            loading: false,
-          });
-        }
-      }
-    };
-
-    void loadDetails();
-    return () => {
-      cancelled = true;
-    };
-  }, [activity.id]);
-
-  const resolvedActivity = detail.activity ?? activity;
+  const resolvedActivity = activity;
 
   const analysis = useMemo(() => {
     const distanceKm = resolvedActivity.distance / 1000;
     const avgPace = formatPace(resolvedActivity.distance, resolvedActivity.moving_time);
     const avgHr = resolvedActivity.average_heartrate ?? 0;
 
-    const timeData = detail.streams?.time?.data ?? [];
-    const distanceData = detail.streams?.distance?.data ?? [];
-    const heartRateData = detail.streams?.heartrate?.data ?? [];
-    const altitudeData = detail.streams?.altitude?.data ?? [];
+    const timeData: number[] = [];
+    const distanceData: number[] = [];
+    const heartRateData: number[] = [];
+    const altitudeData: number[] = [];
     const splitMetrics = resolvedActivity.splits_metric ?? [];
 
     const splits: Array<{
@@ -230,6 +237,33 @@ export function ActivityDetail({
       }
     }
 
+    if (splits.length === 0 && distanceKm > 0) {
+      const defaultHr = resolvedActivity.average_heartrate
+        ? `${Math.round(resolvedActivity.average_heartrate)}`
+        : "--";
+      const fullKm = Math.floor(distanceKm);
+      const paceSecondsPerKm = resolvedActivity.moving_time / Math.max(distanceKm, 0.001);
+      if (fullKm >= 1) {
+        for (let km = 1; km <= fullKm; km += 1) {
+          splits.push({
+            km,
+            paceLabel: formatPace(1000, paceSecondsPerKm).replace(" /km", ""),
+            paceSeconds: Math.round(paceSecondsPerKm),
+            heartRate: defaultHr,
+            elevation: 0,
+          });
+        }
+      } else {
+        splits.push({
+          km: 1,
+          paceLabel: formatPace(resolvedActivity.distance, resolvedActivity.moving_time).replace(" /km", ""),
+          paceSeconds: resolvedActivity.moving_time,
+          heartRate: defaultHr,
+          elevation: 0,
+        });
+      }
+    }
+
     const slowestSplit = Math.max(...splits.map((split) => split.paceSeconds), 1);
     const fastestSplit = Math.min(...splits.map((split) => split.paceSeconds), slowestSplit);
     const splitChartData = splits.map((split) => {
@@ -273,7 +307,7 @@ export function ActivityDetail({
       };
     });
 
-    const trace = fallbackTrace ?? buildTraceFromActivity(resolvedActivity);
+    const trace = fallbackTrace ?? buildTraceFromActivityPolyline(resolvedActivity);
     const comment = formatTrendComment({
       activity: resolvedActivity,
       allActivities,
@@ -293,7 +327,7 @@ export function ActivityDetail({
       hasHeartRateCurve: heartRateSeries.length > 1,
       startDate: new Date(resolvedActivity.start_date),
     };
-  }, [allActivities, detail.streams, fallbackTrace, resolvedActivity]);
+  }, [allActivities, fallbackTrace, resolvedActivity]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">
@@ -352,12 +386,6 @@ export function ActivityDetail({
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
             <GPSMap trace={analysis.trace} />
-          </div>
-        )}
-
-        {detail.loading && (
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
-            <p className="text-sm text-muted-foreground">Chargement des détails Strava...</p>
           </div>
         )}
 
