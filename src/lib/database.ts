@@ -157,7 +157,6 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
   await requireCurrentUserId(userId);
 
   const payload: Record<string, unknown> = {
-    id: userId,
     updated_at:
       typeof data.updated_at === "string"
         ? data.updated_at
@@ -165,12 +164,23 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
   };
 
   if ("first_name" in data) payload.first_name = data.first_name ?? null;
+  if ("last_name" in data) payload.last_name = data.last_name ?? null;
   if ("full_name" in data) payload.full_name = data.full_name ?? null;
   if ("gender" in data) payload.gender = data.gender ?? null;
   if ("date_of_birth" in data) payload.date_of_birth = data.date_of_birth ?? null;
   if ("onboarding_completed" in data) payload.onboarding_completed = data.onboarding_completed ?? false;
   if ("avatar_url" in data) payload.avatar_url = data.avatar_url ?? null;
   if ("username" in data) payload.username = data.username ?? null;
+
+  if (!("full_name" in data)) {
+    const fullNameParts = [payload.first_name, payload.last_name]
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter(Boolean);
+
+    if (fullNameParts.length > 0) {
+      payload.full_name = fullNameParts.join(" ");
+    }
+  }
 
   if ("goal_data" in data) {
     payload.goal_data = (data.goal_data ?? null) as Json;
@@ -184,43 +194,61 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
     payload.goal_type = data.goalType;
   }
 
-  // First try to get the existing profile
-  const { data: existing } = await supabase
+  const { data: updatedProfile, error: updateError } = await supabase
     .from("profiles")
-    .select("id")
+    .update(payload)
     .eq("id", userId)
-    .maybeSingle();
+    .select("*");
 
-  // If profile doesn't exist, insert it first with minimal data
-  if (!existing) {
-    const { error: insertError } = await supabase
-      .from("profiles")
-      .insert({
-        id: userId,
-        created_at: new Date().toISOString(),
-        ...payload,
-      });
-    
-    if (insertError) throw insertError;
-  } else {
-    // Profile exists, do the update
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update(payload)
-      .eq("id", userId);
-    
-    if (updateError) throw updateError;
+  if (updateError) throw updateError;
+
+  if (updatedProfile && updatedProfile.length > 0) {
+    return updatedProfile[0] as ProfileRow;
   }
 
-  // Fetch and return the updated profile
-  const { data: profile, error } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", userId)
+  const insertPayload: Record<string, unknown> = {
+    id: userId,
+    created_at: new Date().toISOString(),
+    ...payload,
+  };
+
+  const { data: insertedProfile, error: insertError } = await supabase
+      .from("profiles")
+      .insert(insertPayload)
+      .select("*")
     .single();
 
-  if (error) throw error;
-  return profile as ProfileRow;
+  if (insertError) throw insertError;
+  return insertedProfile as ProfileRow;
+}
+
+const PROFILE_AVATAR_BUCKET = "avatars";
+
+export async function uploadProfileAvatar(userId: string, file: File) {
+  await requireCurrentUserId(userId);
+
+  const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const filePath = `${userId}/avatar.${extension}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from(PROFILE_AVATAR_BUCKET)
+    .upload(filePath, file, {
+      cacheControl: "3600",
+      upsert: true,
+      contentType: file.type || undefined,
+    });
+
+  if (uploadError) throw uploadError;
+
+  const {
+    data: { publicUrl },
+  } = supabase.storage.from(PROFILE_AVATAR_BUCKET).getPublicUrl(filePath);
+
+  await upsertProfile(userId, {
+    avatar_url: publicUrl,
+  });
+
+  return publicUrl;
 }
 
 export async function saveRun(userId: string, runData: RunInput) {

@@ -1,15 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Calendar, TrendingUp, Route, Clock, Mountain, Edit2, Save, X, ChevronRight, Activity, Zap } from "lucide-react";
+import { Calendar, TrendingUp, Route, Clock, Mountain, Edit2, Save, X, ChevronRight, Activity, Zap, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, getRuns, upsertProfile } from "@/lib/database";
+import { getProfile, getRuns, uploadProfileAvatar, upsertProfile } from "@/lib/database";
 import { getPlanById } from "@/lib/trainingPlans";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -37,6 +38,10 @@ const Profile = () => {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [showAvatarHelp, setShowAvatarHelp] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -56,6 +61,14 @@ const Profile = () => {
     }
   }, [authLoading, user, navigate]);
 
+  useEffect(() => {
+    return () => {
+      if (avatarPreviewUrl) {
+        URL.revokeObjectURL(avatarPreviewUrl);
+      }
+    };
+  }, [avatarPreviewUrl]);
+
   const loadProfileData = async () => {
     if (!user?.id) return;
 
@@ -65,7 +78,22 @@ const Profile = () => {
         getRuns(user.id),
       ]);
 
-      setProfile(profileData);
+      setProfile(
+        profileData ?? {
+          id: user.id,
+          avatar_url: null,
+          created_at: new Date().toISOString(),
+          full_name: null,
+          goal_data: null,
+          goal_type: null,
+          updated_at: null,
+          username: null,
+          first_name: null,
+          last_name: null,
+          gender: null,
+          date_of_birth: null,
+        },
+      );
       setRuns(runsData);
       setFormData({
         firstName: profileData?.first_name || "",
@@ -85,26 +113,48 @@ const Profile = () => {
 
     setIsSaving(true);
     try {
-      await upsertProfile(user.id, {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        gender: formData.gender || null,
-        date_of_birth: formData.dateOfBirth || null,
-      });
+      const payload: Record<string, unknown> = {};
 
-      setProfile({
-        ...profile!,
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        gender: formData.gender,
-        date_of_birth: formData.dateOfBirth,
-      });
+      if ((profile?.first_name ?? "") !== formData.firstName) {
+        payload.first_name = formData.firstName || null;
+      }
 
+      if ((profile?.last_name ?? "") !== formData.lastName) {
+        payload.last_name = formData.lastName || null;
+      }
+
+      const currentFullName = profile?.full_name ?? "";
+      const nextFullName = [formData.firstName, formData.lastName].filter(Boolean).join(" ");
+      if (currentFullName !== nextFullName) {
+        payload.full_name = nextFullName || null;
+      }
+
+      if ((profile?.gender ?? "") !== formData.gender && formData.gender) {
+        payload.gender = formData.gender;
+      }
+
+      if ((profile?.date_of_birth ?? "") !== formData.dateOfBirth && formData.dateOfBirth) {
+        payload.date_of_birth = formData.dateOfBirth;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setIsEditMode(false);
+        toast.success("Aucune modification à enregistrer.");
+        return;
+      }
+
+      const updatedProfile = await upsertProfile(user.id, payload);
+
+      setProfile(updatedProfile);
       setIsEditMode(false);
       toast.success("Profil mis à jour");
     } catch (error) {
       console.error("Error saving profile:", error);
-      toast.error("Erreur lors de la sauvegarde");
+      const message =
+        typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+          ? error.message
+          : "Impossible de sauvegarder les informations.";
+      toast.error(message);
     } finally {
       setIsSaving(false);
     }
@@ -117,7 +167,57 @@ const Profile = () => {
       gender: profile?.gender || "",
       dateOfBirth: profile?.date_of_birth || "",
     });
+    setAvatarPreviewUrl(null);
     setIsEditMode(false);
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      setAvatarPreviewUrl(null);
+      return;
+    }
+
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Choisissez une image JPG, PNG ou WebP.");
+      event.target.value = "";
+      setAvatarPreviewUrl(null);
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("L'image doit faire moins de 5 Mo.");
+      event.target.value = "";
+      setAvatarPreviewUrl(null);
+      return;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setAvatarPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return objectUrl;
+    });
+    setShowAvatarHelp(true);
+
+    if (!user?.id) return;
+
+    try {
+      setIsUploadingAvatar(true);
+      const uploadedUrl = await uploadProfileAvatar(user.id, file);
+      setProfile((current) => (current ? { ...current, avatar_url: uploadedUrl } : current));
+      setAvatarPreviewUrl(null);
+      toast.success("Photo de profil mise à jour");
+    } catch (error) {
+      console.error("Error uploading avatar:", error);
+      const message =
+        typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
+          ? error.message
+          : "Impossible de mettre à jour la photo.";
+      toast.error(message);
+    } finally {
+      setIsUploadingAvatar(false);
+      event.target.value = "";
+    }
   };
 
   if (isLoading) {
@@ -156,9 +256,12 @@ const Profile = () => {
       <ScrollReveal>
         <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
           <CardContent className="flex flex-col items-center gap-4 pt-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent text-2xl font-bold text-accent-foreground">
-              {getUserInitials()}
-            </div>
+            <Avatar className="h-20 w-20 border-2 border-accent/20">
+              <AvatarImage src={avatarPreviewUrl ?? profile.avatar_url ?? undefined} alt="Photo de profil" />
+              <AvatarFallback className="bg-accent text-2xl font-bold text-accent-foreground">
+                {getUserInitials()}
+              </AvatarFallback>
+            </Avatar>
 
             <div className="text-center">
               <h1 className="text-2xl font-bold">
@@ -169,21 +272,33 @@ const Profile = () => {
               </p>
             </div>
 
-            <Button
-              onClick={() => setIsEditMode(!isEditMode)}
-              variant={isEditMode ? "outline" : "outline"}
-              className={isEditMode ? "border-red-500/50 text-red-500 hover:bg-red-500/10" : ""}
-            >
-              {isEditMode ? (
-                <>
-                  <X className="mr-2 h-4 w-4" /> Annuler
-                </>
-              ) : (
-                <>
-                  <Edit2 className="mr-2 h-4 w-4" /> Modifier
-                </>
-              )}
-            </Button>
+            <div className="w-full max-w-xs space-y-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setShowAvatarHelp(true);
+                  fileInputRef.current?.click();
+                }}
+                disabled={isUploadingAvatar}
+              >
+                <Camera className="mr-2 h-4 w-4" />
+                {isUploadingAvatar ? "Mise à jour..." : "Changer la photo"}
+              </Button>
+              {showAvatarHelp ? (
+                <p className="text-center text-xs text-muted-foreground">
+                  JPG, PNG ou WebP, 5 Mo maximum. La photo sera stockée dans Supabase.
+                </p>
+              ) : null}
+            </div>
           </CardContent>
         </Card>
       </ScrollReveal>
@@ -192,7 +307,24 @@ const Profile = () => {
       <ScrollReveal delay={0.05}>
         <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
           <CardHeader>
-            <CardTitle className="text-lg">Informations personnelles</CardTitle>
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-lg">Informations personnelles</CardTitle>
+              <Button
+                onClick={() => (isEditMode ? handleCancel() : setIsEditMode(true))}
+                variant="outline"
+                className={isEditMode ? "border-red-500/50 text-red-500 hover:bg-red-500/10" : ""}
+              >
+                {isEditMode ? (
+                  <>
+                    <X className="mr-2 h-4 w-4" /> Annuler
+                  </>
+                ) : (
+                  <>
+                    <Edit2 className="mr-2 h-4 w-4" /> Modifier
+                  </>
+                )}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             {/* Prénom */}
@@ -235,9 +367,10 @@ const Profile = () => {
             <div className="space-y-2">
               <Label>Genre</Label>
               {isEditMode ? (
-                <div className="grid grid-cols-3 gap-2">
-                  {(["Homme", "Femme", "Autre"] as const).map((option) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {(["Homme", "Femme"] as const).map((option) => (
                     <button
+                      type="button"
                       key={option}
                       onClick={() => setFormData({ ...formData, gender: option })}
                       className={`rounded-lg border-2 px-3 py-2 text-sm font-medium transition-all ${
@@ -288,13 +421,13 @@ const Profile = () => {
                 </Button>
                 <Button
                   onClick={handleSave}
-                  disabled={isSaving}
+                  disabled={isSaving || isUploadingAvatar}
                   className="flex-1 bg-accent text-accent-foreground hover:bg-accent/90"
                 >
-                  {isSaving ? (
+                  {isSaving || isUploadingAvatar ? (
                     <>
                       <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Enregistrement...
+                      {isUploadingAvatar ? "Upload de la photo..." : "Enregistrement..."}
                     </>
                   ) : (
                     <>
