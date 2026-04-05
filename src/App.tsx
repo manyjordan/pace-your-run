@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,13 +9,11 @@ import { AppShell } from "@/components/AppShell";
 import { SplashScreen } from "@/components/SplashScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useState, useEffect, lazy, Suspense, useCallback } from "react";
-import { Loader2 } from "lucide-react";
 import Auth from "./pages/Auth.tsx";
 import EmailConfirmation from "./pages/EmailConfirmation.tsx";
 import Index from "./pages/Index.tsx";
 import Run from "./pages/Run.tsx";
 import Plan from "./pages/Plan.tsx";
-import Profile from "./pages/Profile.tsx";
 import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
 import TermsOfUse from "./pages/TermsOfUse.tsx";
 import SettingsPage from "./pages/Settings.tsx";
@@ -63,7 +61,7 @@ function AppRoutes() {
                   <Route path="/social" element={<Social />} />
                   <Route path="/run" element={<Run />} />
                   <Route path="/plan" element={<Plan />} />
-                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/profile" element={<Navigate to="/settings" replace />} />
                   <Route path="/health" element={<Health />} />
                   <Route path="/import" element={<ImportPage />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />

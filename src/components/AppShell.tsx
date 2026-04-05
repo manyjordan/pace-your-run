@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Heart, Home, ClipboardList, Play, Settings, Users, User } from "lucide-react";
+import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
 
 const desktopNavItems = [
   { to: "/", icon: Home, label: "Accueil" },
@@ -14,7 +14,7 @@ const mobileNavItems = [
   { to: "/social", icon: Users, label: "Social" },
   { to: "/run", icon: Play, label: "Course", isPrimary: true },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
-  { to: "/profile", icon: User, label: "Profil" },
+  { to: "/health", icon: Heart, label: "Santé" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
@@ -73,8 +73,8 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
         <div className="grid grid-cols-5 items-end gap-1 px-2 py-2">
           {mobileNavItems.map((item) => {
             const isActive =
-              item.to === "/profile"
-                ? location.pathname.startsWith("/profile")
+              item.to === "/health"
+                ? location.pathname.startsWith("/health")
                 : item.to === "/"
                   ? location.pathname === "/"
                   : location.pathname.startsWith(item.to);
