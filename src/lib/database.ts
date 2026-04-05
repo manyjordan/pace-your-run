@@ -60,6 +60,7 @@ export type RunInput = {
 };
 
 export type SocialPostRow = {
+  audience?: "private" | "friends" | "public" | null;
   created_at: string | null;
   description: string | null;
   id: string;
@@ -74,6 +75,54 @@ export type PublicPostRecord = SocialPostRow & {
   profile: ProfileRow | null;
   run: RunRow | null;
   likedByMe: boolean;
+};
+
+export type ForumCategoryRow = {
+  created_at: string | null;
+  description: string | null;
+  id: string;
+  sort_order: number;
+  title: string;
+};
+
+export type ForumThreadRow = {
+  category_id: string;
+  content: string;
+  created_at: string | null;
+  id: string;
+  is_locked: boolean;
+  is_pinned: boolean;
+  title: string;
+  updated_at: string | null;
+  user_id: string;
+};
+
+export type ForumReplyRow = {
+  content: string;
+  created_at: string | null;
+  id: string;
+  thread_id: string;
+  updated_at: string | null;
+  user_id: string;
+};
+
+export type ForumCategoryRecord = ForumCategoryRow & {
+  latestActivityAt: string | null;
+  threadsCount: number;
+};
+
+export type ForumReplyRecord = ForumReplyRow & {
+  profile: ProfileRow | null;
+};
+
+export type ForumThreadRecord = ForumThreadRow & {
+  category: ForumCategoryRow | null;
+  profile: ProfileRow | null;
+  repliesCount: number;
+};
+
+export type ForumThreadDetailRecord = ForumThreadRecord & {
+  replies: ForumReplyRecord[];
 };
 
 async function requireCurrentUserId(expectedUserId?: string) {
@@ -228,7 +277,7 @@ export async function getPublicPosts() {
   const { data: posts, error: postsError } = await supabase
     .from("social_posts")
     .select("*")
-    .eq("is_public", true)
+    .eq("audience", "public")
     .order("created_at", { ascending: false })
     .limit(50);
 
@@ -272,19 +321,48 @@ export async function getPublicPosts() {
   })) as PublicPostRecord[];
 }
 
-export async function createPost(userId: string, runId: string, title: string, description: string) {
+export async function createPost(
+  userId: string,
+  runId: string,
+  title: string,
+  description: string,
+  audience: "private" | "friends" | "public" = "public",
+) {
   await requireCurrentUserId(userId);
 
   const { data, error } = await supabase
     .from("social_posts")
     .insert({
+      audience,
       user_id: userId,
       run_id: runId,
       title,
       description,
-      is_public: true,
+      is_public: audience === "public",
       likes_count: 0,
     })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as SocialPostRow;
+}
+
+export async function updatePostAudience(
+  postId: string,
+  userId: string,
+  audience: "private" | "friends" | "public",
+) {
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("social_posts")
+    .update({
+      audience,
+      is_public: audience === "public",
+    })
+    .eq("id", postId)
+    .eq("user_id", userId)
     .select("*")
     .single();
 
@@ -339,6 +417,189 @@ export async function toggleLike(postId: string, userId: string) {
     liked: !existingLike,
     likesCount,
   };
+}
+
+export async function getForumCategories() {
+  const [{ data: categories, error: categoriesError }, { data: threads, error: threadsError }] = await Promise.all([
+    supabase.from("forum_categories").select("*").order("sort_order", { ascending: true }),
+    supabase.from("forum_threads").select("id, category_id, updated_at"),
+  ]);
+
+  if (categoriesError) throw categoriesError;
+  if (threadsError) throw threadsError;
+
+  const threadStats = new Map<string, { latestActivityAt: string | null; threadsCount: number }>();
+
+  for (const thread of threads ?? []) {
+    const current = threadStats.get(thread.category_id) ?? { latestActivityAt: null, threadsCount: 0 };
+    const latestActivityAt =
+      !current.latestActivityAt || (thread.updated_at ?? "") > current.latestActivityAt
+        ? thread.updated_at ?? null
+        : current.latestActivityAt;
+
+    threadStats.set(thread.category_id, {
+      latestActivityAt,
+      threadsCount: current.threadsCount + 1,
+    });
+  }
+
+  return (categories ?? []).map((category) => {
+    const stats = threadStats.get(category.id);
+    return {
+      ...(category as ForumCategoryRow),
+      latestActivityAt: stats?.latestActivityAt ?? null,
+      threadsCount: stats?.threadsCount ?? 0,
+    };
+  }) as ForumCategoryRecord[];
+}
+
+export async function getForumThreads(categoryId?: string) {
+  let threadsQuery = supabase
+    .from("forum_threads")
+    .select("*")
+    .order("is_pinned", { ascending: false })
+    .order("updated_at", { ascending: false })
+    .limit(100);
+
+  if (categoryId) {
+    threadsQuery = threadsQuery.eq("category_id", categoryId);
+  }
+
+  const { data: threads, error: threadsError } = await threadsQuery;
+  if (threadsError) throw threadsError;
+  if (!threads?.length) return [] as ForumThreadRecord[];
+
+  const userIds = Array.from(new Set(threads.map((thread) => thread.user_id).filter(Boolean)));
+  const categoryIds = Array.from(new Set(threads.map((thread) => thread.category_id).filter(Boolean)));
+  const threadIds = threads.map((thread) => thread.id);
+
+  const [
+    { data: profiles, error: profilesError },
+    { data: categories, error: categoriesError },
+    { data: replies, error: repliesError },
+  ] = await Promise.all([
+    userIds.length ? supabase.from("profiles").select("*").in("id", userIds) : Promise.resolve({ data: [], error: null }),
+    categoryIds.length ? supabase.from("forum_categories").select("*").in("id", categoryIds) : Promise.resolve({ data: [], error: null }),
+    threadIds.length ? supabase.from("forum_replies").select("id, thread_id").in("thread_id", threadIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (profilesError) throw profilesError;
+  if (categoriesError) throw categoriesError;
+  if (repliesError) throw repliesError;
+
+  const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile as ProfileRow]));
+  const categoryMap = new Map((categories ?? []).map((category) => [category.id, category as ForumCategoryRow]));
+  const repliesCountMap = new Map<string, number>();
+
+  for (const reply of replies ?? []) {
+    repliesCountMap.set(reply.thread_id, (repliesCountMap.get(reply.thread_id) ?? 0) + 1);
+  }
+
+  return threads.map((thread) => ({
+    ...(thread as ForumThreadRow),
+    category: categoryMap.get(thread.category_id) ?? null,
+    profile: profileMap.get(thread.user_id) ?? null,
+    repliesCount: repliesCountMap.get(thread.id) ?? 0,
+  })) as ForumThreadRecord[];
+}
+
+export async function getForumThreadDetail(threadId: string) {
+  const { data: thread, error: threadError } = await supabase
+    .from("forum_threads")
+    .select("*")
+    .eq("id", threadId)
+    .single();
+
+  if (threadError) throw threadError;
+
+  const [
+    { data: category, error: categoryError },
+    { data: threadProfile, error: threadProfileError },
+    { data: replies, error: repliesError },
+  ] = await Promise.all([
+    supabase.from("forum_categories").select("*").eq("id", thread.category_id).maybeSingle(),
+    supabase.from("profiles").select("*").eq("id", thread.user_id).maybeSingle(),
+    supabase.from("forum_replies").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }),
+  ]);
+
+  if (categoryError) throw categoryError;
+  if (threadProfileError) throw threadProfileError;
+  if (repliesError) throw repliesError;
+
+  const replyUserIds = Array.from(new Set((replies ?? []).map((reply) => reply.user_id).filter(Boolean)));
+  const { data: replyProfiles, error: replyProfilesError } = replyUserIds.length
+    ? await supabase.from("profiles").select("*").in("id", replyUserIds)
+    : { data: [], error: null };
+
+  if (replyProfilesError) throw replyProfilesError;
+
+  const replyProfileMap = new Map((replyProfiles ?? []).map((profile) => [profile.id, profile as ProfileRow]));
+  const replyRecords = (replies ?? []).map((reply) => ({
+    ...(reply as ForumReplyRow),
+    profile: replyProfileMap.get(reply.user_id) ?? null,
+  })) as ForumReplyRecord[];
+
+  return {
+    ...(thread as ForumThreadRow),
+    category: (category as ForumCategoryRow | null) ?? null,
+    profile: (threadProfile as ProfileRow | null) ?? null,
+    repliesCount: replyRecords.length,
+    replies: replyRecords,
+  } as ForumThreadDetailRecord;
+}
+
+export async function createForumThread(userId: string, categoryId: string, title: string, content: string) {
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("forum_threads")
+    .insert({
+      category_id: categoryId,
+      content,
+      title,
+      user_id: userId,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  return data as ForumThreadRow;
+}
+
+export async function createForumReply(userId: string, threadId: string, content: string) {
+  await requireCurrentUserId(userId);
+
+  const { data: thread, error: threadError } = await supabase
+    .from("forum_threads")
+    .select("id, is_locked")
+    .eq("id", threadId)
+    .single();
+
+  if (threadError) throw threadError;
+  if (thread.is_locked) {
+    throw new Error("Ce sujet est verrouillé.");
+  }
+
+  const { data, error } = await supabase
+    .from("forum_replies")
+    .insert({
+      content,
+      thread_id: threadId,
+      user_id: userId,
+    })
+    .select("*")
+    .single();
+
+  if (error) throw error;
+
+  const { error: updateThreadError } = await supabase
+    .from("forum_threads")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", threadId);
+
+  if (updateThreadError) throw updateThreadError;
+
+  return data as ForumReplyRow;
 }
 
 // ── Training Plan Sessions ──

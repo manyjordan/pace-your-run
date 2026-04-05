@@ -1,21 +1,54 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { ActivityDetail } from "@/components/ActivityDetail";
+import { ActivityPostCard } from "@/components/ActivityPostCard";
 import GPSMap from "@/components/GPSMap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, Bluetooth, Loader2, X,
+  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { createPost, saveRun, type RunGpsPoint } from "@/lib/database";
+import { createPost, saveRun, updatePostAudience, type RunGpsPoint } from "@/lib/database";
 import {
   connectHeartRateMonitor,
   disconnectHeartRateMonitor,
   isBluetoothAvailable,
   type BluetoothConnection,
 } from "@/lib/bluetooth";
+import {
+  formatDuration as formatSocialDuration,
+  formatPace as formatSocialPace,
+  formatRelativeTime,
+  getInitials,
+  type CommunityPost,
+  type StravaActivity,
+} from "@/lib/strava";
+import {
+  convertDistanceFromKm,
+  convertPaceFromMinutesPerKm,
+  convertSpeedFromKmPerHour,
+  getDistanceUnitShortLabel,
+  getDefaultRunPreferences,
+  getSplitDistanceKm,
+  getSpeedUnitLabel,
+  loadRunPreferences,
+  saveRunPreferences,
+  type RunPreferences,
+} from "@/lib/runPreferences";
 
 // Haversine formula: calculates distance between two lat/lng points in kilometers
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -31,9 +64,56 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 
 type GPSPoint = RunGpsPoint;
 
+function buildSyntheticSplits(trace: GPSPoint[], totalDistanceKm: number, averageHeartRate?: number) {
+  if (trace.length < 2 || totalDistanceKm < 1) return [];
+
+  const cumulativeDistances: number[] = [];
+  let total = 0;
+
+  for (let index = 0; index < trace.length; index += 1) {
+    if (index === 0) {
+      cumulativeDistances.push(0);
+      continue;
+    }
+
+    total += haversineDistance(trace[index - 1].lat, trace[index - 1].lng, trace[index].lat, trace[index].lng);
+    cumulativeDistances.push(total);
+  }
+
+  const splits = [];
+  let splitStartIndex = 0;
+
+  for (let split = 1; split <= Math.floor(totalDistanceKm); split += 1) {
+    const splitEndIndex = cumulativeDistances.findIndex((distanceKm) => distanceKm >= split);
+    if (splitEndIndex <= splitStartIndex) continue;
+
+    const splitSeconds = Math.max(1, Math.round((trace[splitEndIndex].time - trace[splitStartIndex].time) / 1000));
+    const startAltitude = trace[splitStartIndex].altitude;
+    const endAltitude = trace[splitEndIndex].altitude;
+
+    splits.push({
+      split,
+      distance: 1000,
+      elapsed_time: splitSeconds,
+      moving_time: splitSeconds,
+      average_speed: 1000 / splitSeconds,
+      average_heartrate: averageHeartRate,
+      elevation_difference:
+        typeof startAltitude === "number" && typeof endAltitude === "number"
+          ? endAltitude - startAltitude
+          : 0,
+    });
+
+    splitStartIndex = splitEndIndex;
+  }
+
+  return splits;
+}
+
 /* ── Run component ── */
 export default function Run() {
   const { user } = useAuth();
+  const [postAudience, setPostAudience] = useState<"private" | "friends" | "public">("public");
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
@@ -55,6 +135,13 @@ export default function Run() {
   const [bluetoothError, setBluetoothError] = useState("");
   const [heartRate, setHeartRate] = useState<number | null>(null);
   const [bluetoothAvailable] = useState(() => isBluetoothAvailable());
+  const [runPreferences, setRunPreferences] = useState<RunPreferences>(() => getDefaultRunPreferences());
+  const [completedActivity, setCompletedActivity] = useState<StravaActivity | null>(null);
+  const [completedPost, setCompletedPost] = useState<CommunityPost | null>(null);
+  const [showCompletedActivityDetail, setShowCompletedActivityDetail] = useState(false);
+  const [completedPostId, setCompletedPostId] = useState<string | null>(null);
+  const [isUpdatingAudience, setIsUpdatingAudience] = useState(false);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const watchIdRef = useRef<number | null>(null);
@@ -63,19 +150,30 @@ export default function Run() {
   const bluetoothConnectionRef = useRef<BluetoothConnection | null>(null);
   const heartRateSamplesRef = useRef<number[]>([]);
   const statusRef = useRef<"idle" | "running" | "paused">("idle");
+  const nextSplitAnnouncementRef = useRef(1);
+  const lastSplitAnnouncementElapsedRef = useRef(0);
+  const nextCumulativeAnnouncementRef = useRef<number | null>(null);
+  const postAudienceRef = useRef<"private" | "friends" | "public">("public");
 
-  const formatTime = (s: number) => {
+  const formatTime = useCallback((s: number) => {
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
     return h > 0
       ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
       : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-  };
+  }, []);
 
   const pace = distance > 0 ? elapsed / 60 / distance : 0;
-  const formatPace = (p: number) =>
-    p > 0 ? `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, "0")}` : "--:--";
+  const formatPace = useCallback(
+    (p: number) => (p > 0 ? `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, "0")}` : "--:--"),
+    [],
+  );
+  const distanceUnitShortLabel = getDistanceUnitShortLabel(runPreferences.distanceUnit);
+  const speedUnitLabel = getSpeedUnitLabel(runPreferences.distanceUnit);
+  const splitDistanceKm = getSplitDistanceKm(runPreferences.distanceUnit);
+  const displayDistance = convertDistanceFromKm(distance, runPreferences.distanceUnit);
+  const displayPace = convertPaceFromMinutesPerKm(pace, runPreferences.distanceUnit);
   const averageHeartRate =
     heartRateSamplesRef.current.length > 0
       ? Math.round(
@@ -88,6 +186,15 @@ export default function Run() {
       : bluetoothDevice;
   const isRunActive = status === "running" || status === "paused";
   const hasLiveGpsTrace = gpsTrace.length > 0;
+
+  const announce = useCallback((message: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = "fr-FR";
+    utterance.rate = 1;
+    window.speechSynthesis.speak(utterance);
+  }, []);
 
   // GPS accuracy indicator color
   const getAccuracyColor = (accuracy: number | null) => {
@@ -244,6 +351,20 @@ export default function Run() {
   }, [status]);
 
   useEffect(() => {
+    setRunPreferences(loadRunPreferences(user?.id));
+    setPreferencesLoaded(true);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    saveRunPreferences(runPreferences, user?.id);
+  }, [preferencesLoaded, runPreferences, user?.id]);
+
+  useEffect(() => {
+    postAudienceRef.current = postAudience;
+  }, [postAudience]);
+
+  useEffect(() => {
     if (status === "running") {
       const startOk = startGpsTracking();
       if (startOk) {
@@ -266,11 +387,60 @@ export default function Run() {
   useEffect(() => {
     return () => {
       disconnectHeartRateMonitor();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
     };
   }, []);
 
+  useEffect(() => {
+    if (status !== "running") return;
+
+    const currentDistanceInPreferredUnit = convertDistanceFromKm(distance, runPreferences.distanceUnit);
+
+    while (runPreferences.announceSplitSpeed && currentDistanceInPreferredUnit >= nextSplitAnnouncementRef.current) {
+      const splitElapsed = elapsed - lastSplitAnnouncementElapsedRef.current;
+      const splitSpeedKmPerHour = splitElapsed > 0 ? (splitDistanceKm / splitElapsed) * 3600 : 0;
+      const announcedSpeed = convertSpeedFromKmPerHour(splitSpeedKmPerHour, runPreferences.distanceUnit)
+        .toFixed(1)
+        .replace(".", ",");
+      const unitKeyword = runPreferences.distanceUnit === "mi" ? "mile" : "km";
+
+      announce(`${unitKeyword} ${nextSplitAnnouncementRef.current}, vitesse ${announcedSpeed}${speedUnitLabel}`);
+      lastSplitAnnouncementElapsedRef.current = elapsed;
+      nextSplitAnnouncementRef.current += 1;
+    }
+
+    const cumulativeInterval =
+      runPreferences.cumulativeTimeAnnouncement === "off"
+        ? null
+        : Number(runPreferences.cumulativeTimeAnnouncement);
+
+    if (!cumulativeInterval) {
+      nextCumulativeAnnouncementRef.current = null;
+      return;
+    }
+
+    if (nextCumulativeAnnouncementRef.current === null) {
+      nextCumulativeAnnouncementRef.current = cumulativeInterval;
+    }
+
+    while (
+      nextCumulativeAnnouncementRef.current !== null &&
+      currentDistanceInPreferredUnit >= nextCumulativeAnnouncementRef.current
+    ) {
+      const unitKeyword = runPreferences.distanceUnit === "mi" ? "mile" : "km";
+      announce(`${unitKeyword} ${nextCumulativeAnnouncementRef.current}, temps cumulé ${formatTime(elapsed)}`);
+      nextCumulativeAnnouncementRef.current += cumulativeInterval;
+    }
+  }, [announce, distance, elapsed, formatTime, runPreferences, speedUnitLabel, splitDistanceKm, status]);
+
   const start = () => {
     setRunSummary(null);
+    setCompletedActivity(null);
+    setCompletedPost(null);
+    setCompletedPostId(null);
+    setShowCompletedActivityDetail(false);
     setSaveError("");
     setGpsTrace([]);
     setDistance(0);
@@ -280,6 +450,12 @@ export default function Run() {
     heartRateSamplesRef.current = [];
     lastGpsPointRef.current = null;
     runStartedAtRef.current = new Date().toISOString();
+    nextSplitAnnouncementRef.current = 1;
+    lastSplitAnnouncementElapsedRef.current = 0;
+    nextCumulativeAnnouncementRef.current =
+      runPreferences.cumulativeTimeAnnouncement === "off"
+        ? null
+        : Number(runPreferences.cumulativeTimeAnnouncement);
     setStatus("running");
   };
 
@@ -300,6 +476,7 @@ export default function Run() {
     const finalDistance = distance;
     const finalElapsed = elapsed;
     const finalGpsTrace = gpsTrace;
+    const finalStartedAt = runStartedAtRef.current ?? new Date().toISOString();
     const finalElevation = calculateElevationGain(finalGpsTrace);
     const finalAvgPace = finalDistance > 0 ? finalElapsed / 60 / finalDistance : 0;
     const finalAverageHeartRate =
@@ -319,13 +496,53 @@ export default function Run() {
         gpsTrace: finalGpsTrace,
       });
 
+      const activityName = "Nouvelle course enregistrée";
+      const activityDescription = `Je viens de terminer ${finalDistance.toFixed(2)} km en ${formatTime(finalElapsed)}.`;
+      const syntheticActivity: StravaActivity = {
+        id: Date.now(),
+        name: activityName,
+        distance: finalDistance * 1000,
+        moving_time: finalElapsed,
+        elapsed_time: finalElapsed,
+        total_elevation_gain: finalElevation,
+        average_heartrate: finalAverageHeartRate,
+        start_date: finalStartedAt,
+        type: "Run",
+        sport_type: "Run",
+        splits_metric: buildSyntheticSplits(finalGpsTrace, finalDistance, finalAverageHeartRate),
+      };
+      const identity = user?.email ?? "Vous";
+      const syntheticPost: CommunityPost = {
+        id: syntheticActivity.id,
+        user: identity,
+        initials: getInitials(identity),
+        time: formatRelativeTime(finalStartedAt),
+        type: "run",
+        title: activityName,
+        description: activityDescription,
+        stats: {
+          distance: `${finalDistance.toFixed(2)} km`,
+          pace: formatSocialPace(finalDistance * 1000, finalElapsed),
+          duration: formatSocialDuration(finalElapsed),
+          elevation: `+${Math.round(finalElevation)} m`,
+        },
+        likes: 0,
+        comments: 0,
+        liked: false,
+        gpsTrace: finalGpsTrace,
+      };
+
+      setCompletedActivity(syntheticActivity);
+      setCompletedPost(syntheticPost);
+      setShowCompletedActivityDetail(true);
+
       if (user) {
         try {
           setIsSaving(true);
           setSaveError("");
 
-          const title = "Nouvelle course enregistrée";
-          const description = `Je viens de terminer ${finalDistance.toFixed(2)} km en ${formatTime(finalElapsed)}.`;
+          const title = activityName;
+          const description = activityDescription;
 
           const savedRun = await saveRun(user.id, {
             distance_km: finalDistance,
@@ -339,7 +556,8 @@ export default function Run() {
             title,
           });
 
-          await createPost(user.id, savedRun.id, title, description);
+          const createdPost = await createPost(user.id, savedRun.id, title, description, postAudienceRef.current);
+          setCompletedPostId(createdPost.id);
           window.dispatchEvent(new Event("pace-community-updated"));
         } catch {
           setSaveError("Impossible d'enregistrer cette course pour le moment.");
@@ -364,10 +582,41 @@ export default function Run() {
     setHeartRate(null);
     setGpsError("");
     setBluetoothError("");
+    nextSplitAnnouncementRef.current = 1;
+    lastSplitAnnouncementElapsedRef.current = 0;
+    nextCumulativeAnnouncementRef.current = null;
   };
+
+  const handleAudienceChange = useCallback(
+    async (value: "private" | "friends" | "public") => {
+      setPostAudience(value);
+
+      if (!user || !completedPostId) return;
+
+      try {
+        setIsUpdatingAudience(true);
+        await updatePostAudience(completedPostId, user.id, value);
+        window.dispatchEvent(new Event("pace-community-updated"));
+      } catch {
+        setSaveError("Impossible de mettre à jour l'audience de cette course.");
+      } finally {
+        setIsUpdatingAudience(false);
+      }
+    },
+    [completedPostId, user],
+  );
 
   return (
     <div className="space-y-6">
+      {completedActivity && showCompletedActivityDetail && (
+        <ActivityDetail
+          activity={completedActivity}
+          onClose={() => setShowCompletedActivityDetail(false)}
+          allActivities={[completedActivity]}
+          fallbackTrace={completedPost?.gpsTrace}
+        />
+      )}
+
       <ScrollReveal>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Course</h1>
@@ -393,65 +642,89 @@ export default function Run() {
         </ScrollReveal>
       )}
 
-      {bluetoothError && (
-        <ScrollReveal delay={0.05}>
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-destructive">{bluetoothError}</p>
-          </div>
-        </ScrollReveal>
-      )}
-
       <div className="space-y-6">
         {status === "idle" && (
           <ScrollReveal delay={0.04}>
-            <Card className="border-accent/30">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">Capteur cardiaque Bluetooth</p>
-                    {!bluetoothAvailable ? (
-                      <p className="text-xs text-muted-foreground">Bluetooth non disponible sur cet appareil</p>
-                    ) : bluetoothDevice ? (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span className="h-2 w-2 rounded-full bg-lime-500" />
-                        <span>{bluetoothDevice}</span>
-                        <span>Connecté</span>
-                      </div>
-                    ) : (
-                      <p className="text-xs text-muted-foreground">
-                        Connectez votre ceinture ou brassard BLE avant de démarrer.
-                      </p>
-                    )}
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="w-full justify-between border-accent/30 bg-card/95 px-4 py-6">
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    <SlidersHorizontal className="h-4 w-4" />
+                    Réglages de la course
+                  </span>
+                  <span className="text-xs text-muted-foreground">Ouvrir</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Réglages de la course</DialogTitle>
+                  <DialogDescription>
+                    Choisissez vos unités et les annonces vocales avant de démarrer.
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Unité de distance</Label>
+                    <Select
+                      value={runPreferences.distanceUnit}
+                      onValueChange={(value) =>
+                        setRunPreferences((current) => ({ ...current, distanceUnit: value as "km" | "mi" }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir une unité" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="km">Kilomètres</SelectItem>
+                        <SelectItem value="mi">Miles</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {bluetoothDevice ? (
-                    <Button variant="outline" onClick={handleDisconnectBluetooth}>
-                      Déconnecter
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="outline"
-                      onClick={() => void handleConnectBluetooth()}
-                      disabled={isConnectingBluetooth || !bluetoothAvailable}
-                      className="border-accent/40"
+                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">Annonce vocale de vitesse</p>
+                      <p className="text-xs text-muted-foreground">
+                        Si activée, vous entendrez{" "}
+                        {runPreferences.distanceUnit === "mi"
+                          ? "\"mile X, vitesse X mph\" à chaque mile."
+                          : "\"km X, vitesse X km/h\" à chaque kilomètre."}
+                      </p>
+                    </div>
+                    <Switch
+                      checked={runPreferences.announceSplitSpeed}
+                      onCheckedChange={(checked) =>
+                        setRunPreferences((current) => ({ ...current, announceSplitSpeed: checked }))
+                      }
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Annonce du temps cumulé</Label>
+                    <Select
+                      value={runPreferences.cumulativeTimeAnnouncement}
+                      onValueChange={(value) =>
+                        setRunPreferences((current) => ({
+                          ...current,
+                          cumulativeTimeAnnouncement: value as RunPreferences["cumulativeTimeAnnouncement"],
+                        }))
+                      }
                     >
-                      {isConnectingBluetooth ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Recherche d'appareils...
-                        </>
-                      ) : (
-                        <>
-                          <Bluetooth className="mr-2 h-4 w-4" />
-                          Connecter un capteur cardiaque
-                        </>
-                      )}
-                    </Button>
-                  )}
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choisir une fréquence" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="off">Aucune annonce</SelectItem>
+                        <SelectItem value="1">Chaque {runPreferences.distanceUnit === "mi" ? "mile" : "km"}</SelectItem>
+                        <SelectItem value="5">Tous les 5 {runPreferences.distanceUnit === "mi" ? "miles" : "km"}</SelectItem>
+                        <SelectItem value="10">Tous les 10 {runPreferences.distanceUnit === "mi" ? "miles" : "km"}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              </DialogContent>
+            </Dialog>
           </ScrollReveal>
         )}
 
@@ -494,24 +767,6 @@ export default function Run() {
         <ScrollReveal delay={0.05}>
           <Card className="border-accent/30">
             <CardContent className="p-6 flex flex-col items-center space-y-6">
-              {(status === "running" || status === "paused") && bluetoothDevice && (
-                <div className="flex w-full justify-center">
-                  <Badge variant="outline" className="flex items-center gap-2 border-accent/40 px-3 py-1.5">
-                    <span className="max-w-[110px] truncate">{truncatedDeviceName}</span>
-                    <Heart className="h-3.5 w-3.5 animate-pulse text-red-500" />
-                    <span className="font-bold tabular-nums">{heartRate ?? "--"} bpm</span>
-                    <button
-                      type="button"
-                      onClick={handleDisconnectBluetooth}
-                      className="rounded-full p-0.5 text-muted-foreground transition-colors hover:text-foreground"
-                      aria-label="Déconnecter le capteur"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </Badge>
-                </div>
-              )}
-
               <div className="text-6xl font-black tracking-tighter tabular-nums text-foreground" style={{ lineHeight: 1.1 }}>
                 {formatTime(elapsed)}
               </div>
@@ -543,13 +798,13 @@ export default function Run() {
                       </TooltipProvider>
                     )}
                   </div>
-                  <div className="text-xl font-bold tabular-nums">{distance.toFixed(2)}</div>
-                  <div className="text-[10px] text-muted-foreground">km</div>
+                  <div className="text-xl font-bold tabular-nums">{displayDistance.toFixed(2)}</div>
+                  <div className="text-[10px] text-muted-foreground">{distanceUnitShortLabel}</div>
                 </div>
                 <div className="text-center space-y-1">
                   <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><Zap className="h-3 w-3" /> Allure</div>
-                  <div className="text-xl font-bold tabular-nums">{formatPace(pace)}</div>
-                  <div className="text-[10px] text-muted-foreground">/km</div>
+                  <div className="text-xl font-bold tabular-nums">{formatPace(displayPace)}</div>
+                  <div className="text-[10px] text-muted-foreground">/{distanceUnitShortLabel}</div>
                 </div>
                 <div className="text-center space-y-1">
                   <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><Heart className="h-3 w-3" /> Fréquence</div>
@@ -584,40 +839,35 @@ export default function Run() {
           <ScrollReveal delay={0.1}>
             <Card className="border-accent/50 bg-accent/10">
               <CardContent className="p-5 space-y-3">
-                <h3 className="text-sm font-semibold">Résumé de la course</h3>
-                {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Distance</p>
-                    <p className="text-lg font-bold">{runSummary.distance.toFixed(2)} km</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Durée</p>
-                    <p className="text-lg font-bold">{formatTime(runSummary.duration)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Allure moyenne</p>
-                    <p className="text-lg font-bold">{formatPace(runSummary.avgPace)}</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Dénivelé</p>
-                    <p className="text-lg font-bold">+{Math.round(runSummary.elevation)} m</p>
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">FC moyenne</p>
-                    <p className="text-lg font-bold">{runSummary.averageHeartRate ?? "--"} bpm</p>
-                  </div>
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold">Récapitulatif de performance</h3>
+                  <Button variant="outline" size="sm" onClick={() => setShowCompletedActivityDetail(true)}>
+                    Ouvrir l'analyse
+                  </Button>
                 </div>
-                {runSummary.gpsTrace.length > 2 && (
-                  <div className="space-y-2">
-                    <GPSMap trace={runSummary.gpsTrace} height={180} />
-                  </div>
-                )}
-                {runSummary.gpsTrace.length > 0 && (
-                  <div className="pt-2 border-t border-border/50">
-                    <p className="text-xs text-muted-foreground">Points GPS enregistrés: {runSummary.gpsTrace.length}</p>
-                  </div>
-                )}
+                {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
+                <div className="space-y-2">
+                  <Label>Audience de cette course</Label>
+                  <Select value={postAudience} onValueChange={(value) => void handleAudienceChange(value as "private" | "friends" | "public")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir l'audience" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="private">Moi uniquement</SelectItem>
+                      <SelectItem value="friends">Mes amis</SelectItem>
+                      <SelectItem value="public">Tout le monde</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    {postAudience === "public"
+                      ? "Cette course apparaît dans le fil public."
+                      : postAudience === "friends"
+                        ? "Cette course est masquée du fil public et réservée à l'audience amis."
+                        : "Cette course reste visible uniquement par vous."}
+                  </p>
+                  {isUpdatingAudience ? <p className="text-xs text-muted-foreground">Mise à jour de l'audience...</p> : null}
+                </div>
+                {completedPost ? <ActivityPostCard post={completedPost} onOpen={() => setShowCompletedActivityDetail(true)} /> : null}
               </CardContent>
             </Card>
           </ScrollReveal>
@@ -627,31 +877,33 @@ export default function Run() {
           <ScrollReveal delay={0.1}>
             <Card>
               <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Splits (Km)</h3><ChevronUp className="h-4 w-4 text-muted-foreground" /></div>
+                <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Splits ({distanceUnitShortLabel.toUpperCase()})</h3><ChevronUp className="h-4 w-4 text-muted-foreground" /></div>
                 {gpsTrace.length > 0 ? (
-                  Array.from({ length: Math.floor(distance) }, (_, i) => {
+                  Array.from({ length: Math.floor(distance / splitDistanceKm) }, (_, i) => {
                     const splitStart = gpsTrace.findIndex((p) => {
                       const d = gpsTrace.slice(0, gpsTrace.indexOf(p) + 1).reduce((acc, curr, idx) => {
                         if (idx === 0) return 0;
                         return acc + haversineDistance(gpsTrace[idx - 1].lat, gpsTrace[idx - 1].lng, curr.lat, curr.lng);
                       }, 0);
-                      return d >= i * 1;
+                      return d >= i * splitDistanceKm;
                     });
                     const splitEnd = gpsTrace.findIndex((p) => {
                       const d = gpsTrace.slice(0, gpsTrace.indexOf(p) + 1).reduce((acc, curr, idx) => {
                         if (idx === 0) return 0;
                         return acc + haversineDistance(gpsTrace[idx - 1].lat, gpsTrace[idx - 1].lng, curr.lat, curr.lng);
                       }, 0);
-                      return d >= (i + 1) * 1;
+                      return d >= (i + 1) * splitDistanceKm;
                     });
 
                     if (splitStart >= 0 && splitEnd > splitStart) {
                       const splitTime = (gpsTrace[splitEnd].time - gpsTrace[splitStart].time) / 1000;
-                      const splitPace = splitTime / 60;
+                      const splitPace = (splitTime / 60) / splitDistanceKm;
                       return (
                         <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
-                          <span className="text-muted-foreground">Km {i + 1}</span>
-                          <span className="font-bold tabular-nums">{formatPace(splitPace)}</span>
+                          <span className="text-muted-foreground">
+                            {runPreferences.distanceUnit === "mi" ? "Mile" : "Km"} {i + 1}
+                          </span>
+                          <span className="font-bold tabular-nums">{formatPace(convertPaceFromMinutesPerKm(splitPace, runPreferences.distanceUnit))}</span>
                         </div>
                       );
                     }
@@ -660,7 +912,11 @@ export default function Run() {
                 ) : (
                   <p className="text-xs text-muted-foreground text-center py-2">Attendez les données GPS...</p>
                 )}
-                {Math.floor(distance) === 0 && <p className="text-xs text-muted-foreground text-center py-2">Le premier split apparaîtra à 1 km</p>}
+                {Math.floor(distance / splitDistanceKm) === 0 && (
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    Le premier split apparaîtra à 1 {runPreferences.distanceUnit === "mi" ? "mile" : "km"}
+                  </p>
+                )}
               </CardContent>
             </Card>
           </ScrollReveal>

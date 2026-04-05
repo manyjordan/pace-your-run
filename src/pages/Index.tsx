@@ -158,24 +158,11 @@ const Dashboard = () => {
 
       <ScrollReveal>
         <div className="rounded-2xl border border-accent/70 bg-accent px-5 py-5 text-accent-foreground shadow-[0_18px_44px_hsl(var(--accent)/0.2)]">
-          <div className="flex flex-col gap-3">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                Bonjour <span className="text-accent-foreground">{athleteName}</span>
-              </h1>
-              <p className="mt-1 text-sm text-accent-foreground/80">{weeklyInsight}</p>
-            </div>
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <p className="text-sm text-accent-foreground/80">
-                Importez votre historique pour enrichir vos stats, vos dernières activités et vos futurs plans.
-              </p>
-              <Link
-                to="/import"
-                className="inline-flex items-center justify-center rounded-lg border border-accent-foreground/20 bg-accent-foreground px-3 py-2 text-xs font-semibold text-accent transition-opacity hover:opacity-90"
-              >
-                Importer mon historique
-              </Link>
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              Bonjour <span className="text-accent-foreground">{athleteName}</span>
+            </h1>
+            <p className="mt-1 text-sm text-accent-foreground/80">{weeklyInsight}</p>
           </div>
         </div>
       </ScrollReveal>
@@ -187,7 +174,7 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm font-semibold">Importez votre historique de courses pour voir vos statistiques</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  GPX, FIT, archive Strava ou export Apple Health : tout est analyse localement dans le navigateur.
+                  GPX, FIT, archive Strava/Nike/Adidas ou export Apple Health, importe ton historique de courses en un clin d'oeil.
                 </p>
               </div>
               <Link

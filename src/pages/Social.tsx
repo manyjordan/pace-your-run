@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Heart,
   MessageCircle,
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import GPSMap from "@/components/GPSMap";
+import { ForumSection } from "@/components/social/ForumSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { getPublicPosts, toggleLike as togglePostLike, type PublicPostRecord, type RunRow } from "@/lib/database";
 import { useNavigate } from "react-router-dom";
@@ -285,7 +287,7 @@ export default function Social() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Communauté</h1>
-            <p className="text-sm text-muted-foreground">Partagez vos courses et suivez vos amis</p>
+            <p className="text-sm text-muted-foreground">Suivez les activités et préparez l'arrivée d'un forum running</p>
           </div>
           <Button
             variant="outline"
@@ -299,258 +301,273 @@ export default function Social() {
         </div>
       </ScrollReveal>
 
-      <div className="space-y-4">
-        {showFriendSearch && (
-          <ScrollReveal delay={0.04}>
+      <Tabs defaultValue="activity" className="space-y-6">
+        <ScrollReveal delay={0.04}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="activity">
+              <Users className="mr-1.5 h-4 w-4" /> Activité
+            </TabsTrigger>
+            <TabsTrigger value="forum">
+              <MessageCircle className="mr-1.5 h-4 w-4" /> Forum
+            </TabsTrigger>
+          </TabsList>
+        </ScrollReveal>
+
+        <TabsContent value="activity" className="space-y-4">
+          {showFriendSearch && (
+            <ScrollReveal delay={0.04}>
+              <Card>
+                <CardContent className="space-y-3 p-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      type="text"
+                      placeholder="Chercher un ami..."
+                      value={friendQuery}
+                      onChange={(e) => setFriendQuery(e.target.value)}
+                      className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none transition focus:ring-2 ring-accent"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    {filteredFriends.map((friend) => (
+                      <div key={friend.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="text-[10px] font-bold">{friend.initials}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{friend.name}</p>
+                            <p className="text-xs text-muted-foreground">{friend.discipline}</p>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={friend.following ? "secondary" : "default"}
+                          onClick={() => toggleFollow(friend.id)}
+                        >
+                          {friend.following ? (
+                            "Suivi"
+                          ) : (
+                            <>
+                              <UserPlus className="mr-1 h-4 w-4" /> Suivre
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    ))}
+                    {filteredFriends.length === 0 && (
+                      <p className="py-2 text-center text-xs text-muted-foreground">Aucun ami trouvé.</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          )}
+
+          <ScrollReveal delay={0.08}>
             <Card>
-              <CardContent className="p-4 space-y-3">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    type="text"
-                    placeholder="Chercher un ami..."
-                    value={friendQuery}
-                    onChange={(e) => setFriendQuery(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-background py-2 pl-9 pr-3 text-sm outline-none focus:ring-2 ring-accent transition"
+              <CardContent className="space-y-3 p-4">
+                <div className="flex gap-3">
+                  <Avatar className="h-9 w-9">
+                    <AvatarFallback className="bg-accent text-xs font-bold text-accent-foreground">MOI</AvatarFallback>
+                  </Avatar>
+                  <Textarea
+                    placeholder="Partagez votre dernière course..."
+                    value={newPost}
+                    onChange={(e) => setNewPost(e.target.value)}
+                    className="min-h-[60px] resize-none"
                   />
                 </div>
-                <div className="space-y-2">
-                  {filteredFriends.map((friend) => (
-                    <div key={friend.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="text-[10px] font-bold">{friend.initials}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">{friend.name}</p>
-                          <p className="text-xs text-muted-foreground">{friend.discipline}</p>
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        variant={friend.following ? "secondary" : "default"}
-                        onClick={() => toggleFollow(friend.id)}
-                      >
-                        {friend.following ? "Suivi" : <><UserPlus className="h-4 w-4 mr-1" /> Suivre</>}
-                      </Button>
-                    </div>
-                  ))}
-                  {filteredFriends.length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-2">Aucun ami trouvé.</p>
-                  )}
+                <div className="flex items-center justify-between">
+                  <Button variant="ghost" size="sm" className="text-muted-foreground">
+                    <ImageIcon className="mr-1 h-4 w-4" /> Photo
+                  </Button>
+                  <Button size="sm" disabled={!newPost.trim()}>
+                    <Send className="mr-1 h-4 w-4" /> Publier
+                  </Button>
                 </div>
               </CardContent>
             </Card>
           </ScrollReveal>
-        )}
 
-        {/* Compose */}
-        <ScrollReveal delay={0.08}>
-          <Card>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex gap-3">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className="bg-accent text-accent-foreground text-xs font-bold">MOI</AvatarFallback>
-                </Avatar>
-                <Textarea
-                  placeholder="Partagez votre dernière course..."
-                  value={newPost}
-                  onChange={(e) => setNewPost(e.target.value)}
-                  className="min-h-[60px] resize-none"
-                />
-              </div>
-              <div className="flex items-center justify-between">
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
-                  <ImageIcon className="h-4 w-4 mr-1" /> Photo
-                </Button>
-                <Button size="sm" disabled={!newPost.trim()}>
-                  <Send className="h-4 w-4 mr-1" /> Publier
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
-
-        {/* Posts */}
-        {isLoadingPosts
-          ? Array.from({ length: 3 }, (_, i) => (
-              <ScrollReveal key={`skeleton-${i}`} delay={0.1 + i * 0.06}>
-                <Card className="overflow-hidden">
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-10 w-10 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-4 w-32" />
-                        <Skeleton className="h-3 w-20" />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Skeleton className="h-4 w-56" />
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-5/6" />
-                    </div>
-                    <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
-                      <Skeleton className="h-12 w-full" />
-                      <Skeleton className="h-12 w-full" />
-                      <Skeleton className="h-12 w-full" />
-                      <Skeleton className="h-12 w-full" />
-                    </div>
-                    <Skeleton className="h-10 w-full" />
-                  </CardContent>
-                </Card>
-              </ScrollReveal>
-            ))
-          : postsError ? (
-              <ScrollReveal delay={0.1}>
-                <Card className="border-destructive/30 bg-destructive/5">
-                  <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                      <AlertTriangle className="h-6 w-6" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="font-semibold">Impossible de charger le fil d&apos;actualité. Vérifiez votre connexion.</h3>
-                    </div>
-                    <Button
-                      variant="outline"
-                      className="border-[hsl(var(--accent))] text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/10"
-                      onClick={() => void loadCommunityPosts()}
-                    >
-                      Réessayer
-                    </Button>
-                  </CardContent>
-                </Card>
-              </ScrollReveal>
-            ) : posts.length === 0 ? (
-              <ScrollReveal delay={0.1}>
-                <Card className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
-                  <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]">
-                      <Users className="h-7 w-7" />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="font-semibold">Aucune activité pour l&apos;instant</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Les courses de vos abonnés apparaîtront ici. Commencez par enregistrer votre première course !
-                      </p>
-                    </div>
-                    <Button
-                      className="bg-[hsl(var(--accent))] text-accent-foreground hover:bg-[hsl(var(--accent))]/90"
-                      onClick={() => navigate("/run")}
-                    >
-                      Enregistrer une course
-                    </Button>
-                  </CardContent>
-                </Card>
-              </ScrollReveal>
-            ) : posts.map((post, i) => (
-              <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
-                <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
-                  <CardContent className="p-4 space-y-3">
-                    {/* Header */}
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs font-bold">
-                          {post.initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm">{post.user}</span>
-                          {post.type === "race" && (
-                            <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                              <Trophy className="h-3 w-3 mr-0.5" /> Course
-                            </Badge>
-                          )}
+          {isLoadingPosts
+            ? Array.from({ length: 3 }, (_, i) => (
+                <ScrollReveal key={`skeleton-${i}`} delay={0.1 + i * 0.06}>
+                  <Card className="overflow-hidden">
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex items-center gap-3">
+                        <Skeleton className="h-10 w-10 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-4 w-32" />
+                          <Skeleton className="h-3 w-20" />
                         </div>
-                        <span className="text-xs text-muted-foreground">{post.time}</span>
                       </div>
-                    </div>
-
-                    {/* Content */}
-                    <div>
-                      <h3 className="font-semibold text-sm">{post.title}</h3>
-                      <p className="text-sm text-muted-foreground mt-1">{post.description}</p>
-                    </div>
-
-                    {/* Stats strip */}
-                    <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
-                      <div className="text-center">
-                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                          <MapPin className="h-3 w-3" /> Dist.
-                        </div>
-                        <div className="text-sm font-bold mt-0.5">{post.stats.distance}</div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-56" />
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-5/6" />
                       </div>
-                      <div className="text-center">
-                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                          <Zap className="h-3 w-3" /> Allure
-                        </div>
-                        <div className="text-sm font-bold mt-0.5">{post.stats.pace}</div>
+                      <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
+                        <Skeleton className="h-12 w-full" />
                       </div>
-                      <div className="text-center">
-                        <div className="text-xs text-muted-foreground flex items-center justify-center gap-1">
-                          <Clock className="h-3 w-3" /> Durée
-                        </div>
-                        <div className="text-sm font-bold mt-0.5">{post.stats.duration}</div>
+                      <Skeleton className="h-10 w-full" />
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              ))
+            : postsError ? (
+                <ScrollReveal delay={0.1}>
+                  <Card className="border-destructive/30 bg-destructive/5">
+                    <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+                        <AlertTriangle className="h-6 w-6" />
                       </div>
-                      <div className="text-center">
-                        <div className="text-xs text-muted-foreground">D+</div>
-                        <div className="text-sm font-bold mt-0.5">{post.stats.elevation}</div>
+                      <div className="space-y-1">
+                        <h3 className="font-semibold">Impossible de charger le fil d&apos;actualité. Vérifiez votre connexion.</h3>
                       </div>
-                    </div>
-
-                    {post.gpsTrace && post.gpsTrace.length > 0 && (
-                      <GPSMap trace={post.gpsTrace} />
-                    )}
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOpenActivity(post);
-                      }}
-                    >
-                      Voir les détails de l'activité
-                    </Button>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-1 pt-1 border-t border-border">
                       <Button
-                        variant="ghost"
+                        variant="outline"
+                        className="border-[hsl(var(--accent))] text-[hsl(var(--accent))] hover:bg-[hsl(var(--accent))]/10"
+                        onClick={() => void loadCommunityPosts()}
+                      >
+                        Réessayer
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              ) : posts.length === 0 ? (
+                <ScrollReveal delay={0.1}>
+                  <Card className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
+                    <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]">
+                        <Users className="h-7 w-7" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="font-semibold">Aucune activité pour l&apos;instant</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Les courses de vos abonnés apparaîtront ici. Commencez par enregistrer votre première course !
+                        </p>
+                      </div>
+                      <Button
+                        className="bg-[hsl(var(--accent))] text-accent-foreground hover:bg-[hsl(var(--accent))]/90"
+                        onClick={() => navigate("/run")}
+                      >
+                        Enregistrer une course
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              ) : posts.map((post, i) => (
+                <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
+                  <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
+                    <CardContent className="space-y-3 p-4">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
+                            {post.initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold">{post.user}</span>
+                            {post.type === "race" && (
+                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                                <Trophy className="mr-0.5 h-3 w-3" /> Course
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground">{post.time}</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-semibold">{post.title}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">{post.description}</p>
+                      </div>
+
+                      <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3" /> Dist.
+                          </div>
+                          <div className="mt-0.5 text-sm font-bold">{post.stats.distance}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                            <Zap className="h-3 w-3" /> Allure
+                          </div>
+                          <div className="mt-0.5 text-sm font-bold">{post.stats.pace}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" /> Durée
+                          </div>
+                          <div className="mt-0.5 text-sm font-bold">{post.stats.duration}</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-xs text-muted-foreground">D+</div>
+                          <div className="mt-0.5 text-sm font-bold">{post.stats.elevation}</div>
+                        </div>
+                      </div>
+
+                      {post.gpsTrace && post.gpsTrace.length > 0 && <GPSMap trace={post.gpsTrace} />}
+
+                      <Button
+                        variant="outline"
                         size="sm"
-                        disabled={likeBusyId === post.dbId}
-                        className={post.liked ? "text-red-500" : "text-muted-foreground"}
+                        className="w-full"
                         onClick={(event) => {
                           event.stopPropagation();
-                          void handleToggleLike(post);
+                          handleOpenActivity(post);
                         }}
                       >
-                        <Heart className={`h-4 w-4 mr-1 ${post.liked ? "fill-current" : ""}`} />
-                        {post.likes}
+                        Voir les détails de l&apos;activité
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <MessageCircle className="h-4 w-4 mr-1" /> {post.comments}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="ml-auto text-muted-foreground"
-                        onClick={(event) => event.stopPropagation()}
-                      >
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </ScrollReveal>
-            ))}
-      </div>
+
+                      <div className="flex items-center gap-1 border-t border-border pt-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          disabled={likeBusyId === post.dbId}
+                          className={post.liked ? "text-red-500" : "text-muted-foreground"}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleToggleLike(post);
+                          }}
+                        >
+                          <Heart className={`mr-1 h-4 w-4 ${post.liked ? "fill-current" : ""}`} />
+                          {post.likes}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <MessageCircle className="mr-1 h-4 w-4" /> {post.comments}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="ml-auto text-muted-foreground"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <Share2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </ScrollReveal>
+              ))}
+        </TabsContent>
+
+        <TabsContent value="forum">
+          <ForumSection />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

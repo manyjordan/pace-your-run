@@ -1,8 +1,11 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { useMemo, useState } from "react";
+import { AlertCircle, Search } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Issue = {
   name: string;
@@ -633,23 +636,55 @@ const issuesData: Record<string, Issue> = {
   },
 };
 
-const bodyParts = [
-  { id: "neck", label: "Cou", x: 50, y: 12, issues: ["Cervicalgie"] },
-  { id: "upper-back", label: "Haut du dos", x: 50, y: 24, issues: ["Dorsalgie"] },
-  { id: "lower-back", label: "Bas du dos", x: 50, y: 41, issues: ["Lombalgie"] },
-  { id: "hip", label: "Hanche", x: 43, y: 50, issues: ["Elongation du flechisseur de hanche", "Bursite"] },
-  { id: "hamstring", label: "Ischio-jambiers", x: 57, y: 60, issues: ["Elongation des ischio-jambiers", "Tendinopathie proximale"] },
-  { id: "knee", label: "Genou", x: 47, y: 70.5, issues: ["Syndrome rotulien", "Syndrome de l'essuie-glace", "Menisque"] },
-  { id: "shin", label: "Tibia", x: 46, y: 81, issues: ["Periostite tibiale", "Fracture de fatigue"] },
-  { id: "calf", label: "Mollet", x: 55, y: 81, issues: ["Elongation du mollet", "Tendinite d'Achille"] },
-  { id: "ankle", label: "Cheville", x: 46, y: 92, issues: ["Entorse de cheville", "Tendinite des peroniers"] },
-  { id: "foot", label: "Pied", x: 44, y: 97.5, issues: ["Fasciite plantaire", "Fracture de fatigue metatarsienne"] },
+type SymptomZone = {
+  description: string;
+  id: string;
+  issues: string[];
+  title: string;
+};
+
+const symptomZones: SymptomZone[] = [
+  {
+    id: "upper-body",
+    title: "Cou et dos",
+    description: "Raideurs, douleurs posturales et tensions du haut au bas du dos.",
+    issues: ["Cervicalgie", "Dorsalgie", "Lombalgie"],
+  },
+  {
+    id: "hip-pelvis",
+    title: "Hanche et bassin",
+    description: "Douleurs de hanche, de l'aine ou instabilités liées à la foulée.",
+    issues: ["Elongation du flechisseur de hanche", "Bursite"],
+  },
+  {
+    id: "thigh",
+    title: "Cuisse et ischio-jambiers",
+    description: "Tensions à l'arrière de cuisse, douleurs à la base de la fesse ou gênes musculaires.",
+    issues: ["Elongation des ischio-jambiers", "Tendinopathie proximale"],
+  },
+  {
+    id: "knee",
+    title: "Genou",
+    description: "Douleurs autour de la rotule, côté externe du genou ou gêne articulaire.",
+    issues: ["Syndrome rotulien", "Syndrome de l'essuie-glace", "Menisque"],
+  },
+  {
+    id: "lower-leg",
+    title: "Tibia et mollet",
+    description: "Douleurs osseuses, musculaires ou tendineuses de la jambe inférieure.",
+    issues: ["Periostite tibiale", "Fracture de fatigue", "Elongation du mollet", "Tendinite d'Achille"],
+  },
+  {
+    id: "ankle-foot",
+    title: "Cheville et pied",
+    description: "Instabilité, douleurs tendineuses ou plantaires du pied et de la cheville.",
+    issues: ["Entorse de cheville", "Tendinite des peroniers", "Fasciite plantaire", "Fracture de fatigue metatarsienne"],
+  },
 ];
 
 const Health = () => {
-  const [selected, setSelected] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
-  const selectedPart = bodyParts.find((p) => p.id === selected);
+  const [searchQuery, setSearchQuery] = useState("");
   const issueDetails = selectedIssue ? issuesData[selectedIssue] : null;
   const cleanMedicalText = (text: string) => text.replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/g, " ").trim();
   const punctuateMedicalText = (text: string) => {
@@ -665,6 +700,32 @@ const Health = () => {
       .map(punctuateMedicalText)
       .filter(Boolean)
       .join(" ");
+
+  const normalizedSearch = searchQuery.trim().toLowerCase();
+  const filteredZones = useMemo(() => {
+    if (!normalizedSearch) return symptomZones;
+
+    return symptomZones
+      .map((zone) => ({
+        ...zone,
+        issues: zone.issues.filter((issue) => {
+          const details = issuesData[issue];
+          const haystack = [
+            issue,
+            zone.title,
+            zone.description,
+            ...(details?.symptomesRessentis ?? []),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          return haystack.includes(normalizedSearch);
+        }),
+      }))
+      .filter((zone) => zone.issues.length > 0);
+  }, [normalizedSearch]);
+
+  const visibleIssuesCount = filteredZones.reduce((count, zone) => count + zone.issues.length, 0);
 
   return (
     <div className="space-y-6">
@@ -684,99 +745,105 @@ const Health = () => {
         </div>
       </ScrollReveal>
 
-      {/* Body map */}
       <ScrollReveal>
         <div className="rounded-xl border border-border bg-card p-5">
-          <h2 className="mb-2 text-sm font-semibold">Vérification des symptômes</h2>
-          <p className="mb-4 text-xs text-muted-foreground">Cliquez sur une zone du corps pour explorer les problèmes fréquents et leur traitement</p>
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h2 className="mb-2 text-sm font-semibold">Explorer les symptômes</h2>
+              <p className="text-xs text-muted-foreground">
+                Parcourez les douleurs possibles par zone du corps ou recherchez directement un symptôme.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Badge variant="secondary">{symptomZones.length} zones</Badge>
+              <Badge variant="secondary">{visibleIssuesCount} problèmes visibles</Badge>
+            </div>
+          </div>
+
+          <div className="mb-6 rounded-2xl border border-accent/20 bg-gradient-to-r from-card via-card to-accent/5 p-4 shadow-[0_18px_40px_hsl(var(--accent)/0.08)]">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Ex. douleur au genou, fasciite, ischio, cheville..."
+                className="pl-9"
+              />
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Astuce : tapez une zone, un symptôme ou le nom d&apos;une blessure pour filtrer rapidement la liste.
+            </p>
+          </div>
+
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="mx-auto w-full max-w-[320px] rounded-2xl border border-accent/20 bg-gradient-to-b from-card via-card to-accent/5 p-4 shadow-[0_18px_40px_hsl(var(--accent)/0.08)]">
-              <div className="mx-auto flex h-[460px] w-[240px] items-center justify-center">
-                <div className="relative aspect-[619/1024] w-full">
-                  <img
-                    src="/health-body-running-back.png"
-                    alt="Silhouette du corps"
-                    className="h-full w-full rounded-2xl object-contain opacity-95"
-                  />
+            <div className="flex flex-col">
+              <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+                <CardContent className="p-4">
+                  {filteredZones.length > 0 ? (
+                    <Accordion type="multiple" className="space-y-2">
+                      {filteredZones.map((zone) => (
+                        <AccordionItem
+                          key={zone.id}
+                          value={zone.id}
+                          className="rounded-xl border border-border bg-muted/10 px-4"
+                        >
+                          <AccordionTrigger className="py-4 text-left hover:no-underline">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-semibold">{zone.title}</span>
+                                <Badge variant="outline">{zone.issues.length}</Badge>
+                              </div>
+                              <p className="text-xs text-muted-foreground">{zone.description}</p>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="space-y-2">
+                            {zone.issues.map((issue) => {
+                              const details = issuesData[issue];
+                              const isActive = selectedIssue === issue;
 
-                  {bodyParts.map((part) => (
-                    <button
-                      key={part.id}
-                      onClick={() => {
-                        setSelected(selected === part.id ? null : part.id);
-                        setSelectedIssue(null);
-                      }}
-                      className={`absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 transition-all ${
-                        selected === part.id
-                          ? "border-accent bg-accent text-accent-foreground scale-110 shadow-[0_0_0_6px_hsl(var(--accent)/0.18)]"
-                          : "border-white/70 bg-[hsl(var(--foreground)/0.14)] hover:border-accent hover:bg-accent/80 hover:text-accent-foreground"
-                      }`}
-                      style={{ left: `${part.x}%`, top: `${part.y}%`, width: "24px", height: "24px" }}
-                      title={part.label}
-                    >
-                      <span className="sr-only">{part.label}</span>
-                    </button>
-                  ))}
-
-                  {selectedPart && (
-                    <div
-                      className="absolute -translate-y-1/2 rounded-full border border-accent/40 bg-card px-3 py-1 text-xs font-semibold shadow-md"
-                      style={{
-                        left: selectedPart.x < 50 ? "62%" : "4%",
-                        top: `${selectedPart.y}%`,
-                      }}
-                    >
-                      {selectedPart.label}
+                              return (
+                                <button
+                                  key={issue}
+                                  type="button"
+                                  onClick={() => setSelectedIssue(issue)}
+                                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
+                                    isActive
+                                      ? "border-accent bg-accent/10"
+                                      : "border-border bg-card hover:bg-muted/30"
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between gap-3">
+                                    <p className="text-sm font-medium">{issue}</p>
+                                    <span className="text-xs font-medium text-muted-foreground">Voir le détail</span>
+                                  </div>
+                                  <p className="mt-1 text-xs text-muted-foreground">
+                                    {toSentence(details?.symptomesRessentis ?? [], 1)}
+                                  </p>
+                                </button>
+                              );
+                            })}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-accent/30 bg-accent/5 py-8 text-center text-muted-foreground">
+                      <p className="text-sm font-medium">Aucun résultat pour cette recherche</p>
+                      <p className="mt-1 text-xs">Essayez un autre mot-clé, par exemple genou, pied, cheville ou ischio.</p>
                     </div>
                   )}
-                </div>
-              </div>
+                </CardContent>
+              </Card>
             </div>
 
-            {/* Details panel - Enhanced styling */}
             <div className="flex flex-col">
-              {selectedPart && !selectedIssue ? (
-                <div className="animate-count-up space-y-2">
-                  <div className="flex items-center gap-2 mb-3 pb-3 border-b">
-                    <div className="h-3 w-3 rounded-full bg-accent" />
-                    <h3 className="text-sm font-bold">Problèmes courants : {selectedPart.label}</h3>
-                  </div>
-                  <div className="rounded-lg border border-accent/30 bg-accent/10 p-3">
-                    <p className="text-xs font-medium text-foreground">
-                      Étape suivante : choisissez un problème ci-dessous pour afficher les détails.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Le contenu détaillé s'ouvre juste en dessous dans cette même colonne.
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    {selectedPart.issues.map((issue) => (
-                      <button
-                        key={issue}
-                        onClick={() => setSelectedIssue(issue)}
-                        className="w-full rounded-lg border border-border bg-card p-3 text-left text-sm transition-colors hover:bg-muted/30"
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <p className="font-medium">{issue}</p>
-                          <span className="text-xs font-medium text-muted-foreground">Détail</span>
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Touchez pour afficher une version courte et pratique.
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : selectedIssue && issueDetails ? (
-                <div className="space-y-3 max-h-[600px] overflow-y-auto">
+              {selectedIssue && issueDetails ? (
+                <div className="space-y-3 max-h-[700px] overflow-y-auto">
                   <div className="flex items-start justify-between gap-2 pb-3 border-b">
                     <h3 className="font-semibold text-sm">{issueDetails.name}</h3>
-                    <button
-                      onClick={() => setSelectedIssue(null)}
-                      className="text-muted-foreground hover:text-foreground"
-                    >
-                      ✕
-                    </button>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedIssue(null)}>
+                      Fermer
+                    </Button>
                   </div>
 
                   <div className="space-y-3 text-sm">
@@ -818,8 +885,10 @@ const Health = () => {
                 </div>
               ) : (
                 <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-accent/30 bg-accent/5 py-8 text-center text-muted-foreground">
-                  <p className="text-sm font-medium">Sélectionnez une zone du corps</p>
-                  <p className="mt-1 text-xs">Puis choisissez le problème affiché juste en dessous pour voir le détail.</p>
+                  <p className="text-sm font-medium">Choisissez un symptôme ou une blessure</p>
+                  <p className="mt-1 text-xs">
+                    Explorez les zones à gauche puis touchez un problème pour afficher sa fiche pratique ici.
+                  </p>
                 </div>
               )}
             </div>
