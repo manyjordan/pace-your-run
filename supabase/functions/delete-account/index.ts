@@ -14,7 +14,6 @@ export const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 
     if (!supabaseUrl || !serviceRoleKey) {
       return new Response(JSON.stringify({ error: "Missing Supabase environment variables" }), {
@@ -46,22 +45,12 @@ export const handler = async (req: Request): Promise<Response> => {
       }
     );
 
-    const supabaseAuth = createClient(
-      supabaseUrl,
-      anonKey || serviceRoleKey,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
-
     // Verify the token and extract user_id
+    console.log("Step: verifying token");
     const {
       data: { user },
       error: tokenError,
-    } = await supabaseAuth.auth.getUser(token);
+    } = await supabaseAdmin.auth.getUser(token);
 
     if (tokenError || !user) {
       return new Response(JSON.stringify({ error: "Invalid or expired token" }), {
@@ -71,6 +60,7 @@ export const handler = async (req: Request): Promise<Response> => {
     }
 
     const userId = user.id;
+    console.log("Step: user verified, id:", userId);
 
     const isIgnorableCleanupError = (error: unknown) => {
       if (!error || typeof error !== "object") return false;
@@ -182,6 +172,7 @@ export const handler = async (req: Request): Promise<Response> => {
       await cleanupTable("forum_threads", "user_id", userId);
     };
 
+    console.log("Step: cleaning up data");
     await deleteAvatarFolder();
     await deleteSocialData();
     await deleteForumData();
@@ -192,6 +183,7 @@ export const handler = async (req: Request): Promise<Response> => {
 
     // Delete the auth user. All rows referencing auth.users(id) with ON DELETE CASCADE
     // are cleaned up automatically by Postgres.
+    console.log("Step: deleting auth user");
     const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId);
 
     if (authDeleteError) {

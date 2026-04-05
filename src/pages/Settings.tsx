@@ -115,6 +115,15 @@ const SettingsPage = () => {
         throw new Error("Configuration Supabase manquante");
       }
 
+      const {
+        data: { session: freshSession },
+        error: refreshError,
+      } = await supabase.auth.refreshSession();
+
+      if (refreshError || !freshSession) {
+        throw new Error("Session expirée. Reconnectez-vous puis réessayez.");
+      }
+
       const response = await fetch(
         `${supabaseUrl}/functions/v1/delete-account`,
         {
@@ -122,7 +131,7 @@ const SettingsPage = () => {
           headers: {
             Accept: "application/json",
             "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${freshSession.access_token}`,
             apikey: supabaseAnonKey,
           },
         },
