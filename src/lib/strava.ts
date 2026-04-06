@@ -19,31 +19,6 @@ export type CommunityPost = {
   gpsTrace?: GPSTracePoint[];
 };
 
-export type StravaActivity = {
-  id: number;
-  name: string;
-  distance: number;
-  moving_time: number;
-  elapsed_time: number;
-  total_elevation_gain: number;
-  average_heartrate?: number;
-  start_date: string;
-  sport_type?: string;
-  type?: string;
-  map?: {
-    summary_polyline?: string | null;
-  };
-  splits_metric?: Array<{
-    distance: number;
-    elapsed_time: number;
-    elevation_difference?: number;
-    moving_time: number;
-    split: number;
-    average_speed?: number;
-    average_heartrate?: number;
-  }>;
-};
-
 export function formatDuration(seconds: number) {
   const safeSeconds = Math.max(0, Math.round(seconds));
   const hours = Math.floor(safeSeconds / 3600);

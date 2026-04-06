@@ -23,7 +23,7 @@ import {
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { createPost, saveRun, updatePostAudience, type RunGpsPoint } from "@/lib/database";
+import { createPost, saveRun, updatePostAudience, type RunGpsPoint, type RunRow } from "@/lib/database";
 import {
   connectHeartRateMonitor,
   disconnectHeartRateMonitor,
@@ -36,7 +36,6 @@ import {
   formatRelativeTime,
   getInitials,
   type CommunityPost,
-  type StravaActivity,
 } from "@/lib/strava";
 import {
   convertDistanceFromKm,
@@ -65,52 +64,6 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 
 type GPSPoint = RunGpsPoint;
 
-function buildSyntheticSplits(trace: GPSPoint[], totalDistanceKm: number, averageHeartRate?: number) {
-  if (trace.length < 2 || totalDistanceKm < 1) return [];
-
-  const cumulativeDistances: number[] = [];
-  let total = 0;
-
-  for (let index = 0; index < trace.length; index += 1) {
-    if (index === 0) {
-      cumulativeDistances.push(0);
-      continue;
-    }
-
-    total += haversineDistance(trace[index - 1].lat, trace[index - 1].lng, trace[index].lat, trace[index].lng);
-    cumulativeDistances.push(total);
-  }
-
-  const splits = [];
-  let splitStartIndex = 0;
-
-  for (let split = 1; split <= Math.floor(totalDistanceKm); split += 1) {
-    const splitEndIndex = cumulativeDistances.findIndex((distanceKm) => distanceKm >= split);
-    if (splitEndIndex <= splitStartIndex) continue;
-
-    const splitSeconds = Math.max(1, Math.round((trace[splitEndIndex].time - trace[splitStartIndex].time) / 1000));
-    const startAltitude = trace[splitStartIndex].altitude;
-    const endAltitude = trace[splitEndIndex].altitude;
-
-    splits.push({
-      split,
-      distance: 1000,
-      elapsed_time: splitSeconds,
-      moving_time: splitSeconds,
-      average_speed: 1000 / splitSeconds,
-      average_heartrate: averageHeartRate,
-      elevation_difference:
-        typeof startAltitude === "number" && typeof endAltitude === "number"
-          ? endAltitude - startAltitude
-          : 0,
-    });
-
-    splitStartIndex = splitEndIndex;
-  }
-
-  return splits;
-}
-
 /* ── Run component ── */
 export default function Run() {
   const { user } = useAuth();
@@ -137,7 +90,7 @@ export default function Run() {
   const [heartRate, setHeartRate] = useState<number | null>(null);
   const [bluetoothAvailable] = useState(() => isBluetoothAvailable());
   const [runPreferences, setRunPreferences] = useState<RunPreferences>(() => getDefaultRunPreferences());
-  const [completedActivity, setCompletedActivity] = useState<StravaActivity | null>(null);
+  const [completedActivity, setCompletedActivity] = useState<RunRow | null>(null);
   const [completedPost, setCompletedPost] = useState<CommunityPost | null>(null);
   const [showCompletedActivityDetail, setShowCompletedActivityDetail] = useState(false);
   const [completedPostId, setCompletedPostId] = useState<string | null>(null);
@@ -332,7 +285,13 @@ export default function Run() {
       connection.onDisconnect(() => {
         handleBluetoothDisconnect();
       });
-    } catch {
+    } catch (error) {
+      console.error("[Run] operation failed:", error);
+      import("@sentry/react")
+        .then(({ captureException }) => {
+          captureException(error);
+        })
+        .catch(() => {});
       setBluetoothError("Appareil non trouvé. Vérifiez que votre capteur est allumé.");
       setBluetoothDevice(null);
       setHeartRate(null);
@@ -499,22 +458,24 @@ export default function Run() {
 
       const activityName = "Nouvelle course enregistrée";
       const activityDescription = `Je viens de terminer ${finalDistance.toFixed(2)} km en ${formatTime(finalElapsed)}.`;
-      const syntheticActivity: StravaActivity = {
-        id: Date.now(),
-        name: activityName,
-        distance: finalDistance * 1000,
-        moving_time: finalElapsed,
-        elapsed_time: finalElapsed,
-        total_elevation_gain: finalElevation,
-        average_heartrate: finalAverageHeartRate,
-        start_date: finalStartedAt,
-        type: "Run",
-        sport_type: "Run",
-        splits_metric: buildSyntheticSplits(finalGpsTrace, finalDistance, finalAverageHeartRate),
+      const postNumericId = Date.now();
+      const syntheticRun: RunRow = {
+        id: String(postNumericId),
+        user_id: user?.id ?? null,
+        distance_km: finalDistance,
+        duration_seconds: finalElapsed,
+        elevation_gain: finalElevation,
+        average_pace: finalAvgPace,
+        average_heartrate: finalAverageHeartRate ?? null,
+        gps_trace: finalGpsTrace,
+        run_type: "run",
+        started_at: finalStartedAt,
+        title: activityName,
+        created_at: new Date().toISOString(),
       };
       const identity = user?.email ?? "Vous";
       const syntheticPost: CommunityPost = {
-        id: syntheticActivity.id,
+        id: postNumericId,
         user: identity,
         initials: getInitials(identity),
         time: formatRelativeTime(finalStartedAt),
@@ -533,7 +494,7 @@ export default function Run() {
         gpsTrace: finalGpsTrace,
       };
 
-      setCompletedActivity(syntheticActivity);
+      setCompletedActivity(syntheticRun);
       setCompletedPost(syntheticPost);
       setShowCompletedActivityDetail(true);
 
@@ -560,7 +521,13 @@ export default function Run() {
           const createdPost = await createPost(user.id, savedRun.id, title, description, postAudienceRef.current);
           setCompletedPostId(createdPost.id);
           window.dispatchEvent(new Event("pace-community-updated"));
-        } catch {
+        } catch (error) {
+          console.error("[Run] operation failed:", error);
+          import("@sentry/react")
+            .then(({ captureException }) => {
+              captureException(error);
+            })
+            .catch(() => {});
           setSaveError("Impossible d'enregistrer cette course pour le moment.");
         } finally {
           setIsSaving(false);
@@ -598,7 +565,13 @@ export default function Run() {
         setIsUpdatingAudience(true);
         await updatePostAudience(completedPostId, user.id, value);
         window.dispatchEvent(new Event("pace-community-updated"));
-      } catch {
+      } catch (error) {
+        console.error("[Run] operation failed:", error);
+        import("@sentry/react")
+          .then(({ captureException }) => {
+            captureException(error);
+          })
+          .catch(() => {});
         setSaveError("Impossible de mettre à jour l'audience de cette course.");
       } finally {
         setIsUpdatingAudience(false);

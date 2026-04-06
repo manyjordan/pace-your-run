@@ -56,7 +56,6 @@ import {
   formatRelativeTime,
   getInitials,
   type CommunityPost,
-  type StravaActivity,
 } from "@/lib/strava";
 
 function buildFallbackTrace(seed: number) {
@@ -80,6 +79,7 @@ function ensurePostTrace(post: CommunityPost): CommunityPost {
 type FeedPost = CommunityPost & {
   activityId: number;
   dbId?: string;
+  sourceRun?: RunRow | null;
   feedReason?: PersonalizedFeedPost["feedReason"];
   friendWhoLiked?: PersonalizedFeedPost["friendWhoLiked"];
 };
@@ -127,19 +127,6 @@ function inferPostType(title: string, description: string) {
   return "run" as const;
 }
 
-function runToActivity(run: RunRow, activityId: number): StravaActivity {
-  return {
-    id: activityId,
-    name: run.title ?? "Activité",
-    distance: run.distance_km * 1000,
-    moving_time: run.duration_seconds,
-    elapsed_time: run.duration_seconds,
-    total_elevation_gain: run.elevation_gain ?? 0,
-    start_date: run.started_at ?? run.created_at ?? new Date().toISOString(),
-    type: run.run_type ?? "Run",
-  };
-}
-
 function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
   const displayName =
     post.profile?.username ||
@@ -151,6 +138,7 @@ function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
   return {
     activityId,
     dbId: post.id,
+    sourceRun: run ?? null,
     id: activityId,
     user: displayName,
     initials: getInitials(displayName),
@@ -183,7 +171,7 @@ export default function Social() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FeedPost[]>([]);
-  const [activities, setActivities] = useState<StravaActivity[]>([]);
+  const [activities, setActivities] = useState<RunRow[]>([]);
   const [newPost, setNewPost] = useState("");
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [friendQuery, setFriendQuery] = useState("");
@@ -191,7 +179,7 @@ export default function Social() {
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
   const [followingAnyone, setFollowingAnyone] = useState(false);
   const [followBusyId, setFollowBusyId] = useState<string | null>(null);
-  const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<RunRow | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<CommunityPost["gpsTrace"] | undefined>(undefined);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
@@ -201,7 +189,7 @@ export default function Social() {
   const [notifications, setNotifications] = useState<NotificationWithActor[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
-  const buildActivityFromPost = (post: FeedPost): StravaActivity => {
+  const buildRunFromPost = (post: FeedPost): RunRow => {
     const parseDistance = Number.parseFloat(post.stats.distance.replace(",", "."));
     const [hoursOrMinutes = "0", minutesOrSeconds = "0", seconds = "0"] = post.stats.duration.split(":");
     const durationSeconds =
@@ -211,20 +199,28 @@ export default function Social() {
           Number.parseInt(seconds, 10)
         : Number.parseInt(hoursOrMinutes, 10) * 60 + Number.parseInt(minutesOrSeconds, 10);
 
+    const eleParsed = Number.parseInt(post.stats.elevation.replace(/[^\d-]/g, ""), 10);
+
     return {
-      id: post.activityId,
-      name: post.title,
-      distance: Number.isFinite(parseDistance) ? parseDistance * 1000 : 0,
-      moving_time: durationSeconds,
-      elapsed_time: durationSeconds,
-      total_elevation_gain: Number.parseInt(post.stats.elevation.replace(/[^\d-]/g, ""), 10) || 0,
-      start_date: new Date().toISOString(),
+      id: post.dbId ? `feed-fallback-${post.dbId}` : `feed-fallback-${post.activityId}`,
+      user_id: null,
+      distance_km: Number.isFinite(parseDistance) ? parseDistance : 0,
+      duration_seconds: Number.isFinite(durationSeconds) ? durationSeconds : 0,
+      elevation_gain: Number.isFinite(eleParsed) ? eleParsed : 0,
+      average_pace: null,
+      average_heartrate: null,
+      gps_trace: post.gpsTrace ?? null,
+      run_type: post.type === "race" ? "race" : "run",
+      started_at: new Date().toISOString(),
+      title: post.title,
+      created_at: new Date().toISOString(),
     };
   };
 
   const handleOpenActivity = (post: FeedPost) => {
-    const matched = activities.find((activity) => activity.id === post.activityId);
-    setSelectedActivity(matched ?? buildActivityFromPost(post));
+    const matched =
+      post.sourceRun ?? activities.find((run) => hashStringToNumber(run.id) === post.activityId);
+    setSelectedActivity(matched ?? buildRunFromPost(post));
     setSelectedTrace(post.gpsTrace);
   };
 
@@ -298,9 +294,7 @@ export default function Social() {
 
       setPosts(mappedPosts);
       setActivities(
-        feedPosts
-          .filter((post) => post.run)
-          .map((post) => runToActivity(post.run as RunRow, hashStringToNumber(post.run?.id ?? post.id))),
+        feedPosts.filter((post) => post.run).map((post) => post.run as RunRow),
       );
     } catch {
       setActivities([]);

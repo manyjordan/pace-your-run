@@ -3,13 +3,17 @@ import { BarChart3, Clock, Heart, Mountain, Route, TrendingUp, X } from "lucide-
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import GPSMap from "@/components/GPSMap";
 import type { RunRow } from "@/lib/database";
-import {
-  formatDistance,
-  formatDuration,
-  formatPace,
-  type GPSTracePoint,
-  type StravaActivity,
-} from "@/lib/strava";
+import { formatDistance, formatDuration, formatPace, type GPSTracePoint } from "@/lib/strava";
+
+type ActivitySplitMetric = {
+  distance: number;
+  elapsed_time: number;
+  elevation_difference?: number;
+  moving_time: number;
+  split: number;
+  average_speed?: number;
+  average_heartrate?: number;
+};
 
 type NormalizedActivity = {
   id: string;
@@ -20,46 +24,30 @@ type NormalizedActivity = {
   total_elevation_gain: number;
   average_heartrate?: number;
   start_date: string;
-  splits_metric?: StravaActivity["splits_metric"];
-  map?: StravaActivity["map"];
+  splits_metric?: ActivitySplitMetric[];
+  map?: { summary_polyline?: string | null };
 };
 
-function normalizeActivityDetailInput(input: RunRow | StravaActivity): NormalizedActivity {
-  if ("distance_km" in input) {
-    const r = input;
-    return {
-      id: r.id,
-      name: r.title ?? "Course",
-      distance: r.distance_km * 1000,
-      moving_time: r.duration_seconds,
-      elapsed_time: r.duration_seconds,
-      total_elevation_gain: r.elevation_gain ?? 0,
-      average_heartrate: r.average_heartrate ?? undefined,
-      start_date: r.started_at ?? r.created_at ?? new Date().toISOString(),
-      splits_metric: undefined,
-      map: undefined,
-    };
-  }
-
-  const a = input;
+function normalizeActivityDetailInput(input: RunRow): NormalizedActivity {
+  const r = input;
   return {
-    id: String(a.id),
-    name: a.name,
-    distance: a.distance,
-    moving_time: a.moving_time,
-    elapsed_time: a.elapsed_time,
-    total_elevation_gain: a.total_elevation_gain ?? 0,
-    average_heartrate: a.average_heartrate,
-    start_date: a.start_date,
-    splits_metric: a.splits_metric,
-    map: a.map,
+    id: r.id,
+    name: r.title ?? "Course",
+    distance: r.distance_km * 1000,
+    moving_time: r.duration_seconds,
+    elapsed_time: r.duration_seconds,
+    total_elevation_gain: r.elevation_gain ?? 0,
+    average_heartrate: r.average_heartrate ?? undefined,
+    start_date: r.started_at ?? r.created_at ?? new Date().toISOString(),
+    splits_metric: undefined,
+    map: undefined,
   };
 }
 
 type ActivityDetailProps = {
-  activity: RunRow | StravaActivity;
+  activity: RunRow;
   onClose: () => void;
-  allActivities?: (RunRow | StravaActivity)[];
+  allActivities?: RunRow[];
   fallbackTrace?: GPSTracePoint[];
 };
 

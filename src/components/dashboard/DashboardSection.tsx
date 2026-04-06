@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { Calendar, Route, Clock } from "lucide-react";
+import { Calendar, Route, Clock, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import { getPlanById } from "@/lib/trainingPlans";
 
@@ -29,7 +29,7 @@ type WeeklyMetricCard = {
   unit: string;
   currentValue: string;
   change: string;
-  icon: any;
+  icon: LucideIcon;
   color: string;
   chartData: Array<{ week: string; value: number; showTick?: boolean }>;
   comment: string;

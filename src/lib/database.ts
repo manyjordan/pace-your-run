@@ -313,13 +313,12 @@ export async function getRuns(userId: string) {
 }
 
 export async function deleteRun(runId: string) {
-  await requireCurrentUserId();
-
+  const userId = await requireCurrentUserId();
   const { error } = await supabase
     .from("runs")
     .delete()
-    .eq("id", runId);
-
+    .eq("id", runId)
+    .eq("user_id", userId);
   if (error) throw error;
 }
 
@@ -434,134 +433,99 @@ export async function getFollowing(userId: string): Promise<string[]> {
 export async function getPersonalizedFeed(userId: string): Promise<PersonalizedFeedPost[]> {
   await requireCurrentUserId(userId);
 
-  const following = await getFollowing(userId);
-  const followingSet = new Set(following);
+  const { data, error } = await supabase.rpc("get_personalized_feed", {
+    p_user_id: userId,
+    p_limit: 50,
+  });
 
-  const { data: ownPosts, error: ownErr } = await supabase
-    .from("social_posts")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  if (error) throw error;
+  if (!data?.length) return [];
 
-  if (ownErr) throw ownErr;
-
-  let followingPosts: SocialPostRow[] = [];
-  if (following.length) {
-    const { data, error } = await supabase
-      .from("social_posts")
-      .select("*")
-      .in("user_id", following)
-      .eq("audience", "public")
-      .order("created_at", { ascending: false })
-      .limit(50);
-    if (error) throw error;
-    followingPosts = (data ?? []) as SocialPostRow[];
-  }
-
-  let likedRows: { post_id: string; user_id: string }[] = [];
-  if (following.length) {
-    const { data, error } = await supabase
-      .from("post_likes")
-      .select("post_id, user_id")
-      .in("user_id", following);
-    if (error) throw error;
-    likedRows = (data ?? []) as { post_id: string; user_id: string }[];
-  }
-
-  const likedPostIdList = [...new Set(likedRows.map((r) => r.post_id))];
-  let friendLikedPosts: SocialPostRow[] = [];
-  if (likedPostIdList.length) {
-    const { data, error } = await supabase
-      .from("social_posts")
-      .select("*")
-      .in("id", likedPostIdList)
-      .eq("audience", "public");
-    if (error) throw error;
-    friendLikedPosts = (data ?? []) as SocialPostRow[];
-  }
-
-  const postById = new Map<string, SocialPostRow>();
-  for (const p of ownPosts ?? []) postById.set(p.id, p as SocialPostRow);
-  for (const p of followingPosts) postById.set(p.id, p);
-  for (const p of friendLikedPosts) postById.set(p.id, p);
-
-  const meta = new Map<string, { reason: "own" | "following" | "friend_liked"; friendId?: string }>();
-
-  const setMeta = (postId: string, reason: "own" | "following" | "friend_liked", friendId?: string) => {
-    const cur = meta.get(postId);
-    if (!cur || feedReasonPriority(reason) > feedReasonPriority(cur.reason)) {
-      meta.set(postId, { reason, friendId });
-    }
+  type PersonalizedFeedRpcRow = {
+    id: string;
+    user_id: string;
+    run_id: string | null;
+    title: string | null;
+    description: string | null;
+    is_public: boolean | null;
+    audience: string | null;
+    likes_count: number;
+    created_at: string | null;
+    feed_reason: "own" | "following" | "friend_liked";
+    friend_who_liked_id: string | null;
+    friend_who_liked_name: string | null;
+    run_distance_km: number | null;
+    run_duration_seconds: number | null;
+    run_elevation_gain: number | null;
+    run_average_pace: number | null;
+    run_average_heartrate: number | null;
+    run_started_at: string | null;
+    run_title: string | null;
+    run_gps_trace: Json | null;
+    author_first_name: string | null;
+    author_full_name: string | null;
+    author_username: string | null;
+    author_avatar_url: string | null;
+    liked_by_me: boolean;
   };
 
-  for (const p of ownPosts ?? []) setMeta(p.id, "own");
-  for (const p of followingPosts) setMeta(p.id, "following");
-  for (const p of friendLikedPosts) {
-    const liker = likedRows.find((r) => r.post_id === p.id && followingSet.has(r.user_id));
-    if (liker) setMeta(p.id, "friend_liked", liker.user_id);
-  }
+  return (data as PersonalizedFeedRpcRow[]).map((row): PersonalizedFeedPost => {
+    const profile: ProfileRow | null = row.user_id
+      ? {
+          id: row.user_id,
+          first_name: row.author_first_name,
+          full_name: row.author_full_name,
+          username: row.author_username,
+          avatar_url: row.author_avatar_url,
+          goal_type: null,
+          goal_data: null,
+          created_at: null,
+          updated_at: null,
+        }
+      : null;
 
-  const merged = [...meta.entries()]
-    .map(([id, m]) => ({ id, ...m, post: postById.get(id) }))
-    .filter((x): x is typeof x & { post: SocialPostRow } => Boolean(x.post))
-    .sort(
-      (a, b) =>
-        new Date(b.post.created_at ?? 0).getTime() - new Date(a.post.created_at ?? 0).getTime(),
-    )
-    .slice(0, 50);
+    const run: RunRow | null = row.run_id
+      ? {
+          id: row.run_id,
+          user_id: row.user_id,
+          distance_km: row.run_distance_km ?? 0,
+          duration_seconds: row.run_duration_seconds ?? 0,
+          elevation_gain: row.run_elevation_gain ?? 0,
+          average_pace: row.run_average_pace ?? null,
+          average_heartrate: row.run_average_heartrate ?? null,
+          started_at: row.run_started_at ?? null,
+          title: row.run_title ?? null,
+          gps_trace: row.run_gps_trace ?? null,
+          run_type: "run",
+          created_at: row.created_at,
+        }
+      : null;
 
-  const postIds = merged.map((m) => m.id);
-  const runIds = merged.map((m) => m.post.run_id).filter((v): v is string => Boolean(v));
-  const authorIds = [...new Set(merged.map((m) => m.post.user_id).filter((v): v is string => Boolean(v)))];
-  const friendIds = [...new Set(merged.map((m) => m.friendId).filter((v): v is string => Boolean(v)))];
+    const post: SocialPostRow = {
+      id: row.id,
+      user_id: row.user_id,
+      run_id: row.run_id ?? null,
+      title: row.title,
+      description: row.description,
+      is_public: row.is_public,
+      audience: (row.audience as SocialPostRow["audience"]) ?? "public",
+      likes_count: row.likes_count,
+      created_at: row.created_at,
+    };
 
-  const [
-    { data: runs },
-    { data: profiles },
-    { data: likes },
-    { data: friendProfiles },
-  ] = await Promise.all([
-    runIds.length
-      ? supabase.from("runs").select("*").in("id", runIds)
-      : Promise.resolve({ data: [] as RunRow[] }),
-    authorIds.length
-      ? supabase.from("profiles").select("*").in("id", authorIds)
-      : Promise.resolve({ data: [] as ProfileRow[] }),
-    postIds.length
-      ? supabase.from("post_likes").select("post_id").eq("user_id", userId).in("post_id", postIds)
-      : Promise.resolve({ data: [] as { post_id: string }[] }),
-    friendIds.length
-      ? supabase.from("profiles").select("*").in("id", friendIds)
-      : Promise.resolve({ data: [] as ProfileRow[] }),
-  ]);
-
-  const runMap = new Map((runs ?? []).map((r) => [r.id, r as RunRow]));
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as ProfileRow]));
-  const likedPostIdsSet = new Set((likes ?? []).map((l) => l.post_id).filter((v): v is string => Boolean(v)));
-  const friendProfileMap = new Map((friendProfiles ?? []).map((p) => [p.id, p as ProfileRow]));
-
-  const friendDisplayName = (p: ProfileRow | undefined) => {
-    if (!p) return "Un ami";
-    const first = p.first_name?.trim();
-    if (first) return first;
-    return p.username || p.full_name?.split(/\s+/)[0] || "Coureur";
-  };
-
-  return merged.map(({ post, reason, friendId }) => {
-    const fp = friendId ? friendProfileMap.get(friendId) : undefined;
     return {
-      ...(post as SocialPostRow),
-      likes_count: post.likes_count ?? 0,
-      profile: post.user_id ? profileMap.get(post.user_id) ?? null : null,
-      run: post.run_id ? runMap.get(post.run_id) ?? null : null,
-      likedByMe: likedPostIdsSet.has(post.id),
-      feedReason: reason,
-      friendWhoLiked:
-        reason === "friend_liked" && friendId
-          ? { id: friendId, name: friendDisplayName(fp) }
-          : undefined,
-    } as PersonalizedFeedPost;
+      ...post,
+      profile,
+      run,
+      likedByMe: row.liked_by_me,
+      feedReason: row.feed_reason,
+      friendWhoLiked: row.friend_who_liked_id
+        ? {
+            id: row.friend_who_liked_id,
+            name: row.friend_who_liked_name ?? "Coureur",
+          }
+        : undefined,
+    };
   });
 }
 
