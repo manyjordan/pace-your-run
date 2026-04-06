@@ -27,3 +27,4 @@ generate-apple-secret.mjs
 *.njsproj
 *.sln
 *.sw?
+.env
