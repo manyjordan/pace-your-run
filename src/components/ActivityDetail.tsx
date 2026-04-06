@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { BarChart3, Clock, Heart, Mountain, Route, TrendingUp, X } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import GPSMap from "@/components/GPSMap";
+import type { RunRow } from "@/lib/database";
 import {
   formatDistance,
   formatDuration,
@@ -10,10 +11,55 @@ import {
   type StravaActivity,
 } from "@/lib/strava";
 
+type NormalizedActivity = {
+  id: string;
+  name: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
+  average_heartrate?: number;
+  start_date: string;
+  splits_metric?: StravaActivity["splits_metric"];
+  map?: StravaActivity["map"];
+};
+
+function normalizeActivityDetailInput(input: RunRow | StravaActivity): NormalizedActivity {
+  if ("distance_km" in input) {
+    const r = input;
+    return {
+      id: r.id,
+      name: r.title ?? "Course",
+      distance: r.distance_km * 1000,
+      moving_time: r.duration_seconds,
+      elapsed_time: r.duration_seconds,
+      total_elevation_gain: r.elevation_gain ?? 0,
+      average_heartrate: r.average_heartrate ?? undefined,
+      start_date: r.started_at ?? r.created_at ?? new Date().toISOString(),
+      splits_metric: undefined,
+      map: undefined,
+    };
+  }
+
+  const a = input;
+  return {
+    id: String(a.id),
+    name: a.name,
+    distance: a.distance,
+    moving_time: a.moving_time,
+    elapsed_time: a.elapsed_time,
+    total_elevation_gain: a.total_elevation_gain ?? 0,
+    average_heartrate: a.average_heartrate,
+    start_date: a.start_date,
+    splits_metric: a.splits_metric,
+    map: a.map,
+  };
+}
+
 type ActivityDetailProps = {
-  activity: StravaActivity;
+  activity: RunRow | StravaActivity;
   onClose: () => void;
-  allActivities?: StravaActivity[];
+  allActivities?: (RunRow | StravaActivity)[];
   fallbackTrace?: GPSTracePoint[];
 };
 
@@ -29,8 +75,8 @@ function formatTrendComment({
   allActivities,
   zoneSummary,
 }: {
-  activity: StravaActivity;
-  allActivities: StravaActivity[];
+  activity: NormalizedActivity;
+  allActivities: NormalizedActivity[];
   zoneSummary: Array<{ label: string; percentage: number }>;
 }) {
   const previousActivities = allActivities
@@ -139,7 +185,7 @@ function decodePolyline(polyline: string): Array<{ lat: number; lng: number }> {
   return coordinates;
 }
 
-function buildTraceFromActivityPolyline(activity: StravaActivity): GPSTracePoint[] | undefined {
+function buildTraceFromActivityPolyline(activity: NormalizedActivity): GPSTracePoint[] | undefined {
   const polyline = activity.map?.summary_polyline;
   if (!polyline) return undefined;
 
@@ -163,7 +209,11 @@ export function ActivityDetail({
   allActivities = [],
   fallbackTrace,
 }: ActivityDetailProps) {
-  const resolvedActivity = activity;
+  const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
+  const normalizedAllActivities = useMemo(
+    () => allActivities.map((a) => normalizeActivityDetailInput(a)),
+    [allActivities],
+  );
 
   const analysis = useMemo(() => {
     const distanceKm = resolvedActivity.distance / 1000;
@@ -310,7 +360,7 @@ export function ActivityDetail({
     const trace = fallbackTrace ?? buildTraceFromActivityPolyline(resolvedActivity);
     const comment = formatTrendComment({
       activity: resolvedActivity,
-      allActivities,
+      allActivities: normalizedAllActivities,
       zoneSummary: zones.map(({ label, percentage }) => ({ label, percentage })),
     });
 
@@ -327,7 +377,7 @@ export function ActivityDetail({
       hasHeartRateCurve: heartRateSeries.length > 1,
       startDate: new Date(resolvedActivity.start_date),
     };
-  }, [allActivities, fallbackTrace, resolvedActivity]);
+  }, [fallbackTrace, normalizedAllActivities, resolvedActivity]);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">

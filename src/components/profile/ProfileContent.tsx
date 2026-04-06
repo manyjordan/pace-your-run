@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Calendar, TrendingUp, Route, Clock, Mountain, Edit2, Save, X, ChevronRight, Activity, Zap, Camera } from "lucide-react";
+import { Calendar, TrendingUp, Route, Clock, Mountain, Edit2, Save, X, ChevronRight, Activity, Zap, Camera, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -259,7 +259,14 @@ export function ProfileContent({
   return (
     <div className={containerClass}>
       <ScrollReveal>
-        <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+        <Card className="relative border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+          <Link
+            to="/settings"
+            className="absolute right-3 top-3 z-10 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-accent"
+            aria-label="Paramètres"
+          >
+            <Settings className="h-5 w-5" />
+          </Link>
           <CardContent className="flex flex-col items-center gap-4 pt-6">
             <Avatar className="h-20 w-20 border-2 border-accent/20">
               <AvatarImage src={avatarPreviewUrl ?? profile.avatar_url ?? undefined} alt="Photo de profil" />

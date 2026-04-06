@@ -21,6 +21,7 @@ import {
   Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { createPost, saveRun, updatePostAudience, type RunGpsPoint } from "@/lib/database";
 import {
@@ -808,8 +809,24 @@ export default function Run() {
                 </div>
                 <div className="text-center space-y-1">
                   <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><Heart className="h-3 w-3" /> Fréquence</div>
-                  <div className="text-xl font-bold tabular-nums">{heartRate ?? "--"}</div>
-                  <div className="text-[10px] text-muted-foreground">bpm</div>
+                  {bluetoothDevice ? (
+                    <>
+                      <div className="text-xl font-bold tabular-nums">{heartRate ?? "--"}</div>
+                      <div className="text-[10px] text-muted-foreground">bpm</div>
+                    </>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      <div className="text-xs font-medium text-muted-foreground text-center">
+                        Pas d&apos;information disponible
+                      </div>
+                      <Link
+                        to="/plan?tab=equipment&section=gear"
+                        className="text-[10px] text-accent underline underline-offset-2"
+                      >
+                        Équipement requis : ceinture Bluetooth
+                      </Link>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -845,6 +862,11 @@ export default function Run() {
                     Ouvrir l'analyse
                   </Button>
                 </div>
+                <p className="text-sm text-muted-foreground">
+                  {runSummary.averageHeartRate
+                    ? `FC moyenne : ${runSummary.averageHeartRate} bpm`
+                    : "Connectez une ceinture cardiaque pour mesurer votre FC"}
+                </p>
                 {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
                 <div className="space-y-2">
                   <Label>Audience de cette course</Label>

@@ -4,9 +4,8 @@ import { Activity, List, TrendingUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, getRuns, type RunRow } from "@/lib/database";
+import { getProfile, getRuns, type RunGpsPoint, type RunRow } from "@/lib/database";
 import { normalizeGoalData } from "@/lib/goalHelpers";
-import { type GPSTracePoint, type StravaActivity } from "@/lib/strava";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
 import { PerformanceSection } from "@/components/dashboard/PerformanceSection";
@@ -27,39 +26,14 @@ type ProfileGoalData = {
   goalSavedAt?: string;
 };
 
-function isRunActivity(activity: StravaActivity) {
-  const label = `${activity.sport_type ?? activity.type ?? ""}`.toLowerCase();
-  return label.includes("run") || label.includes("course") || label.includes("trail");
+function isRunRow(run: RunRow): boolean {
+  return run.run_type?.toLowerCase().includes("run") ?? true;
 }
 
-function hashStringToNumber(value: string) {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) {
-    hash = (hash << 5) - hash + value.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash);
-}
-
-function runRowToStravaActivity(run: RunRow): StravaActivity {
-  return {
-    id: hashStringToNumber(run.id),
-    name: run.title ?? "Course",
-    distance: run.distance_km * 1000,
-    moving_time: run.duration_seconds,
-    elapsed_time: run.duration_seconds,
-    total_elevation_gain: run.elevation_gain ?? 0,
-    average_heartrate: run.average_heartrate ?? undefined,
-    start_date: run.started_at ?? run.created_at ?? new Date().toISOString(),
-    sport_type: run.run_type ?? "Run",
-    type: run.run_type ?? "Run",
-  };
-}
-
-function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): GPSTracePoint[] | undefined {
+function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | undefined {
   if (!Array.isArray(trace)) return undefined;
 
-  const points = trace.filter((point): point is GPSTracePoint => {
+  const points = trace.filter((point): point is RunGpsPoint => {
     return (
       typeof point === "object" &&
       point !== null &&
@@ -79,8 +53,8 @@ const Dashboard = () => {
   const [userGoal, setUserGoal] = useState<ProfileGoalData | null>(null);
   const [runCount, setRunCount] = useState(0);
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
-  const [selectedActivityForDetail, setSelectedActivityForDetail] = useState<StravaActivity | null>(null);
-  const [selectedDetailTrace, setSelectedDetailTrace] = useState<GPSTracePoint[] | undefined>(undefined);
+  const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
+  const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
 
   const loadUserData = useCallback(async () => {
     if (!session?.user.id) {
@@ -135,27 +109,24 @@ const Dashboard = () => {
   }, [loadUserData]);
 
   const handleCloseActivityDetail = () => {
-    setSelectedActivityForDetail(null);
+    setSelectedRunForDetail(null);
     setSelectedDetailTrace(undefined);
   };
 
   const openRunDetail = (run: RunRow) => {
-    setSelectedActivityForDetail(runRowToStravaActivity(run));
+    setSelectedRunForDetail(run);
     setSelectedDetailTrace(parseGpsTraceForDetail(run.gps_trace));
   };
 
-  const runningActivities = useMemo(
-    () => recentRuns.map(runRowToStravaActivity).filter(isRunActivity),
-    [recentRuns],
-  );
+  const runningRuns = useMemo(() => recentRuns.filter(isRunRow), [recentRuns]);
 
   const metricCards = useMemo(
     () => [
-      buildMetricData("Distance par semaine", runningActivities, "week", "3m"),
-      buildMetricData("Durée par semaine", runningActivities, "week", "3m"),
-      buildMetricData("Dénivelé par semaine", runningActivities, "week", "3m"),
+      buildMetricData("Distance par semaine", runningRuns, "week", "3m"),
+      buildMetricData("Durée par semaine", runningRuns, "week", "3m"),
+      buildMetricData("Dénivelé par semaine", runningRuns, "week", "3m"),
     ],
-    [runningActivities],
+    [runningRuns],
   );
 
   const filteredMetrics = useMemo(() => metricCards, [metricCards]);
@@ -167,11 +138,11 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {selectedActivityForDetail && (
+      {selectedRunForDetail && (
         <ActivityDetail
-          activity={selectedActivityForDetail}
+          activity={selectedRunForDetail}
           onClose={handleCloseActivityDetail}
-          allActivities={runningActivities}
+          allActivities={runningRuns}
           fallbackTrace={selectedDetailTrace}
         />
       )}

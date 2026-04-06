@@ -77,6 +77,29 @@ export type PublicPostRecord = SocialPostRow & {
   likedByMe: boolean;
 };
 
+export type PersonalizedFeedPost = PublicPostRecord & {
+  feedReason: "own" | "following" | "friend_liked";
+  friendWhoLiked?: {
+    id: string;
+    name: string;
+  };
+};
+
+export type NotificationRow = {
+  id: string;
+  user_id: string;
+  type: "like" | "follow";
+  actor_id: string;
+  post_id: string | null;
+  post_title: string | null;
+  read_at: string | null;
+  created_at: string | null;
+};
+
+export type NotificationWithActor = NotificationRow & {
+  actor: ProfileRow | null;
+};
+
 export type ForumCategoryRow = {
   created_at: string | null;
   description: string | null;
@@ -92,6 +115,7 @@ export type ForumThreadRow = {
   id: string;
   is_locked: boolean;
   is_pinned: boolean;
+  likes_count: number | null;
   title: string;
   updated_at: string | null;
   user_id: string;
@@ -349,6 +373,294 @@ export async function getPublicPosts() {
   })) as PublicPostRecord[];
 }
 
+function feedReasonPriority(reason: "own" | "following" | "friend_liked") {
+  if (reason === "own") return 3;
+  if (reason === "following") return 2;
+  return 1;
+}
+
+export async function followUser(followerId: string, followingId: string) {
+  await requireCurrentUserId(followerId);
+  if (followerId === followingId) {
+    throw new Error("Vous ne pouvez pas vous suivre vous-même.");
+  }
+
+  const { data, error } = await supabase
+    .from("follows")
+    .insert({ follower_id: followerId, following_id: followingId })
+    .select("follower_id");
+
+  if (error) {
+    if (error.code === "23505") return;
+    throw error;
+  }
+
+  if (data?.length) {
+    const { error: notifError } = await supabase.from("notifications").insert({
+      user_id: followingId,
+      type: "follow",
+      actor_id: followerId,
+      post_id: null,
+      post_title: null,
+    });
+    if (notifError) console.error("follow notification:", notifError);
+  }
+}
+
+export async function unfollowUser(followerId: string, followingId: string) {
+  await requireCurrentUserId(followerId);
+
+  const { error } = await supabase
+    .from("follows")
+    .delete()
+    .eq("follower_id", followerId)
+    .eq("following_id", followingId);
+
+  if (error) throw error;
+}
+
+export async function getFollowing(userId: string): Promise<string[]> {
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("follows")
+    .select("following_id")
+    .eq("follower_id", userId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.following_id as string);
+}
+
+export async function getPersonalizedFeed(userId: string): Promise<PersonalizedFeedPost[]> {
+  await requireCurrentUserId(userId);
+
+  const following = await getFollowing(userId);
+  const followingSet = new Set(following);
+
+  const { data: ownPosts, error: ownErr } = await supabase
+    .from("social_posts")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (ownErr) throw ownErr;
+
+  let followingPosts: SocialPostRow[] = [];
+  if (following.length) {
+    const { data, error } = await supabase
+      .from("social_posts")
+      .select("*")
+      .in("user_id", following)
+      .eq("audience", "public")
+      .order("created_at", { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    followingPosts = (data ?? []) as SocialPostRow[];
+  }
+
+  let likedRows: { post_id: string; user_id: string }[] = [];
+  if (following.length) {
+    const { data, error } = await supabase
+      .from("post_likes")
+      .select("post_id, user_id")
+      .in("user_id", following);
+    if (error) throw error;
+    likedRows = (data ?? []) as { post_id: string; user_id: string }[];
+  }
+
+  const likedPostIdList = [...new Set(likedRows.map((r) => r.post_id))];
+  let friendLikedPosts: SocialPostRow[] = [];
+  if (likedPostIdList.length) {
+    const { data, error } = await supabase
+      .from("social_posts")
+      .select("*")
+      .in("id", likedPostIdList)
+      .eq("audience", "public");
+    if (error) throw error;
+    friendLikedPosts = (data ?? []) as SocialPostRow[];
+  }
+
+  const postById = new Map<string, SocialPostRow>();
+  for (const p of ownPosts ?? []) postById.set(p.id, p as SocialPostRow);
+  for (const p of followingPosts) postById.set(p.id, p);
+  for (const p of friendLikedPosts) postById.set(p.id, p);
+
+  const meta = new Map<string, { reason: "own" | "following" | "friend_liked"; friendId?: string }>();
+
+  const setMeta = (postId: string, reason: "own" | "following" | "friend_liked", friendId?: string) => {
+    const cur = meta.get(postId);
+    if (!cur || feedReasonPriority(reason) > feedReasonPriority(cur.reason)) {
+      meta.set(postId, { reason, friendId });
+    }
+  };
+
+  for (const p of ownPosts ?? []) setMeta(p.id, "own");
+  for (const p of followingPosts) setMeta(p.id, "following");
+  for (const p of friendLikedPosts) {
+    const liker = likedRows.find((r) => r.post_id === p.id && followingSet.has(r.user_id));
+    if (liker) setMeta(p.id, "friend_liked", liker.user_id);
+  }
+
+  const merged = [...meta.entries()]
+    .map(([id, m]) => ({ id, ...m, post: postById.get(id) }))
+    .filter((x): x is typeof x & { post: SocialPostRow } => Boolean(x.post))
+    .sort(
+      (a, b) =>
+        new Date(b.post.created_at ?? 0).getTime() - new Date(a.post.created_at ?? 0).getTime(),
+    )
+    .slice(0, 50);
+
+  const postIds = merged.map((m) => m.id);
+  const runIds = merged.map((m) => m.post.run_id).filter((v): v is string => Boolean(v));
+  const authorIds = [...new Set(merged.map((m) => m.post.user_id).filter((v): v is string => Boolean(v)))];
+  const friendIds = [...new Set(merged.map((m) => m.friendId).filter((v): v is string => Boolean(v)))];
+
+  const [
+    { data: runs },
+    { data: profiles },
+    { data: likes },
+    { data: friendProfiles },
+  ] = await Promise.all([
+    runIds.length
+      ? supabase.from("runs").select("*").in("id", runIds)
+      : Promise.resolve({ data: [] as RunRow[] }),
+    authorIds.length
+      ? supabase.from("profiles").select("*").in("id", authorIds)
+      : Promise.resolve({ data: [] as ProfileRow[] }),
+    postIds.length
+      ? supabase.from("post_likes").select("post_id").eq("user_id", userId).in("post_id", postIds)
+      : Promise.resolve({ data: [] as { post_id: string }[] }),
+    friendIds.length
+      ? supabase.from("profiles").select("*").in("id", friendIds)
+      : Promise.resolve({ data: [] as ProfileRow[] }),
+  ]);
+
+  const runMap = new Map((runs ?? []).map((r) => [r.id, r as RunRow]));
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as ProfileRow]));
+  const likedPostIdsSet = new Set((likes ?? []).map((l) => l.post_id).filter((v): v is string => Boolean(v)));
+  const friendProfileMap = new Map((friendProfiles ?? []).map((p) => [p.id, p as ProfileRow]));
+
+  const friendDisplayName = (p: ProfileRow | undefined) => {
+    if (!p) return "Un ami";
+    const first = p.first_name?.trim();
+    if (first) return first;
+    return p.username || p.full_name?.split(/\s+/)[0] || "Coureur";
+  };
+
+  return merged.map(({ post, reason, friendId }) => {
+    const fp = friendId ? friendProfileMap.get(friendId) : undefined;
+    return {
+      ...(post as SocialPostRow),
+      likes_count: post.likes_count ?? 0,
+      profile: post.user_id ? profileMap.get(post.user_id) ?? null : null,
+      run: post.run_id ? runMap.get(post.run_id) ?? null : null,
+      likedByMe: likedPostIdsSet.has(post.id),
+      feedReason: reason,
+      friendWhoLiked:
+        reason === "friend_liked" && friendId
+          ? { id: friendId, name: friendDisplayName(fp) }
+          : undefined,
+    } as PersonalizedFeedPost;
+  });
+}
+
+export async function getNotifications(userId: string): Promise<NotificationWithActor[]> {
+  await requireCurrentUserId(userId);
+
+  const { data: rows, error } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+  if (!rows?.length) return [];
+
+  const actorIds = [...new Set(rows.map((r) => r.actor_id as string))];
+  const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*").in("id", actorIds);
+  if (profilesError) throw profilesError;
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as ProfileRow]));
+
+  return rows.map((r) => ({
+    ...(r as NotificationRow),
+    actor: profileMap.get(r.actor_id as string) ?? null,
+  }));
+}
+
+export async function markNotificationsRead(userId: string) {
+  await requireCurrentUserId(userId);
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("user_id", userId)
+    .is("read_at", null);
+
+  if (error) throw error;
+}
+
+export async function getUnreadNotificationsCount(userId: string): Promise<number> {
+  await requireCurrentUserId(userId);
+
+  const { count, error } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .is("read_at", null);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function getSuggestedUsersToFollow(
+  currentUserId: string,
+  limit = 5,
+): Promise<{ profile: ProfileRow; runCount: number }[]> {
+  await requireCurrentUserId(currentUserId);
+
+  const following = await getFollowing(currentUserId);
+  const exclude = new Set<string>([currentUserId, ...following]);
+
+  const since = new Date();
+  since.setDate(since.getDate() - 30);
+
+  const { data: runs, error } = await supabase
+    .from("runs")
+    .select("user_id")
+    .gte("started_at", since.toISOString())
+    .not("user_id", "is", null);
+
+  if (error) throw error;
+
+  const countByUser = new Map<string, number>();
+  for (const row of runs ?? []) {
+    const uid = row.user_id as string;
+    if (!uid || exclude.has(uid)) continue;
+    countByUser.set(uid, (countByUser.get(uid) ?? 0) + 1);
+  }
+
+  const sorted = [...countByUser.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
+
+  if (!sorted.length) return [];
+
+  const userIds = sorted.map(([id]) => id);
+  const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*").in("id", userIds);
+  if (profilesError) throw profilesError;
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as ProfileRow]));
+
+  return sorted.map(([id, runCount]) => {
+    const profile = profileMap.get(id);
+    return {
+      profile: profile ?? ({ id } as ProfileRow),
+      runCount,
+    };
+  });
+}
+
 export async function createPost(
   userId: string,
   runId: string,
@@ -423,6 +735,23 @@ export async function toggleLike(postId: string, userId: string) {
       .insert({ post_id: postId, user_id: userId });
 
     if (insertError) throw insertError;
+
+    const { data: postRow, error: postFetchError } = await supabase
+      .from("social_posts")
+      .select("user_id, title")
+      .eq("id", postId)
+      .maybeSingle();
+
+    if (!postFetchError && postRow?.user_id && postRow.user_id !== userId) {
+      const { error: notifError } = await supabase.from("notifications").insert({
+        user_id: postRow.user_id,
+        type: "like",
+        actor_id: userId,
+        post_id: postId,
+        post_title: postRow.title,
+      });
+      if (notifError) console.error("like notification:", notifError);
+    }
   }
 
   const { count, error: countError } = await supabase
@@ -523,12 +852,16 @@ export async function getForumThreads(categoryId?: string) {
     repliesCountMap.set(reply.thread_id, (repliesCountMap.get(reply.thread_id) ?? 0) + 1);
   }
 
-  return threads.map((thread) => ({
-    ...(thread as ForumThreadRow),
-    category: categoryMap.get(thread.category_id) ?? null,
-    profile: profileMap.get(thread.user_id) ?? null,
-    repliesCount: repliesCountMap.get(thread.id) ?? 0,
-  })) as ForumThreadRecord[];
+  return threads.map((thread) => {
+    const row = thread as ForumThreadRow & { likes_count?: number | null };
+    return {
+      ...row,
+      likes_count: row.likes_count ?? 0,
+      category: categoryMap.get(thread.category_id) ?? null,
+      profile: profileMap.get(thread.user_id) ?? null,
+      repliesCount: repliesCountMap.get(thread.id) ?? 0,
+    };
+  }) as ForumThreadRecord[];
 }
 
 export async function getForumThreadDetail(threadId: string) {
@@ -567,8 +900,11 @@ export async function getForumThreadDetail(threadId: string) {
     profile: replyProfileMap.get(reply.user_id) ?? null,
   })) as ForumReplyRecord[];
 
+  const threadRow = thread as ForumThreadRow & { likes_count?: number | null };
+
   return {
-    ...(thread as ForumThreadRow),
+    ...threadRow,
+    likes_count: threadRow.likes_count ?? 0,
     category: (category as ForumCategoryRow | null) ?? null,
     profile: (threadProfile as ProfileRow | null) ?? null,
     repliesCount: replyRecords.length,
@@ -628,6 +964,103 @@ export async function createForumReply(userId: string, threadId: string, content
   if (updateThreadError) throw updateThreadError;
 
   return data as ForumReplyRow;
+}
+
+export async function toggleForumLike(threadId: string, userId: string): Promise<boolean> {
+  await requireCurrentUserId(userId);
+
+  const { data: existingLike, error: existingError } = await supabase
+    .from("forum_likes")
+    .select("id")
+    .eq("thread_id", threadId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existingError) throw existingError;
+
+  if (existingLike) {
+    const { error: deleteError } = await supabase.from("forum_likes").delete().eq("id", existingLike.id);
+    if (deleteError) throw deleteError;
+  } else {
+    const { error: insertError } = await supabase.from("forum_likes").insert({ thread_id: threadId, user_id: userId });
+    if (insertError) throw insertError;
+  }
+
+  const { count, error: countError } = await supabase
+    .from("forum_likes")
+    .select("id", { count: "exact", head: true })
+    .eq("thread_id", threadId);
+
+  if (countError) throw countError;
+
+  const likesCount = count ?? 0;
+
+  const { error: updateError } = await supabase
+    .from("forum_threads")
+    .update({ likes_count: likesCount })
+    .eq("id", threadId);
+
+  if (updateError) throw updateError;
+
+  return !existingLike;
+}
+
+export async function getForumLikes(threadIds: string[], userId: string): Promise<string[]> {
+  if (!threadIds.length) return [];
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("forum_likes")
+    .select("thread_id")
+    .eq("user_id", userId)
+    .in("thread_id", threadIds);
+
+  if (error) throw error;
+  return Array.from(new Set((data ?? []).map((row) => row.thread_id as string)));
+}
+
+export async function updateForumThread(
+  threadId: string,
+  userId: string,
+  updates: { title?: string; content?: string }
+): Promise<void> {
+  await requireCurrentUserId(userId);
+
+  const payload: Record<string, unknown> = {
+    updated_at: new Date().toISOString(),
+  };
+  if (updates.title !== undefined) payload.title = updates.title;
+  if (updates.content !== undefined) payload.content = updates.content;
+
+  const { error } = await supabase.from("forum_threads").update(payload).eq("id", threadId).eq("user_id", userId);
+
+  if (error) throw error;
+}
+
+export async function deleteForumThread(threadId: string, userId: string): Promise<void> {
+  await requireCurrentUserId(userId);
+
+  const { error } = await supabase.from("forum_threads").delete().eq("id", threadId).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function updateForumReply(replyId: string, userId: string, content: string): Promise<void> {
+  await requireCurrentUserId(userId);
+
+  const { error } = await supabase
+    .from("forum_replies")
+    .update({ content, updated_at: new Date().toISOString() })
+    .eq("id", replyId)
+    .eq("user_id", userId);
+
+  if (error) throw error;
+}
+
+export async function deleteForumReply(replyId: string, userId: string): Promise<void> {
+  await requireCurrentUserId(userId);
+
+  const { error } = await supabase.from("forum_replies").delete().eq("id", replyId).eq("user_id", userId);
+  if (error) throw error;
 }
 
 // ── Training Plan Sessions ──

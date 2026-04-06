@@ -21,13 +21,35 @@ import {
   UserPlus,
   Users,
   AlertTriangle,
+  Bell,
+  Check,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import GPSMap from "@/components/GPSMap";
 import { ForumSection } from "@/components/social/ForumSection";
 import { useAuth } from "@/contexts/AuthContext";
-import { getPublicPosts, toggleLike as togglePostLike, type PublicPostRecord, type RunRow } from "@/lib/database";
+import {
+  followUser,
+  getFollowing,
+  getNotifications,
+  getPersonalizedFeed,
+  getSuggestedUsersToFollow,
+  getUnreadNotificationsCount,
+  markNotificationsRead,
+  toggleLike as togglePostLike,
+  type NotificationWithActor,
+  type PersonalizedFeedPost,
+  type ProfileRow,
+  type RunRow,
+} from "@/lib/database";
 import { useNavigate } from "react-router-dom";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import {
   formatDuration,
   formatPace,
@@ -58,6 +80,8 @@ function ensurePostTrace(post: CommunityPost): CommunityPost {
 type FeedPost = CommunityPost & {
   activityId: number;
   dbId?: string;
+  feedReason?: PersonalizedFeedPost["feedReason"];
+  friendWhoLiked?: PersonalizedFeedPost["friendWhoLiked"];
 };
 
 function hashStringToNumber(value: string) {
@@ -116,7 +140,7 @@ function runToActivity(run: RunRow, activityId: number): StravaActivity {
   };
 }
 
-function mapPublicPostToFeedPost(post: PublicPostRecord): FeedPost {
+function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
   const displayName =
     post.profile?.username ||
     post.profile?.full_name ||
@@ -144,16 +168,16 @@ function mapPublicPostToFeedPost(post: PublicPostRecord): FeedPost {
     likes: post.likes_count ?? 0,
     comments: 0,
     liked: post.likedByMe,
+    feedReason: post.feedReason,
+    friendWhoLiked: post.friendWhoLiked,
   };
 }
 
-// TODO: replace with real user search from Supabase
-const friendsSeed = [
-  { id: 1, name: "Camille Bernard", initials: "CB", discipline: "10 km", following: false },
-  { id: 2, name: "Nicolas Petit", initials: "NP", discipline: "Semi-marathon", following: false },
-  { id: 3, name: "Sarah Lopez", initials: "SL", discipline: "Trail", following: true },
-  { id: 4, name: "Maxime Laurent", initials: "ML", discipline: "Marathon", following: false },
-];
+function suggestionDisplayName(profile: ProfileRow) {
+  const first = profile.first_name?.trim();
+  if (first) return first;
+  return profile.username || profile.full_name || "Coureur";
+}
 
 export default function Social() {
   const { user } = useAuth();
@@ -163,12 +187,19 @@ export default function Social() {
   const [newPost, setNewPost] = useState("");
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [friendQuery, setFriendQuery] = useState("");
-  const [friends, setFriends] = useState(friendsSeed);
+  const [suggestions, setSuggestions] = useState<{ profile: ProfileRow; runCount: number }[]>([]);
+  const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [followingAnyone, setFollowingAnyone] = useState(false);
+  const [followBusyId, setFollowBusyId] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<StravaActivity | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<CommunityPost["gpsTrace"] | undefined>(undefined);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationWithActor[]>([]);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
 
   const buildActivityFromPost = (post: FeedPost): StravaActivity => {
     const parseDistance = Number.parseFloat(post.stats.distance.replace(",", "."));
@@ -226,25 +257,48 @@ export default function Social() {
     }
   };
 
-  const toggleFollow = (id: number) => {
-    setFriends((prev) => prev.map((f) => (f.id === id ? { ...f, following: !f.following } : f)));
-  };
-
-  const filteredFriends = friends.filter((f) =>
-    f.name.toLowerCase().includes(friendQuery.toLowerCase()),
+  const filteredSuggestions = suggestions.filter((s) =>
+    suggestionDisplayName(s.profile).toLowerCase().includes(friendQuery.toLowerCase()),
   );
 
+  const refreshUnreadCount = useCallback(async () => {
+    if (!user?.id) {
+      setUnreadNotifCount(0);
+      return;
+    }
+    try {
+      const n = await getUnreadNotificationsCount(user.id);
+      setUnreadNotifCount(n);
+    } catch {
+      setUnreadNotifCount(0);
+    }
+  }, [user?.id]);
+
   const loadCommunityPosts = useCallback(async () => {
+    if (!user?.id) {
+      setIsLoadingPosts(false);
+      return;
+    }
+
     setIsLoadingPosts(true);
     setPostsError(null);
 
     try {
-      const publicPosts = await getPublicPosts();
-      const mappedPosts = publicPosts.map(mapPublicPostToFeedPost).map(ensurePostTrace);
+      const [feedPosts, followingList, suggested] = await Promise.all([
+        getPersonalizedFeed(user.id),
+        getFollowing(user.id),
+        getSuggestedUsersToFollow(user.id, 5),
+      ]);
+
+      setFollowingIds(new Set(followingList));
+      setFollowingAnyone(followingList.length > 0);
+      setSuggestions(suggested);
+
+      const mappedPosts = feedPosts.map(mapPersonalizedPostToFeedPost).map(ensurePostTrace);
 
       setPosts(mappedPosts);
       setActivities(
-        publicPosts
+        feedPosts
           .filter((post) => post.run)
           .map((post) => runToActivity(post.run as RunRow, hashStringToNumber(post.run?.id ?? post.id))),
       );
@@ -255,19 +309,68 @@ export default function Social() {
     } finally {
       setIsLoadingPosts(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     void loadCommunityPosts();
+    void refreshUnreadCount();
     const handleReload = () => {
       void loadCommunityPosts();
     };
+    const handleNotif = () => {
+      void refreshUnreadCount();
+    };
 
     window.addEventListener("pace-community-updated", handleReload);
+    window.addEventListener("pace-notifications-updated", handleNotif);
     return () => {
       window.removeEventListener("pace-community-updated", handleReload);
+      window.removeEventListener("pace-notifications-updated", handleNotif);
     };
-  }, [loadCommunityPosts]);
+  }, [loadCommunityPosts, refreshUnreadCount]);
+
+  const handleFollowSuggestion = async (profileId: string) => {
+    if (!user?.id) return;
+    try {
+      setFollowBusyId(profileId);
+      await followUser(user.id, profileId);
+      setFollowingIds((prev) => new Set([...prev, profileId]));
+      setFollowingAnyone(true);
+      setSuggestions((prev) => prev.filter((s) => s.profile.id !== profileId));
+      window.dispatchEvent(new Event("pace-notifications-updated"));
+    } catch {
+      setPostsError("Impossible de suivre ce coureur pour le moment.");
+    } finally {
+      setFollowBusyId(null);
+    }
+  };
+
+  const handleNotifOpenChange = async (open: boolean) => {
+    setNotifOpen(open);
+    if (!open || !user?.id) return;
+
+    setNotifLoading(true);
+    try {
+      const list = await getNotifications(user.id);
+      setNotifications(list);
+      await markNotificationsRead(user.id);
+      setUnreadNotifCount(0);
+      window.dispatchEvent(new Event("pace-notifications-updated"));
+      const cleared = await getNotifications(user.id);
+      setNotifications(cleared);
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotifLoading(false);
+    }
+  };
+
+  const actorFirstName = (actor: ProfileRow | null) => {
+    if (!actor) return "Quelqu'un";
+    const first = actor.first_name?.trim();
+    if (first) return first;
+    return actor.username || actor.full_name?.split(/\s+/)[0] || "Coureur";
+  };
 
   return (
     <div className="space-y-6">
@@ -289,15 +392,73 @@ export default function Social() {
             <h1 className="text-2xl font-bold tracking-tight">Communauté</h1>
             <p className="text-sm text-muted-foreground">Suivez les activités et préparez l'arrivée d'un forum running</p>
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            className="shrink-0"
-            onClick={() => setShowFriendSearch((v) => !v)}
-            aria-label="Rechercher des amis"
-          >
-            <Search className="h-4 w-4" />
-          </Button>
+          <div className="flex shrink-0 items-center gap-1">
+            <Sheet open={notifOpen} onOpenChange={(o) => void handleNotifOpenChange(o)}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="relative" aria-label="Notifications">
+                  <Bell className="h-4 w-4" />
+                  {unreadNotifCount > 0 ? (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
+                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                    </span>
+                  ) : null}
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>Notifications</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 space-y-2">
+                  {notifLoading ? (
+                    <div className="space-y-2 py-4">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+                      ))}
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">Aucune notification pour l&apos;instant</p>
+                  ) : (
+                    notifications.map((n) => (
+                      <div
+                        key={n.id}
+                        className={`flex gap-3 rounded-lg border border-border p-3 ${
+                          !n.read_at ? "bg-accent/10" : ""
+                        }`}
+                      >
+                        <div className="mt-0.5 text-muted-foreground">
+                          {n.type === "like" ? <Heart className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                        </div>
+                        <div className="min-w-0 flex-1 text-sm">
+                          <p>
+                            {n.type === "like" ? (
+                              <>
+                                {actorFirstName(n.actor)} a aimé votre course{" "}
+                                <span className="font-medium">{n.post_title || "sans titre"}</span>
+                              </>
+                            ) : (
+                              <>{actorFirstName(n.actor)} a commencé à vous suivre</>
+                            )}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {formatRelativeTime(n.created_at ?? new Date().toISOString())}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
+            <Button
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => setShowFriendSearch((v) => !v)}
+              aria-label="Rechercher des amis"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </ScrollReveal>
 
@@ -329,34 +490,49 @@ export default function Social() {
                     />
                   </div>
                   <div className="space-y-2">
-                    {filteredFriends.map((friend) => (
-                      <div key={friend.id} className="flex items-center justify-between rounded-lg border border-border p-2.5">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-8 w-8">
-                            <AvatarFallback className="text-[10px] font-bold">{friend.initials}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{friend.name}</p>
-                            <p className="text-xs text-muted-foreground">{friend.discipline}</p>
-                          </div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant={friend.following ? "secondary" : "default"}
-                          onClick={() => toggleFollow(friend.id)}
+                    <p className="text-xs font-medium text-muted-foreground">Suggestions d&apos;amis</p>
+                    {filteredSuggestions.map((s) => {
+                      const name = suggestionDisplayName(s.profile);
+                      const isFollowing = followingIds.has(s.profile.id);
+                      return (
+                        <div
+                          key={s.profile.id}
+                          className="flex items-center justify-between rounded-lg border border-border p-2.5"
                         >
-                          {friend.following ? (
-                            "Suivi"
-                          ) : (
-                            <>
-                              <UserPlus className="mr-1 h-4 w-4" /> Suivre
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    ))}
-                    {filteredFriends.length === 0 && (
-                      <p className="py-2 text-center text-xs text-muted-foreground">Aucun ami trouvé.</p>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-[10px] font-bold">{getInitials(name)}</AvatarFallback>
+                            </Avatar>
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-medium">{name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {s.runCount} {s.runCount === 1 ? "course" : "courses"}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant={isFollowing ? "secondary" : "default"}
+                            disabled={followBusyId === s.profile.id || isFollowing}
+                            onClick={() => void handleFollowSuggestion(s.profile.id)}
+                          >
+                            {isFollowing ? (
+                              <>
+                                <Check className="mr-1 h-4 w-4" /> Suivi
+                              </>
+                            ) : (
+                              <>
+                                <UserPlus className="mr-1 h-4 w-4" /> Suivre
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      );
+                    })}
+                    {filteredSuggestions.length === 0 && (
+                      <p className="py-2 text-center text-xs text-muted-foreground">
+                        Aucune suggestion pour le moment.
+                      </p>
                     )}
                   </div>
                 </CardContent>
@@ -446,9 +622,11 @@ export default function Social() {
                         <Users className="h-7 w-7" />
                       </div>
                       <div className="space-y-1">
-                        <h3 className="font-semibold">Aucune activité pour l&apos;instant</h3>
+                        <h3 className="font-semibold">Fil vide</h3>
                         <p className="text-sm text-muted-foreground">
-                          Les courses de vos abonnés apparaîtront ici. Commencez par enregistrer votre première course !
+                          {!followingAnyone
+                            ? "Suivez des coureurs pour voir leur activité ici. Commencez par enregistrer votre première course et partagez-la !"
+                            : "Aucune activité récente de vos abonnements"}
                         </p>
                       </div>
                       <Button
@@ -464,6 +642,14 @@ export default function Social() {
                 <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
                   <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
                     <CardContent className="space-y-3 p-4">
+                      {post.feedReason === "friend_liked" && post.friendWhoLiked ? (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <Heart className="h-3 w-3 shrink-0" />
+                          <span>
+                            👍 {post.friendWhoLiked.name} a aimé cette publication
+                          </span>
+                        </div>
+                      ) : null}
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
                           <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">

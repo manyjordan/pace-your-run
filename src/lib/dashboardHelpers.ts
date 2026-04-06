@@ -1,5 +1,9 @@
-import type { StravaActivity } from "@/lib/strava";
+import type { RunRow } from "@/lib/database";
 import { Route, Clock, Mountain } from "lucide-react";
+
+function runActivityDate(run: RunRow): string {
+  return run.started_at ?? run.created_at ?? new Date().toISOString();
+}
 
 type WeeklyMetricCard = {
   title: string;
@@ -47,17 +51,17 @@ export function getStartOfWeek(input: Date) {
   return date;
 }
 
-export function getMetricAmountForTitle(title: string, activities: StravaActivity[]) {
+export function getMetricAmountForTitle(title: string, runs: RunRow[]) {
   if (title.includes("Distance")) {
-    return activities.reduce((sum, activity) => sum + activity.distance / 1000, 0);
+    return runs.reduce((sum, run) => sum + run.distance_km, 0);
   }
   if (title.includes("Durée")) {
-    return activities.reduce((sum, activity) => sum + activity.moving_time / 3600, 0);
+    return runs.reduce((sum, run) => sum + run.duration_seconds / 3600, 0);
   }
-  return activities.reduce((sum, activity) => sum + (activity.total_elevation_gain ?? 0), 0);
+  return runs.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
 }
 
-export function formatWeeklyGrowthSummary(title: string, activities: StravaActivity[]) {
+export function formatWeeklyGrowthSummary(title: string, runs: RunRow[]) {
   const currentWeekStart = getStartOfWeek(new Date());
   const weeklyValues = Array.from({ length: 4 }, (_, index) => {
     const weekStart = new Date(currentWeekStart);
@@ -65,12 +69,12 @@ export function formatWeeklyGrowthSummary(title: string, activities: StravaActiv
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 7);
 
-    const weekActivities = activities.filter((activity) => {
-      const activityDate = new Date(activity.start_date);
+    const weekRuns = runs.filter((run) => {
+      const activityDate = new Date(runActivityDate(run));
       return activityDate >= weekStart && activityDate < weekEnd;
     });
 
-    return getMetricAmountForTitle(title, weekActivities);
+    return getMetricAmountForTitle(title, weekRuns);
   });
 
   const baseline = weeklyValues[0];
@@ -269,7 +273,7 @@ export function buildWeeklyInsight(metrics: WeeklyMetricCard[]) {
 
 export function buildMetricData(
   title: string,
-  activities: StravaActivity[],
+  runs: RunRow[],
   granularity: "week" | "month" | "quarter",
   period: "1m" | "3m" | "1y" | "all",
 ): WeeklyMetricCard {
@@ -286,8 +290,8 @@ export function buildMetricData(
     startDate = new Date("2000-01-01");
   }
 
-  const filteredActivities = activities.filter((activity) => {
-    const actDate = new Date(activity.start_date);
+  const filteredRuns = runs.filter((run) => {
+    const actDate = new Date(runActivityDate(run));
     return actDate >= startDate && actDate <= now;
   });
 
@@ -309,8 +313,8 @@ export function buildMetricData(
       const weekEnd = new Date(weekStart);
       weekEnd.setDate(weekStart.getDate() + 7);
 
-      const weekActivities = filteredActivities.filter((activity) => {
-        const actDate = new Date(activity.start_date);
+      const weekRuns = filteredRuns.filter((run) => {
+        const actDate = new Date(runActivityDate(run));
         return actDate >= weekStart && actDate < weekEnd;
       });
 
@@ -319,9 +323,9 @@ export function buildMetricData(
       periods.push({
         label,
         start: new Date(weekStart),
-        distanceKm: weekActivities.reduce((sum, a) => sum + a.distance / 1000, 0),
-        durationSeconds: weekActivities.reduce((sum, a) => sum + a.moving_time, 0),
-        elevation: weekActivities.reduce((sum, a) => sum + (a.total_elevation_gain ?? 0), 0),
+        distanceKm: weekRuns.reduce((sum, r) => sum + r.distance_km, 0),
+        durationSeconds: weekRuns.reduce((sum, r) => sum + r.duration_seconds, 0),
+        elevation: weekRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0),
       });
 
       if (weekStart.getTime() === currentWeekStart.getTime()) currentLabel = label;
@@ -332,8 +336,8 @@ export function buildMetricData(
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthEnd = i === 0 ? now : new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
 
-      const monthActivities = filteredActivities.filter((activity) => {
-        const actDate = new Date(activity.start_date);
+      const monthRuns = filteredRuns.filter((run) => {
+        const actDate = new Date(runActivityDate(run));
         return actDate >= monthStart && actDate < monthEnd;
       });
 
@@ -341,9 +345,9 @@ export function buildMetricData(
       periods.push({
         label,
         start: new Date(monthStart),
-        distanceKm: monthActivities.reduce((sum, a) => sum + a.distance / 1000, 0),
-        durationSeconds: monthActivities.reduce((sum, a) => sum + a.moving_time, 0),
-        elevation: monthActivities.reduce((sum, a) => sum + (a.total_elevation_gain ?? 0), 0),
+        distanceKm: monthRuns.reduce((sum, r) => sum + r.distance_km, 0),
+        durationSeconds: monthRuns.reduce((sum, r) => sum + r.duration_seconds, 0),
+        elevation: monthRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0),
       });
 
       if (i === 0) currentLabel = label;
@@ -354,8 +358,8 @@ export function buildMetricData(
       const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 - i * 3, 1);
       const quarterEnd = i === 0 ? now : new Date(quarterStart.getFullYear(), quarterStart.getMonth() + 3, 1);
 
-      const quarterActivities = filteredActivities.filter((activity) => {
-        const actDate = new Date(activity.start_date);
+      const quarterRuns = filteredRuns.filter((run) => {
+        const actDate = new Date(runActivityDate(run));
         return actDate >= quarterStart && actDate < quarterEnd;
       });
 
@@ -363,9 +367,9 @@ export function buildMetricData(
       periods.push({
         label,
         start: new Date(quarterStart),
-        distanceKm: quarterActivities.reduce((sum, a) => sum + a.distance / 1000, 0),
-        durationSeconds: quarterActivities.reduce((sum, a) => sum + a.moving_time, 0),
-        elevation: quarterActivities.reduce((sum, a) => sum + (a.total_elevation_gain ?? 0), 0),
+        distanceKm: quarterRuns.reduce((sum, r) => sum + r.distance_km, 0),
+        durationSeconds: quarterRuns.reduce((sum, r) => sum + r.duration_seconds, 0),
+        elevation: quarterRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0),
       });
 
       if (i === 0) currentLabel = label;
@@ -440,7 +444,7 @@ export function buildMetricData(
     title,
     unit: title.includes("Distance") ? "km" : title.includes("Durée") ? "h" : "m",
     currentValue: displayValue,
-    change: formatWeeklyGrowthSummary(title, activities),
+    change: formatWeeklyGrowthSummary(title, runs),
     icon,
     color,
     chartData: annotateAdaptiveTicks(periods.map((p) => ({

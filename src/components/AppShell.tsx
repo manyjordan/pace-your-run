@@ -1,5 +1,8 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Heart, Home, ClipboardList, Play, Settings, User, Users } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { getUnreadNotificationsCount } from "@/lib/database";
 
 const desktopNavItems = [
   { to: "/", icon: Home, label: "Accueil" },
@@ -14,11 +17,41 @@ const mobileNavItems = [
   { to: "/social", icon: Users, label: "Social" },
   { to: "/run", icon: Play, label: "Course", isPrimary: true },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
-  { to: "/health", icon: Heart, label: "Santé" },
+  { to: "/profile", icon: User, label: "Profil" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
+  const { user } = useAuth();
+  const [socialUnread, setSocialUnread] = useState(0);
+
+  const refreshSocialUnread = useCallback(async () => {
+    if (!user?.id) {
+      setSocialUnread(0);
+      return;
+    }
+    try {
+      const n = await getUnreadNotificationsCount(user.id);
+      setSocialUnread(n);
+    } catch {
+      setSocialUnread(0);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    void refreshSocialUnread();
+    const t = window.setInterval(() => {
+      void refreshSocialUnread();
+    }, 60_000);
+    const onNotif = () => {
+      void refreshSocialUnread();
+    };
+    window.addEventListener("pace-notifications-updated", onNotif);
+    return () => {
+      window.clearInterval(t);
+      window.removeEventListener("pace-notifications-updated", onNotif);
+    };
+  }, [refreshSocialUnread]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,8 +106,8 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
         <div className="grid grid-cols-5 items-end gap-1 px-2 py-2">
           {mobileNavItems.map((item) => {
             const isActive =
-              item.to === "/health"
-                ? location.pathname.startsWith("/health")
+              item.to === "/profile"
+                ? location.pathname.startsWith("/profile") || location.pathname.startsWith("/settings")
                 : item.to === "/"
                   ? location.pathname === "/"
                   : location.pathname.startsWith(item.to);
@@ -103,7 +136,12 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                   isActive ? "text-accent" : "text-muted-foreground"
                 }`}
               >
-                <item.icon className="h-5 w-5" />
+                <span className="relative inline-flex">
+                  <item.icon className="h-5 w-5" />
+                  {item.to === "/social" && socialUnread > 0 ? (
+                    <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
+                  ) : null}
+                </span>
                 <span className="font-medium whitespace-nowrap">{item.label}</span>
               </NavLink>
             );

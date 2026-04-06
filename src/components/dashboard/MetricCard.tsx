@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Route, Clock, Mountain } from "lucide-react";
-import type { StravaActivity } from "@/lib/strava";
+import type { RunRow } from "@/lib/database";
 
 type WeeklyMetricCard = {
   title: string;
@@ -28,8 +28,8 @@ interface MetricCardProps {
   metric: WeeklyMetricCard;
   index: number;
   onMetricChange?: (title: string, granularity: "week" | "month", period: "1m" | "3m" | "1y" | "all") => void;
-  buildMetricData: (title: string, activities: StravaActivity[], granularity: "week" | "month", period: "1m" | "3m" | "1y" | "all") => WeeklyMetricCard;
-  activities: StravaActivity[];
+  buildMetricData: (title: string, runs: RunRow[], granularity: "week" | "month", period: "1m" | "3m" | "1y" | "all") => WeeklyMetricCard;
+  activities: RunRow[];
 }
 
 function CompactYearTick({
