@@ -627,7 +627,9 @@ export default function Run() {
                 description: "Elle sera synchronisée automatiquement dès que vous serez reconnecté.",
               });
               setSaveError("");
-            } catch {
+            } catch (error) {
+              console.error("[Run] save failed:", error);
+              import("@sentry/react").then(({ captureException }) => captureException(error)).catch(() => {});
               setSaveError("Impossible d'enregistrer cette course pour le moment.");
             }
           } else {
