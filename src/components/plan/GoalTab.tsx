@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { DaySelector, defaultDaysForWeekCount } from "@/components/goal/DaySelector";
 import { DistanceSelector } from "@/components/goal/DistanceSelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, upsertProfile, getRuns } from "@/lib/database";
 import { selectPlan, detectLevel } from "@/lib/planSelector";
+import { mapSessionsToDays } from "@/lib/plans";
 import type { TrainingPlan } from "@/lib/trainingPlans";
 import {
   calculateWeeksAvailable,
@@ -32,7 +34,7 @@ type RaceType = "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
 type ProfileGoalData = {
   weightKg: string;
   goalType: GoalType;
-  availableDaysPerWeek: string;
+  availableDays: string[];
   targetWeightKg: string;
   weightTargetDate: string;
   raceType: RaceType;
@@ -49,7 +51,7 @@ type ProfileGoalData = {
 const defaultData: ProfileGoalData = {
   weightKg: "",
   goalType: "weight",
-  availableDaysPerWeek: "",
+  availableDays: [],
   targetWeightKg: "",
   weightTargetDate: "",
   raceType: "marathon",
@@ -162,7 +164,33 @@ export default function GoalTab() {
 
         const goalData = profile?.goal_data;
         const normalizedGoalData = normalizeGoalData(goalData as Partial<ProfileGoalData>);
-        const newFormData = { ...defaultData, ...(normalizedGoalData as Partial<ProfileGoalData>) };
+        const rawGoal =
+          goalData && typeof goalData === "object" && !Array.isArray(goalData)
+            ? (goalData as Record<string, unknown>)
+            : {};
+        let availableDays: string[] = [];
+        if (profile?.available_days && Array.isArray(profile.available_days) && profile.available_days.length >= 2) {
+          availableDays = profile.available_days.filter((x): x is string => typeof x === "string");
+        } else {
+          const rawAvailable = rawGoal.availableDays;
+          if (Array.isArray(rawAvailable)) {
+            availableDays = rawAvailable.filter((x): x is string => typeof x === "string");
+          }
+          if (availableDays.length < 2) {
+            const legacy = String(normalizedGoalData.availableDaysPerWeek ?? normalizedGoalData.daysPerWeek ?? "");
+            const n = Number(legacy);
+            if (n >= 2 && n <= 5) {
+              availableDays = defaultDaysForWeekCount(n);
+            }
+          }
+        }
+
+        const newFormData = {
+          ...defaultData,
+          ...(normalizedGoalData as Partial<ProfileGoalData>),
+          availableDays,
+        } as ProfileGoalData;
+        delete (newFormData as { availableDaysPerWeek?: string }).availableDaysPerWeek;
 
         // Auto-detect level from running history
         const autoDetectedLevel = detectLevel(runs);
@@ -170,7 +198,7 @@ export default function GoalTab() {
         setDetectedLevel(autoDetectedLevel);
 
         // Auto-select a plan based on goal data
-        if (newFormData.availableDaysPerWeek) {
+        if (newFormData.availableDays.length >= 2) {
           const goalType = newFormData.goalType === "race" ? "race" : newFormData.goalType === "distance" ? "distance" : "weight";
           const targetDistance =
             goalType === "race"
@@ -189,12 +217,13 @@ export default function GoalTab() {
             goal: goalType,
             targetDistance,
             level: newFormData.level || "beginner",
-            daysPerWeek: Number(newFormData.availableDaysPerWeek),
+            daysPerWeek: newFormData.availableDays.length,
+            availableDays: newFormData.availableDays,
             weeksAvailable,
           });
 
           newFormData.selectedPlanId = plan.id;
-          setSelectedPlan(plan);
+          setSelectedPlan(mapSessionsToDays(plan, newFormData.availableDays));
         }
 
         setShowCustomDistance(Number(newFormData.distanceKm) > 0 && !["5", "10", "20", "21.097", "42.195"].includes(newFormData.distanceKm));
@@ -282,8 +311,11 @@ export default function GoalTab() {
       }
     }
 
-    if (formData.availableDaysPerWeek) {
-      details.push({ label: "Jours par semaine", value: `${formData.availableDaysPerWeek} jours` });
+    if (formData.availableDays.length > 0) {
+      details.push({
+        label: "Jours d'entraînement",
+        value: formData.availableDays.join(", "),
+      });
     }
 
     if (formData.level) {
@@ -385,7 +417,7 @@ export default function GoalTab() {
     setWarnings(warns);
 
     // Auto-generate and select plan if form is complete
-    if (data.availableDaysPerWeek && data.level) {
+    if (data.availableDays.length >= 2 && data.level) {
       const goalType = data.goalType === "race" ? "race" : data.goalType === "distance" ? "distance" : "weight";
       const targetDistance =
         goalType === "race"
@@ -404,12 +436,14 @@ export default function GoalTab() {
         goal: goalType,
         targetDistance,
         level: data.level,
-        daysPerWeek: Number(data.availableDaysPerWeek),
+        daysPerWeek: data.availableDays.length,
+        availableDays: data.availableDays,
         weeksAvailable,
       });
+      const mapped = mapSessionsToDays(plan, data.availableDays);
 
-      setSelectedPlan(plan);
-      setFormData(prev => ({ ...prev, selectedPlanId: plan.id }));
+      setSelectedPlan(mapped);
+      setFormData((prev) => ({ ...prev, selectedPlanId: plan.id }));
     }
   };
 
@@ -427,6 +461,11 @@ export default function GoalTab() {
       }
     }
 
+    if (formData.availableDays.length < 2 || formData.availableDays.length > 5) {
+      setSaveError("Choisissez entre 2 et 5 jours d'entraînement.");
+      return;
+    }
+
     try {
       setSaveError(null);
       // Add goalSavedAt timestamp when saving
@@ -434,8 +473,10 @@ export default function GoalTab() {
         ...formData,
         level: formData.level,
         fitnessLevel: formData.level,
-        daysPerWeek: Number(formData.availableDaysPerWeek),
+        daysPerWeek: formData.availableDays.length,
+        availableDaysPerWeek: String(formData.availableDays.length),
         goalSavedAt: new Date().toISOString(),
+        available_days: formData.availableDays,
       };
       await upsertProfile(user.id, dataToSave);
       window.dispatchEvent(new Event("pace-goal-updated"));
@@ -632,18 +673,13 @@ export default function GoalTab() {
                 onChange={(value) => updateField("weightTargetDate", value)}
               />
               <div className="space-y-2">
-                <Label htmlFor="availableDaysWeight">Nombre de jours disponibles par semaine pour aller courir</Label>
-                <Select value={formData.availableDaysPerWeek} onValueChange={(value) => updateField("availableDaysPerWeek", value)}>
-                  <SelectTrigger id="availableDaysWeight">
-                    <SelectValue placeholder="Choisir le nombre de jours" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2">2 jours</SelectItem>
-                    <SelectItem value="3">3 jours</SelectItem>
-                    <SelectItem value="4">4 jours</SelectItem>
-                    <SelectItem value="5">5 jours</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Jours disponibles pour aller courir</Label>
+                <DaySelector
+                  selectedDays={formData.availableDays}
+                  onChange={(days) => {
+                    updateField("availableDays", days);
+                  }}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="levelWeight">Votre niveau</Label>
@@ -714,18 +750,13 @@ export default function GoalTab() {
                 onChange={(value) => updateField("raceTargetDate", value)}
               />
               <div className="space-y-2">
-                <Label htmlFor="availableDaysRace">Nombre de jours disponibles par semaine pour aller courir</Label>
-                <Select value={formData.availableDaysPerWeek} onValueChange={(value) => updateField("availableDaysPerWeek", value)}>
-                  <SelectTrigger id="availableDaysRace">
-                    <SelectValue placeholder="Choisir le nombre de jours" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2">2 jours</SelectItem>
-                    <SelectItem value="3">3 jours</SelectItem>
-                    <SelectItem value="4">4 jours</SelectItem>
-                    <SelectItem value="5">5 jours</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Jours disponibles pour aller courir</Label>
+                <DaySelector
+                  selectedDays={formData.availableDays}
+                  onChange={(days) => {
+                    updateField("availableDays", days);
+                  }}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="levelRace">Votre niveau</Label>
@@ -797,18 +828,13 @@ export default function GoalTab() {
                 onChange={(value) => updateField("distanceTargetDate", value)}
               />
               <div className="space-y-2">
-                <Label htmlFor="availableDaysDistance">Nombre de jours disponibles par semaine pour aller courir</Label>
-                <Select value={formData.availableDaysPerWeek} onValueChange={(value) => updateField("availableDaysPerWeek", value)}>
-                  <SelectTrigger id="availableDaysDistance">
-                    <SelectValue placeholder="Choisir le nombre de jours" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="2">2 jours</SelectItem>
-                    <SelectItem value="3">3 jours</SelectItem>
-                    <SelectItem value="4">4 jours</SelectItem>
-                    <SelectItem value="5">5 jours</SelectItem>
-                  </SelectContent>
-                </Select>
+                <Label>Jours disponibles pour aller courir</Label>
+                <DaySelector
+                  selectedDays={formData.availableDays}
+                  onChange={(days) => {
+                    updateField("availableDays", days);
+                  }}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="levelDistance">Votre niveau</Label>

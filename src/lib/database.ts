@@ -22,6 +22,7 @@ export type ProfileRow = {
   date_of_birth?: string | null;
   first_name?: string | null;
   last_name?: string | null;
+  available_days?: string[];
 };
 
 export type RunGpsPoint = {
@@ -41,6 +42,7 @@ export type RunRow = {
   elevation_gain: number | null;
   gps_trace: Json | null;
   id: string;
+  ran_with?: string[] | null;
   run_type: string | null;
   started_at: string | null;
   title: string | null;
@@ -54,6 +56,7 @@ export type RunInput = {
   duration_seconds: number;
   elevation_gain?: number | null;
   gps_trace?: RunGpsPoint[];
+  ran_with?: string[];
   run_type?: string | null;
   started_at?: string | null;
   title?: string | null;
@@ -195,6 +198,7 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
   if ("onboarding_completed" in data) payload.onboarding_completed = data.onboarding_completed ?? false;
   if ("avatar_url" in data) payload.avatar_url = data.avatar_url ?? null;
   if ("username" in data) payload.username = data.username ?? null;
+  if ("available_days" in data) payload.available_days = (data.available_days ?? []) as string[];
 
   if (!("full_name" in data)) {
     const fullNameParts = [payload.first_name, payload.last_name]
@@ -288,6 +292,7 @@ export async function saveRun(userId: string, runData: RunInput) {
       duration_seconds: runData.duration_seconds,
       elevation_gain: runData.elevation_gain ?? null,
       gps_trace: (runData.gps_trace ?? []) as Json,
+      ran_with: runData.ran_with ?? [],
       run_type: runData.run_type ?? "run",
       started_at: runData.started_at ?? new Date().toISOString(),
       title: runData.title ?? null,
@@ -297,6 +302,41 @@ export async function saveRun(userId: string, runData: RunInput) {
 
   if (error) throw error;
   return data as RunRow;
+}
+
+export async function detectSimultaneousRuns(
+  userId: string,
+  startedAt: string,
+  durationSeconds: number,
+  gpsTrace: RunGpsPoint[],
+): Promise<string[]> {
+  if (!gpsTrace.length) return [];
+
+  const endedAt = new Date(new Date(startedAt).getTime() + durationSeconds * 1000).toISOString();
+
+  const { data, error } = await supabase.rpc("detect_simultaneous_runs", {
+    p_user_id: userId,
+    p_started_at: startedAt,
+    p_ended_at: endedAt,
+    p_gps_trace: JSON.stringify(gpsTrace),
+  });
+
+  if (error) {
+    console.error("detectSimultaneousRuns error:", error);
+    return [];
+  }
+
+  return (data as string[]) ?? [];
+}
+
+export async function getProfilesByIds(userIds: string[]): Promise<ProfileRow[]> {
+  if (!userIds.length) return [];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, first_name, full_name, username, avatar_url")
+    .in("id", userIds);
+  if (error) throw error;
+  return (data ?? []) as ProfileRow[];
 }
 
 export async function getRuns(userId: string) {
@@ -931,9 +971,22 @@ export async function createForumReply(userId: string, threadId: string, content
 }
 
 export async function toggleForumLike(threadId: string, userId: string): Promise<boolean> {
+  /*
+   * Run in Supabase SQL Editor:
+   *
+   * create or replace function increment_forum_likes(thread_id_input uuid)
+   * returns void language sql as $$
+   *   update forum_threads set likes_count = coalesce(likes_count,0) + 1 where id = thread_id_input;
+   * $$;
+   *
+   * create or replace function decrement_forum_likes(thread_id_input uuid)
+   * returns void language sql as $$
+   *   update forum_threads set likes_count = greatest(0, coalesce(likes_count,0) - 1) where id = thread_id_input;
+   * $$;
+   */
   await requireCurrentUserId(userId);
 
-  const { data: existingLike, error: existingError } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from("forum_likes")
     .select("id")
     .eq("thread_id", threadId)
@@ -942,34 +995,32 @@ export async function toggleForumLike(threadId: string, userId: string): Promise
 
   if (existingError) throw existingError;
 
-  if (existingLike) {
-    const { error: deleteError } = await supabase.from("forum_likes").delete().eq("id", existingLike.id);
+  if (existing) {
+    const { error: deleteError } = await supabase.from("forum_likes").delete().eq("id", existing.id);
     if (deleteError) throw deleteError;
-  } else {
-    const { error: insertError } = await supabase.from("forum_likes").insert({ thread_id: threadId, user_id: userId });
-    if (insertError) throw insertError;
+
+    const { error: rpcError } = await supabase.rpc("decrement_forum_likes", {
+      thread_id_input: threadId,
+    });
+    if (rpcError) throw rpcError;
+
+    return false;
   }
 
-  const { count, error: countError } = await supabase
+  const { error: insertError } = await supabase
     .from("forum_likes")
-    .select("id", { count: "exact", head: true })
-    .eq("thread_id", threadId);
+    .insert({ thread_id: threadId, user_id: userId });
+  if (insertError) throw insertError;
 
-  if (countError) throw countError;
+  const { error: rpcError } = await supabase.rpc("increment_forum_likes", {
+    thread_id_input: threadId,
+  });
+  if (rpcError) throw rpcError;
 
-  const likesCount = count ?? 0;
-
-  const { error: updateError } = await supabase
-    .from("forum_threads")
-    .update({ likes_count: likesCount })
-    .eq("id", threadId);
-
-  if (updateError) throw updateError;
-
-  return !existingLike;
+  return true;
 }
 
-export async function getForumLikes(threadIds: string[], userId: string): Promise<string[]> {
+export async function getForumLikedThreadIds(threadIds: string[], userId: string): Promise<string[]> {
   if (!threadIds.length) return [];
   await requireCurrentUserId(userId);
 
@@ -980,7 +1031,7 @@ export async function getForumLikes(threadIds: string[], userId: string): Promis
     .in("thread_id", threadIds);
 
   if (error) throw error;
-  return Array.from(new Set((data ?? []).map((row) => row.thread_id as string)));
+  return (data ?? []).map((r) => r.thread_id as string);
 }
 
 export async function updateForumThread(
@@ -990,13 +1041,11 @@ export async function updateForumThread(
 ): Promise<void> {
   await requireCurrentUserId(userId);
 
-  const payload: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
-  if (updates.title !== undefined) payload.title = updates.title;
-  if (updates.content !== undefined) payload.content = updates.content;
-
-  const { error } = await supabase.from("forum_threads").update(payload).eq("id", threadId).eq("user_id", userId);
+  const { error } = await supabase
+    .from("forum_threads")
+    .update({ ...updates, updated_at: new Date().toISOString() })
+    .eq("id", threadId)
+    .eq("user_id", userId);
 
   if (error) throw error;
 }

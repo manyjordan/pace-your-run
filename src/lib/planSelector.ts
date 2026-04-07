@@ -6,6 +6,8 @@ export type PlanSelectorParams = {
   targetDistance?: "5k" | "10k" | "20k" | "semi" | "marathon";
   level: "beginner" | "intermediate" | "advanced";
   daysPerWeek: number;
+  /** Specific weekdays (French names); when set, length drives plan template selection. */
+  availableDays?: string[];
   weeksAvailable?: number;
 };
 
@@ -72,8 +74,12 @@ export function detectLevel(runs: RunRow[]): "beginner" | "intermediate" | "adva
  * Always returns a plan (never null) - returns closest match if exact match doesn't exist
  */
 export function selectPlan(params: PlanSelectorParams): TrainingPlan {
-  // Normalize days per week to valid values (2, 3, 4, 5)
-  const daysPerWeek = Math.min(5, Math.max(2, Math.round(params.daysPerWeek)));
+  const fromSelection =
+    params.availableDays && params.availableDays.length > 0 ? params.availableDays.length : null;
+  const daysPerWeek = Math.min(
+    5,
+    Math.max(2, fromSelection ?? Math.round(params.daysPerWeek)),
+  );
 
   // Normalize weeks available
   const weeksAvailable = params.weeksAvailable ? Math.max(4, Math.min(16, params.weeksAvailable)) : undefined;

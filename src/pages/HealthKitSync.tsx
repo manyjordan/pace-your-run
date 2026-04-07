@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, Watch, Loader2 } from "lucide-react";
+import { Watch, Loader2 } from "lucide-react";
+import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
 import { useToast } from "@/hooks/use-toast";
 import { isHealthKitAvailable, requestHealthKitPermissions, fetchRecentRuns, isHealthKitAuthorized } from "@/lib/healthkit";
 import { saveRun } from "@/lib/database";
@@ -234,12 +235,11 @@ const HealthKitSync = () => {
       )}
 
       <ScrollReveal delay={0.3}>
-        <Alert className="border-border bg-card">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Les données de vos courses Apple Santé seront importées et affichées dans votre historique Pace. Vos données restent privées et sécurisées.
-          </AlertDescription>
-        </Alert>
+        <CollapsibleDisclaimer
+          variant="info"
+          summary="Les courses Apple Santé importées apparaissent dans votre historique Pace."
+          fullText="Les données de vos courses Apple Santé seront importées et affichées dans votre historique Pace. Vos données restent privées et sécurisées."
+        />
       </ScrollReveal>
     </div>
   );

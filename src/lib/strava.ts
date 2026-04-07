@@ -1,23 +1,10 @@
-export type GPSTracePoint = {
-  lat: number;
-  lng: number;
-  time: number;
-};
+/**
+ * Utility functions for formatting run data.
+ * Legacy Strava API types have been removed.
+ * TODO: rename this file to runFormatters.ts in a future cleanup.
+ */
 
-export type CommunityPost = {
-  id: number;
-  user: string;
-  initials: string;
-  time: string;
-  type: "run" | "race";
-  title: string;
-  description: string;
-  stats: { distance: string; pace: string; duration: string; elevation: string };
-  likes: number;
-  comments: number;
-  liked: boolean;
-  gpsTrace?: GPSTracePoint[];
-};
+export type { CommunityPost, GPSTracePoint } from "./types";
 
 export function formatDuration(seconds: number) {
   const safeSeconds = Math.max(0, Math.round(seconds));

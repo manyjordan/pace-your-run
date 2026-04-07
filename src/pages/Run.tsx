@@ -18,12 +18,22 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal,
+  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { createPost, saveRun, updatePostAudience, type RunGpsPoint, type RunRow } from "@/lib/database";
+import { useToast } from "@/hooks/use-toast";
+import {
+  createPost,
+  detectSimultaneousRuns,
+  getProfilesByIds,
+  saveRun,
+  updatePostAudience,
+  type RunGpsPoint,
+  type RunRow,
+} from "@/lib/database";
+import { supabase } from "@/lib/supabase";
 import {
   connectHeartRateMonitor,
   disconnectHeartRateMonitor,
@@ -40,11 +50,9 @@ import {
 import {
   convertDistanceFromKm,
   convertPaceFromMinutesPerKm,
-  convertSpeedFromKmPerHour,
   getDistanceUnitShortLabel,
   getDefaultRunPreferences,
   getSplitDistanceKm,
-  getSpeedUnitLabel,
   loadRunPreferences,
   saveRunPreferences,
   type RunPreferences,
@@ -62,11 +70,49 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   return R * c;
 }
 
+const OFFLINE_RUNS_KEY = "pace-offline-runs";
+
+function isLikelyNetworkError(error: unknown): boolean {
+  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
+  if (error instanceof TypeError) {
+    const m = String(error.message);
+    if (/fetch|network|load failed/i.test(m)) return true;
+  }
+  const msg = String((error as { message?: string })?.message ?? error);
+  if (/failed to fetch|networkerror|network request failed/i.test(msg)) return true;
+  return false;
+}
+
 type GPSPoint = RunGpsPoint;
+
+/** Minutes per km over the trace from kilometre (endKm - 1) to endKm; null if GPS data is insufficient. */
+function paceMinutesPerKmForLastKm(trace: GPSPoint[], endKm: number): number | null {
+  if (trace.length < 2 || endKm < 1) return null;
+  let cum = 0;
+  let startTime: number | null = null;
+  let endTime: number | null = null;
+  for (let i = 1; i < trace.length; i++) {
+    const prev = trace[i - 1];
+    const curr = trace[i];
+    cum += haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
+    if (startTime === null && cum >= endKm - 1) {
+      startTime = curr.time;
+    }
+    if (cum >= endKm) {
+      endTime = curr.time;
+      break;
+    }
+  }
+  if (startTime === null || endTime === null || endTime <= startTime) return null;
+  const seconds = (endTime - startTime) / 1000;
+  if (seconds <= 0) return null;
+  return seconds / 60;
+}
 
 /* ── Run component ── */
 export default function Run() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [postAudience, setPostAudience] = useState<"private" | "friends" | "public">("public");
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
   const [elapsed, setElapsed] = useState(0);
@@ -104,9 +150,9 @@ export default function Run() {
   const bluetoothConnectionRef = useRef<BluetoothConnection | null>(null);
   const heartRateSamplesRef = useRef<number[]>([]);
   const statusRef = useRef<"idle" | "running" | "paused">("idle");
-  const nextSplitAnnouncementRef = useRef(1);
-  const lastSplitAnnouncementElapsedRef = useRef(0);
-  const nextCumulativeAnnouncementRef = useRef<number | null>(null);
+  /** Preferences snapshot for speech for this run (set in start()). */
+  const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
+  const lastAnnouncedKmRef = useRef(0);
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
 
   const formatTime = useCallback((s: number) => {
@@ -124,7 +170,6 @@ export default function Run() {
     [],
   );
   const distanceUnitShortLabel = getDistanceUnitShortLabel(runPreferences.distanceUnit);
-  const speedUnitLabel = getSpeedUnitLabel(runPreferences.distanceUnit);
   const splitDistanceKm = getSplitDistanceKm(runPreferences.distanceUnit);
   const displayDistance = convertDistanceFromKm(distance, runPreferences.distanceUnit);
   const displayPace = convertPaceFromMinutesPerKm(pace, runPreferences.distanceUnit);
@@ -140,15 +185,6 @@ export default function Run() {
       : bluetoothDevice;
   const isRunActive = status === "running" || status === "paused";
   const hasLiveGpsTrace = gpsTrace.length > 0;
-
-  const announce = useCallback((message: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.lang = "fr-FR";
-    utterance.rate = 1;
-    window.speechSynthesis.speak(utterance);
-  }, []);
 
   // GPS accuracy indicator color
   const getAccuracyColor = (accuracy: number | null) => {
@@ -353,47 +389,58 @@ export default function Run() {
     };
   }, []);
 
+  // Kilometre voice announcements (Web Speech API).
+  // iOS Safari only allows speech after a user gesture; tapping Start satisfies that.
+  // On iOS, speechSynthesis can be interrupted when the screen locks — limitation of the platform.
   useEffect(() => {
     if (status !== "running") return;
 
-    const currentDistanceInPreferredUnit = convertDistanceFromKm(distance, runPreferences.distanceUnit);
+    const prefs = speechPrefsRef.current;
+    if (!prefs.announceSplitSpeed && prefs.cumulativeTimeAnnouncement === "off") return;
 
-    while (runPreferences.announceSplitSpeed && currentDistanceInPreferredUnit >= nextSplitAnnouncementRef.current) {
-      const splitElapsed = elapsed - lastSplitAnnouncementElapsedRef.current;
-      const splitSpeedKmPerHour = splitElapsed > 0 ? (splitDistanceKm / splitElapsed) * 3600 : 0;
-      const announcedSpeed = convertSpeedFromKmPerHour(splitSpeedKmPerHour, runPreferences.distanceUnit)
-        .toFixed(1)
-        .replace(".", ",");
-      const unitKeyword = runPreferences.distanceUnit === "mi" ? "mile" : "km";
+    const currentKm = Math.floor(distance);
+    if (currentKm <= lastAnnouncedKmRef.current) return;
 
-      announce(`${unitKeyword} ${nextSplitAnnouncementRef.current}, vitesse ${announcedSpeed}${speedUnitLabel}`);
-      lastSplitAnnouncementElapsedRef.current = elapsed;
-      nextSplitAnnouncementRef.current += 1;
+    lastAnnouncedKmRef.current = currentKm;
+
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const messages: string[] = [];
+
+    if (prefs.announceSplitSpeed && currentKm > 0) {
+      const splitMinPerKm =
+        paceMinutesPerKmForLastKm(gpsTrace, currentKm) ?? (distance > 0 ? elapsed / 60 / distance : 0);
+      const paceForUnit = convertPaceFromMinutesPerKm(splitMinPerKm, prefs.distanceUnit);
+      const paceMinutes = Math.floor(paceForUnit);
+      const paceSeconds = Math.round((paceForUnit % 1) * 60);
+      const unit = prefs.distanceUnit === "mi" ? "mile" : "kilomètre";
+      const pacePart =
+        paceSeconds > 0
+          ? `Allure ${paceMinutes} minutes ${paceSeconds} secondes par ${unit}.`
+          : `Allure ${paceMinutes} minutes par ${unit}.`;
+      messages.push(`Kilomètre ${currentKm}. ${pacePart}`);
     }
 
-    const cumulativeInterval =
-      runPreferences.cumulativeTimeAnnouncement === "off"
-        ? null
-        : Number(runPreferences.cumulativeTimeAnnouncement);
-
-    if (!cumulativeInterval) {
-      nextCumulativeAnnouncementRef.current = null;
-      return;
+    const cumInterval = parseInt(prefs.cumulativeTimeAnnouncement, 10);
+    if (!Number.isNaN(cumInterval) && cumInterval > 0 && currentKm % cumInterval === 0) {
+      const totalMinutes = Math.floor(elapsed / 60);
+      const totalSeconds = elapsed % 60;
+      const timePart =
+        totalSeconds > 0
+          ? `Temps total : ${totalMinutes} minutes ${totalSeconds} secondes.`
+          : `Temps total : ${totalMinutes} minutes.`;
+      messages.push(timePart);
     }
 
-    if (nextCumulativeAnnouncementRef.current === null) {
-      nextCumulativeAnnouncementRef.current = cumulativeInterval;
-    }
+    if (messages.length === 0) return;
 
-    while (
-      nextCumulativeAnnouncementRef.current !== null &&
-      currentDistanceInPreferredUnit >= nextCumulativeAnnouncementRef.current
-    ) {
-      const unitKeyword = runPreferences.distanceUnit === "mi" ? "mile" : "km";
-      announce(`${unitKeyword} ${nextCumulativeAnnouncementRef.current}, temps cumulé ${formatTime(elapsed)}`);
-      nextCumulativeAnnouncementRef.current += cumulativeInterval;
-    }
-  }, [announce, distance, elapsed, formatTime, runPreferences, speedUnitLabel, splitDistanceKm, status]);
+    const utterance = new SpeechSynthesisUtterance(messages.join(" "));
+    utterance.lang = "fr-FR";
+    utterance.rate = 1.0;
+    utterance.volume = 1.0;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, [distance, elapsed, gpsTrace, status]);
 
   const start = () => {
     setRunSummary(null);
@@ -410,12 +457,11 @@ export default function Run() {
     heartRateSamplesRef.current = [];
     lastGpsPointRef.current = null;
     runStartedAtRef.current = new Date().toISOString();
-    nextSplitAnnouncementRef.current = 1;
-    lastSplitAnnouncementElapsedRef.current = 0;
-    nextCumulativeAnnouncementRef.current =
-      runPreferences.cumulativeTimeAnnouncement === "off"
-        ? null
-        : Number(runPreferences.cumulativeTimeAnnouncement);
+    speechPrefsRef.current = loadRunPreferences(user?.id);
+    lastAnnouncedKmRef.current = 0;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
     setStatus("running");
   };
 
@@ -499,28 +545,62 @@ export default function Run() {
       setShowCompletedActivityDetail(true);
 
       if (user) {
+        const title = activityName;
+        const description = activityDescription;
+        const runData = {
+          distance_km: finalDistance,
+          duration_seconds: finalElapsed,
+          average_pace: finalAvgPace,
+          average_heartrate: finalAverageHeartRate ?? null,
+          elevation_gain: finalElevation,
+          gps_trace: finalGpsTrace,
+          run_type: "run" as const,
+          started_at: runStartedAtRef.current,
+          title,
+        };
+
         try {
           setIsSaving(true);
           setSaveError("");
 
-          const title = activityName;
-          const description = activityDescription;
-
-          const savedRun = await saveRun(user.id, {
-            distance_km: finalDistance,
-            duration_seconds: finalElapsed,
-            average_pace: finalAvgPace,
-            average_heartrate: finalAverageHeartRate ?? null,
-            elevation_gain: finalElevation,
-            gps_trace: finalGpsTrace,
-            run_type: "run",
-            started_at: runStartedAtRef.current,
-            title,
-          });
+          const savedRun = await saveRun(user.id, runData);
 
           const createdPost = await createPost(user.id, savedRun.id, title, description, postAudienceRef.current);
           setCompletedPostId(createdPost.id);
           window.dispatchEvent(new Event("pace-community-updated"));
+
+          const ranWithIds = await detectSimultaneousRuns(
+            user.id,
+            runStartedAtRef.current ?? finalStartedAt,
+            finalElapsed,
+            finalGpsTrace,
+          ).catch(() => []);
+
+          if (ranWithIds.length > 0) {
+            toast({
+              title: "Course partagée détectée ! 🤝",
+              description: `Il semblerait que vous ayez couru avec ${ranWithIds.length} ami(s) !`,
+            });
+
+            await supabase
+              .from("runs")
+              .update({ ran_with: ranWithIds })
+              .eq("id", savedRun.id)
+              .catch(() => {});
+
+            const ranWithProfiles = await getProfilesByIds(ranWithIds).catch(() => []);
+            const names = ranWithProfiles
+              .map((p) => p.first_name ?? p.full_name ?? p.username ?? "Un ami")
+              .join(", ");
+
+            const updatedDescription = `${description} Couru avec ${names} 🤝`;
+
+            await supabase
+              .from("social_posts")
+              .update({ description: updatedDescription })
+              .eq("id", createdPost.id)
+              .catch(() => {});
+          }
         } catch (error) {
           console.error("[Run] operation failed:", error);
           import("@sentry/react")
@@ -528,7 +608,31 @@ export default function Run() {
               captureException(error);
             })
             .catch(() => {});
-          setSaveError("Impossible d'enregistrer cette course pour le moment.");
+
+          if (isLikelyNetworkError(error)) {
+            console.error("Failed to save run online:", error);
+            try {
+              const existing = JSON.parse(localStorage.getItem(OFFLINE_RUNS_KEY) ?? "[]");
+              const queue = Array.isArray(existing) ? existing : [];
+              const offlineRun = {
+                ...runData,
+                offlinePostDescription: description,
+                offlinePostAudience: postAudienceRef.current,
+                savedOfflineAt: new Date().toISOString(),
+                id: crypto.randomUUID(),
+              };
+              localStorage.setItem(OFFLINE_RUNS_KEY, JSON.stringify([offlineRun, ...queue]));
+              toast({
+                title: "Course sauvegardée localement",
+                description: "Elle sera synchronisée automatiquement dès que vous serez reconnecté.",
+              });
+              setSaveError("");
+            } catch {
+              setSaveError("Impossible d'enregistrer cette course pour le moment.");
+            }
+          } else {
+            setSaveError("Impossible d'enregistrer cette course pour le moment.");
+          }
         } finally {
           setIsSaving(false);
         }
@@ -550,9 +654,10 @@ export default function Run() {
     setHeartRate(null);
     setGpsError("");
     setBluetoothError("");
-    nextSplitAnnouncementRef.current = 1;
-    lastSplitAnnouncementElapsedRef.current = 0;
-    nextCumulativeAnnouncementRef.current = null;
+    lastAnnouncedKmRef.current = 0;
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
   };
 
   const handleAudienceChange = useCallback(
@@ -772,6 +877,12 @@ export default function Run() {
                       </TooltipProvider>
                     )}
                   </div>
+                  {isRunActive && runPreferences.announceSplitSpeed && (
+                    <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                      <Volume2 className="h-3 w-3 shrink-0" aria-hidden />
+                      <span>🔊 Annonces vocales actives</span>
+                    </div>
+                  )}
                   <div className="text-xl font-bold tabular-nums">{displayDistance.toFixed(2)}</div>
                   <div className="text-[10px] text-muted-foreground">{distanceUnitShortLabel}</div>
                 </div>

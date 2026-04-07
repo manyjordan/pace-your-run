@@ -27,9 +27,9 @@ export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
         <div className="flex flex-col items-center gap-6">
           {/* App Icon */}
           <motion.img
-            src="/logo-splash.png"
+            src="/logo-runner-yellow.svg"
             alt="Pace"
-            className="w-24 h-24 rounded-2xl app-icon"
+            className="w-24 h-24 rounded-2xl"
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.3, delay: 0 }}

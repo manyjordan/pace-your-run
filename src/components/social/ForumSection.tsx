@@ -6,7 +6,7 @@ import {
   deleteForumReply,
   deleteForumThread,
   getForumCategories,
-  getForumLikes,
+  getForumLikedThreadIds,
   getForumThreadDetail,
   getForumThreads,
   toggleForumLike,
@@ -131,7 +131,7 @@ export function ForumSection() {
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [newThreadContent, setNewThreadContent] = useState("");
   const [replyContent, setReplyContent] = useState("");
-  const [likedThreadIds, setLikedThreadIds] = useState<Set<string>>(() => new Set());
+  const [likedThreadIds, setLikedThreadIds] = useState<string[]>([]);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editThreadContent, setEditThreadContent] = useState("");
   const [isSavingThread, setIsSavingThread] = useState(false);
@@ -157,16 +157,16 @@ export function ForumSection() {
 
       if (user?.id && threadsData.length > 0) {
         try {
-          const liked = await getForumLikes(
+          const liked = await getForumLikedThreadIds(
             threadsData.map((t) => t.id),
             user.id,
           );
-          setLikedThreadIds(new Set(liked));
+          setLikedThreadIds(liked);
         } catch {
-          setLikedThreadIds(new Set());
+          setLikedThreadIds([]);
         }
       } else {
-        setLikedThreadIds(new Set());
+        setLikedThreadIds([]);
       }
 
       if (!newThreadCategoryId && categoriesData.length > 0) {
@@ -278,10 +278,10 @@ export function ForumSection() {
     setThreads((prev) => prev.map((row) => (row.id === threadId ? { ...row, likes_count: count } : row)));
     setSelectedThreadDetail((prev) => (prev?.id === threadId ? { ...prev, likes_count: count } : prev));
     setLikedThreadIds((prev) => {
-      const next = new Set(prev);
-      if (liked) next.add(threadId);
-      else next.delete(threadId);
-      return next;
+      if (liked) {
+        return prev.includes(threadId) ? prev : [...prev, threadId];
+      }
+      return prev.filter((id) => id !== threadId);
     });
   };
 
@@ -295,7 +295,7 @@ export function ForumSection() {
     const fromList = threads.find((t) => t.id === threadId);
     const fromDetail = selectedThreadDetail?.id === threadId ? selectedThreadDetail : null;
     const base = fromList ?? fromDetail;
-    const prevLiked = likedThreadIds.has(threadId);
+    const prevLiked = likedThreadIds.includes(threadId);
     const prevCount = base ? threadLikeCount(base) : 0;
     const nextLiked = !prevLiked;
     const nextCount = Math.max(0, nextLiked ? prevCount + 1 : prevCount - 1);
@@ -339,11 +339,7 @@ export function ForumSection() {
     try {
       await deleteForumThread(deleteThreadId, user.id);
       setThreads((prev) => prev.filter((t) => t.id !== deleteThreadId));
-      setLikedThreadIds((prev) => {
-        const next = new Set(prev);
-        next.delete(deleteThreadId);
-        return next;
-      });
+      setLikedThreadIds((prev) => prev.filter((id) => id !== deleteThreadId));
       if (selectedThreadId === deleteThreadId) {
         setSelectedThreadId(null);
         setSelectedThreadDetail(null);
@@ -630,100 +626,16 @@ export function ForumSection() {
                 const author = formatAuthorName(thread.profile?.full_name, thread.profile?.username);
                 const initials = getInitials(author);
                 const isOwner = Boolean(user?.id && thread.user_id === user.id);
-                const liked = likedThreadIds.has(thread.id);
+                const liked = likedThreadIds.includes(thread.id);
                 const likeCount = threadLikeCount(thread);
                 const isEditing = editingThreadId === thread.id;
 
                 return (
                   <ScrollReveal key={thread.id} delay={0.14 + index * 0.04}>
-                    <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)] transition-colors hover:border-accent/40">
+                    <Card className="relative border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)] transition-colors hover:border-accent/40">
                       <CardContent className="space-y-3 p-5">
-                        {isEditing ? (
-                          <div className="space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline">{thread.category?.title ?? "Forum"}</Badge>
-                              {thread.is_pinned ? <Badge variant="secondary">Épinglé</Badge> : null}
-                              {thread.is_locked ? <Badge variant="secondary">Verrouillé</Badge> : null}
-                            </div>
-                            <h4 className="text-sm font-semibold">{thread.title}</h4>
-                            <Textarea
-                              value={editThreadContent}
-                              onChange={(e) => setEditThreadContent(e.target.value)}
-                              className="min-h-[120px] resize-none"
-                            />
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                size="sm"
-                                disabled={isSavingThread}
-                                onClick={() => void handleSaveThreadEdit(thread.id)}
-                              >
-                                {isSavingThread ? "Enregistrement..." : "Sauvegarder"}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={isSavingThread}
-                                onClick={() => {
-                                  setEditingThreadId(null);
-                                  setEditThreadContent("");
-                                }}
-                              >
-                                Annuler
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            className="w-full space-y-3 text-left"
-                            onClick={() => setSelectedThreadId(thread.id)}
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline">{thread.category?.title ?? "Forum"}</Badge>
-                              {thread.is_pinned ? <Badge variant="secondary">Épinglé</Badge> : null}
-                              {thread.is_locked ? <Badge variant="secondary">Verrouillé</Badge> : null}
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-semibold">{thread.title}</h4>
-                              <p className="mt-1 text-sm text-muted-foreground">{excerpt(thread.content)}</p>
-                            </div>
-                            <div className="flex items-start gap-3">
-                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
-                                {initials}
-                              </div>
-                              <div className="min-w-0 flex-1 space-y-0.5">
-                                <p className="text-sm font-semibold leading-tight">{author}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatRelativeTime(thread.updated_at ?? thread.created_at ?? new Date().toISOString())}{" "}
-                                  · {thread.repliesCount} réponse{thread.repliesCount !== 1 ? "s" : ""}
-                                </p>
-                              </div>
-                            </div>
-                          </button>
-                        )}
-
-                        <div className="flex items-center justify-between gap-2 border-t border-border/60 pt-3">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
-                            disabled={likeBusyThreadId === thread.id}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              void handleToggleThreadLike(thread.id);
-                            }}
-                          >
-                            <Heart
-                              className={cn(
-                                "h-4 w-4 shrink-0",
-                                liked ? "fill-red-500 text-red-500" : "text-muted-foreground",
-                              )}
-                            />
-                            <span className="text-sm font-medium tabular-nums text-foreground">{likeCount}</span>
-                          </Button>
-                          {isOwner ? (
+                        {isOwner ? (
+                          <div className="absolute right-3 top-3 z-10">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button
@@ -762,7 +674,94 @@ export function ForumSection() {
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
-                          ) : null}
+                          </div>
+                        ) : null}
+
+                        {isEditing ? (
+                          <div className={cn("space-y-3", isOwner && "pr-10")}>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">{thread.category?.title ?? "Forum"}</Badge>
+                              {thread.is_pinned ? <Badge variant="secondary">Épinglé</Badge> : null}
+                              {thread.is_locked ? <Badge variant="secondary">Verrouillé</Badge> : null}
+                            </div>
+                            <h4 className="text-sm font-semibold">{thread.title}</h4>
+                            <Textarea
+                              value={editThreadContent}
+                              onChange={(e) => setEditThreadContent(e.target.value)}
+                              className="min-h-[120px] resize-none"
+                            />
+                            <div className="flex flex-wrap gap-2">
+                              <Button
+                                size="sm"
+                                disabled={isSavingThread}
+                                onClick={() => void handleSaveThreadEdit(thread.id)}
+                              >
+                                {isSavingThread ? "Enregistrement..." : "Sauvegarder"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={isSavingThread}
+                                onClick={() => {
+                                  setEditingThreadId(null);
+                                  setEditThreadContent("");
+                                }}
+                              >
+                                Annuler
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            className={cn("w-full space-y-3 text-left", isOwner && "pr-10")}
+                            onClick={() => setSelectedThreadId(thread.id)}
+                          >
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline">{thread.category?.title ?? "Forum"}</Badge>
+                              {thread.is_pinned ? <Badge variant="secondary">Épinglé</Badge> : null}
+                              {thread.is_locked ? <Badge variant="secondary">Verrouillé</Badge> : null}
+                            </div>
+                            <div>
+                              <h4 className="text-sm font-semibold">{thread.title}</h4>
+                              <p className="mt-1 text-sm text-muted-foreground">{excerpt(thread.content)}</p>
+                            </div>
+                            <div className="flex items-start gap-3">
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground">
+                                {initials}
+                              </div>
+                              <div className="min-w-0 flex-1 space-y-0.5">
+                                <p className="text-sm font-semibold leading-tight">{author}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {formatRelativeTime(thread.updated_at ?? thread.created_at ?? new Date().toISOString())}{" "}
+                                  · {thread.repliesCount} réponse{thread.repliesCount !== 1 ? "s" : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        )}
+
+                        <div className="flex justify-end border-t border-border/60 pt-3">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                            disabled={likeBusyThreadId === thread.id}
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              void handleToggleThreadLike(thread.id);
+                            }}
+                          >
+                            <Heart
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                liked ? "fill-red-500 text-red-500" : "text-muted-foreground fill-none",
+                              )}
+                            />
+                            <span className="text-sm font-medium tabular-nums text-foreground">{likeCount}</span>
+                          </Button>
                         </div>
                       </CardContent>
                     </Card>
@@ -823,7 +822,7 @@ export function ForumSection() {
                       </div>
                     </div>
                     <p className="text-sm leading-6 text-foreground">{selectedThreadDetail.content}</p>
-                    <div className="flex items-center border-t border-border/60 pt-3">
+                    <div className="flex justify-end border-t border-border/60 pt-3">
                       <Button
                         type="button"
                         variant="ghost"
@@ -835,9 +834,9 @@ export function ForumSection() {
                         <Heart
                           className={cn(
                             "h-4 w-4 shrink-0",
-                            likedThreadIds.has(selectedThreadDetail.id)
+                            likedThreadIds.includes(selectedThreadDetail.id)
                               ? "fill-red-500 text-red-500"
-                              : "text-muted-foreground",
+                              : "text-muted-foreground fill-none",
                           )}
                         />
                         <span className="text-sm font-medium tabular-nums text-foreground">

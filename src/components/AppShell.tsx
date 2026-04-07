@@ -1,8 +1,41 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { Heart, Home, ClipboardList, Play, Settings, User, Users } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
-import { getUnreadNotificationsCount } from "@/lib/database";
+import { useToast } from "@/hooks/use-toast";
+import { createPost, getUnreadNotificationsCount, saveRun, type RunInput } from "@/lib/database";
+
+const OFFLINE_RUNS_KEY = "pace-offline-runs";
+
+type OfflinePostAudience = "private" | "friends" | "public";
+
+function normalizeOfflineAudience(value: unknown): OfflinePostAudience {
+  if (value === "private" || value === "friends" || value === "public") return value;
+  return "public";
+}
+
+function formatDurationForOfflinePost(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const sec = Math.floor(seconds % 60);
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  return `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+type OfflinePostOnlyQueueItem = {
+  syncPostOnly: true;
+  runId: string;
+  title: string;
+  description: string;
+  audience: OfflinePostAudience;
+};
+
+function isOfflinePostOnlyItem(item: unknown): item is OfflinePostOnlyQueueItem {
+  if (!item || typeof item !== "object") return false;
+  const o = item as Record<string, unknown>;
+  return o.syncPostOnly === true && typeof o.runId === "string";
+}
 
 const desktopNavItems = [
   { to: "/", icon: Home, label: "Accueil" },
@@ -23,7 +56,92 @@ const mobileNavItems = [
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [socialUnread, setSocialUnread] = useState(0);
+  const [isOnline, setIsOnline] = useState(() =>
+    typeof navigator !== "undefined" ? navigator.onLine : true,
+  );
+
+  const syncOfflineRuns = useCallback(async () => {
+    if (!user?.id) return;
+    let offline: unknown[];
+    try {
+      offline = JSON.parse(localStorage.getItem(OFFLINE_RUNS_KEY) ?? "[]") as unknown[];
+    } catch {
+      return;
+    }
+    if (!Array.isArray(offline) || offline.length === 0) return;
+
+    const remaining: unknown[] = [];
+    let synced = 0;
+    for (const item of offline) {
+      if (isOfflinePostOnlyItem(item)) {
+        try {
+          await createPost(user.id, item.runId, item.title, item.description, item.audience);
+          synced += 1;
+          window.dispatchEvent(new Event("pace-community-updated"));
+        } catch {
+          remaining.push(item);
+        }
+        continue;
+      }
+
+      if (!item || typeof item !== "object") continue;
+      const record = item as Record<string, unknown>;
+      const {
+        savedOfflineAt: _savedAt,
+        id: _offlineId,
+        offlinePostDescription,
+        offlinePostAudience,
+        ...runPayload
+      } = record;
+
+      const postTitle =
+        typeof runPayload.title === "string" && runPayload.title.trim()
+          ? runPayload.title
+          : "Nouvelle course enregistrée";
+      const audience = normalizeOfflineAudience(offlinePostAudience);
+      const postDescription =
+        typeof offlinePostDescription === "string"
+          ? offlinePostDescription
+          : typeof runPayload.distance_km === "number" && typeof runPayload.duration_seconds === "number"
+            ? `Je viens de terminer ${runPayload.distance_km.toFixed(2)} km en ${formatDurationForOfflinePost(runPayload.duration_seconds)}.`
+            : "Activité synchronisée";
+
+      let savedRun;
+      try {
+        savedRun = await saveRun(user.id, runPayload as RunInput);
+      } catch {
+        remaining.push(item);
+        continue;
+      }
+
+      try {
+        await createPost(user.id, savedRun.id, postTitle, postDescription, audience);
+        synced += 1;
+        window.dispatchEvent(new Event("pace-community-updated"));
+      } catch {
+        remaining.push({
+          syncPostOnly: true,
+          runId: savedRun.id,
+          title: postTitle,
+          description: postDescription,
+          audience,
+        } satisfies OfflinePostOnlyQueueItem);
+      }
+    }
+
+    if (remaining.length === 0) {
+      localStorage.removeItem(OFFLINE_RUNS_KEY);
+    } else {
+      localStorage.setItem(OFFLINE_RUNS_KEY, JSON.stringify(remaining));
+    }
+    if (synced > 0) {
+      toast({
+        title: `${synced} course(s) synchronisée(s) ✅`,
+      });
+    }
+  }, [user?.id, toast]);
 
   const refreshSocialUnread = useCallback(async () => {
     if (!user?.id) {
@@ -52,6 +170,20 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       window.removeEventListener("pace-notifications-updated", onNotif);
     };
   }, [refreshSocialUnread]);
+
+  useEffect(() => {
+    const handleOffline = () => setIsOnline(false);
+    const handleOnline = () => {
+      setIsOnline(true);
+      void syncOfflineRuns();
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [syncOfflineRuns]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -88,6 +220,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
           </nav>
 
           <div className="flex items-center gap-1">
+            <ThemeToggle className="text-accent-foreground/80 hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground" />
             <NavLink
               to="/settings"
               className="rounded-lg p-2 text-accent-foreground/80 transition-colors hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"
@@ -97,6 +230,14 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
           </div>
         </div>
       </header>
+
+      {!isOnline ? (
+        <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2 text-center">
+          <p className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+            📡 Mode hors ligne — certaines fonctionnalités peuvent être limitées
+          </p>
+        </div>
+      ) : null}
 
       {/* Main */}
       <main className="container py-6 pb-24 md:pb-6">{children}</main>
@@ -151,3 +292,4 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
     </div>
   );
 };
+

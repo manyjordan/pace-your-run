@@ -154,7 +154,7 @@ const Auth = () => {
                     <Input
                       id="signin-email"
                       type="email"
-                      placeholder="you@example.com"
+                      placeholder="votre@email.fr"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       disabled={loading}
@@ -228,7 +228,7 @@ const Auth = () => {
                       <Input
                         id="signup-email"
                         type="email"
-                        placeholder="you@example.com"
+                        placeholder="votre@email.fr"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         disabled={loading}

@@ -1,8 +1,11 @@
 import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
+import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import "./styles/logo-colors.css";
+
+registerSW({ immediate: true });
 
 Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,

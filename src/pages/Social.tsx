@@ -25,6 +25,7 @@ import {
   Check,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import GPSMap from "@/components/GPSMap";
 import { ForumSection } from "@/components/social/ForumSection";
 import { useAuth } from "@/contexts/AuthContext";
@@ -127,6 +128,14 @@ function inferPostType(title: string, description: string) {
   return "run" as const;
 }
 
+function ranWithBadgeText(description: string): string | null {
+  if (!description.includes("Couru avec")) return null;
+  const m = description.match(/Couru avec\s+(.+?)\s*🤝/);
+  if (m) return `🤝 Couru avec ${m[1].trim()}`;
+  const idx = description.indexOf("Couru avec");
+  return `🤝 ${description.slice(idx).trim()}`;
+}
+
 function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
   const displayName =
     post.profile?.username ||
@@ -169,6 +178,7 @@ function suggestionDisplayName(profile: ProfileRow) {
 
 export default function Social() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [activities, setActivities] = useState<RunRow[]>([]);
@@ -250,6 +260,35 @@ export default function Social() {
       setPostsError("Impossible de mettre à jour le like pour le moment.");
     } finally {
       setLikeBusyId(null);
+    }
+  };
+
+  const handleShare = async (post: FeedPost) => {
+    const shareData = {
+      title: post.title ?? "Course Pace",
+      text: `${post.user} a couru ${post.stats.distance} en ${post.stats.duration} sur Pace 🏃`,
+      url: window.location.origin,
+    };
+
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      try {
+        await navigator.share(shareData);
+      } catch (error) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Share failed:", error);
+        }
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
+        toast({ title: "Lien copié dans le presse-papiers ✅" });
+      } catch {
+        toast({
+          title: "Partage non disponible",
+          description: "Votre navigateur ne supporte pas le partage natif.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -632,7 +671,9 @@ export default function Social() {
                     </CardContent>
                   </Card>
                 </ScrollReveal>
-              ) : posts.map((post, i) => (
+              ) : posts.map((post, i) => {
+                const ranWithLine = ranWithBadgeText(post.description ?? "");
+                return (
                 <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
                   <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
                     <CardContent className="space-y-3 p-4">
@@ -693,6 +734,13 @@ export default function Social() {
                         </div>
                       </div>
 
+                      {ranWithLine ? (
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-accent">
+                          <Users className="h-3.5 w-3.5 shrink-0" />
+                          <span>{ranWithLine}</span>
+                        </div>
+                      ) : null}
+
                       {post.gpsTrace && post.gpsTrace.length > 0 && <GPSMap trace={post.gpsTrace} />}
 
                       <Button
@@ -733,7 +781,10 @@ export default function Social() {
                           variant="ghost"
                           size="sm"
                           className="ml-auto text-muted-foreground"
-                          onClick={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleShare(post);
+                          }}
                         >
                           <Share2 className="h-4 w-4" />
                         </Button>
@@ -741,7 +792,8 @@ export default function Social() {
                     </CardContent>
                   </Card>
                 </ScrollReveal>
-              ))}
+              );
+              })}
         </TabsContent>
 
         <TabsContent value="forum">

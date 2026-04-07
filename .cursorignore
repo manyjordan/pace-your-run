@@ -1,0 +1,22 @@
+﻿# Large static data files - no need for Cursor to read these
+src/lib/trainingPlans.ts
+
+# Lock files
+bun.lock
+bun.lockb
+package-lock.json
+
+# Build output
+dist/
+.next/
+
+# Dependencies
+node_modules/
+
+# Capacitor
+ios/
+android/
+
+# Test files
+src/test/
+

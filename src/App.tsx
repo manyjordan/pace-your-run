@@ -1,4 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ThemeProvider } from "next-themes";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -94,21 +95,23 @@ const App = () => {
 
   return (
     <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <AuthProvider>
-            <Toaster />
-            <Sonner />
-            {showSplash ? (
-              <SplashScreen onComplete={handleSplashComplete} />
-            ) : (
-              <BrowserRouter>
-                <AppRoutes />
-              </BrowserRouter>
-            )}
-          </AuthProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <AuthProvider>
+              <Toaster />
+              <Sonner />
+              {showSplash ? (
+                <SplashScreen onComplete={handleSplashComplete} />
+              ) : (
+                <BrowserRouter>
+                  <AppRoutes />
+                </BrowserRouter>
+              )}
+            </AuthProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 };

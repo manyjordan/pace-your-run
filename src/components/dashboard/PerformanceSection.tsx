@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import { getStartOfWeek } from "@/lib/dashboardHelpers";
@@ -271,6 +272,10 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
             </div>
           </div>
         </div>
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <RacePredictionsCard runs={runs} />
       </ScrollReveal>
     </div>
   );

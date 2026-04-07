@@ -1,6 +1,7 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
 import { useMemo, useState } from "react";
-import { AlertCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -736,13 +737,11 @@ const Health = () => {
 
       {/* Medical disclaimer */}
       <ScrollReveal>
-        <div className="rounded-xl border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800/50 p-4 flex gap-3">
-          <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-          <div className="text-sm text-amber-900 dark:text-amber-100">
-            <p className="font-semibold mb-1">⚠️ Avertissement important</p>
-            <p>Nous ne remplacerons jamais un bon rendez-vous chez le médecin. Les informations ici sont à titre informatif. <strong>La consultation reste la meilleure option en cas de doute ou douleur persistante.</strong> Si la douleur s'aggrave, consultez immédiatement un professionnel de santé.</p>
-          </div>
-        </div>
+        <CollapsibleDisclaimer
+          variant="warning"
+          summary="Ces informations ne remplacent pas un avis médical professionnel."
+          fullText="Nous ne remplacerons jamais un bon rendez-vous chez le médecin. Les informations ici sont à titre informatif. La consultation reste la meilleure option en cas de doute ou douleur persistante. Si la douleur s'aggrave, consultez immédiatement un professionnel de santé."
+        />
       </ScrollReveal>
 
       <ScrollReveal>

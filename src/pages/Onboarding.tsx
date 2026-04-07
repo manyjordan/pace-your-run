@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { DaySelector } from "@/components/goal/DaySelector";
 import { DistanceSelector } from "@/components/goal/DistanceSelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { useAuth } from "@/contexts/AuthContext";
@@ -18,6 +19,7 @@ import {
   validateRaceTargetTime,
 } from "@/lib/goalHelpers";
 import { selectPlan } from "@/lib/planSelector";
+import { mapSessionsToDays } from "@/lib/plans";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 
@@ -31,7 +33,7 @@ type OnboardingData = {
   raceDistance?: string;
   raceTargetDate?: string;
   raceTargetTime?: string;
-  daysPerWeek: number | null;
+  availableDays: string[];
 };
 
 function buildOnboardingPlanData(data: OnboardingData) {
@@ -46,21 +48,27 @@ function buildOnboardingPlanData(data: OnboardingData) {
       ? calculateWeeksAvailable(data.raceTargetDate)
       : calculateWeeksAvailable(undefined);
 
-  const plan = selectPlan({
+  const daysCount = data.availableDays?.length ? Math.min(5, Math.max(2, data.availableDays.length)) : 3;
+  let plan = selectPlan({
     goal: data.goalType || "distance",
-    daysPerWeek: data.daysPerWeek || 3,
+    daysPerWeek: daysCount,
+    availableDays: data.availableDays?.length >= 2 ? data.availableDays : undefined,
     weeksAvailable,
     level: data.fitnessLevel || "beginner",
     targetDistance,
   });
+  if (data.availableDays?.length >= 2) {
+    plan = mapSessionsToDays(plan, data.availableDays);
+  }
 
   const goalData = {
     goalType: data.goalType,
     goal_type: data.goalType,
     level: data.fitnessLevel,
     fitnessLevel: data.fitnessLevel,
-    availableDaysPerWeek: String(data.daysPerWeek || 3),
-    daysPerWeek: data.daysPerWeek || 3,
+    availableDays: data.availableDays ?? [],
+    availableDaysPerWeek: String(daysCount),
+    daysPerWeek: daysCount,
     ...(data.goalType === "distance" && {
       raceType: data.raceType,
       raceDistanceKm: data.raceDistance,
@@ -90,7 +98,7 @@ const Onboarding = () => {
     dateOfBirth: "",
     fitnessLevel: null,
     goalType: null,
-    daysPerWeek: null,
+    availableDays: [],
   });
 
   useEffect(() => {
@@ -140,6 +148,7 @@ const Onboarding = () => {
         date_of_birth: data.dateOfBirth || null,
         goal_type: data.goalType,
         goal_data: goalData,
+        available_days: data.availableDays ?? [],
       });
 
       setIsLoading(false);
@@ -714,10 +723,23 @@ function Step4Goal({
         </motion.div>
       )}
 
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-2 rounded-xl border border-border bg-card/50 p-4"
+      >
+        <Label>Quels jours pouvez-vous vous entraîner ?</Label>
+        <DaySelector
+          selectedDays={data.availableDays}
+          onChange={(days) => setData({ ...data, availableDays: days })}
+        />
+      </motion.div>
+
       <Button
         onClick={onNext}
         disabled={
           !data.goalType ||
+          data.availableDays.length < 2 ||
           (data.goalType !== "weight" && !data.raceType) ||
           (data.goalType === "race" && (!data.raceTargetTime || Boolean(targetTimeError)))
         }
@@ -742,7 +764,7 @@ function Step5Summary({
   onCompleteAndImport: () => void;
 }) {
   const { plan } = buildOnboardingPlanData(data);
-  const resolvedDaysPerWeek = data.daysPerWeek || 3;
+  const resolvedDaysPerWeek = data.availableDays.length >= 2 ? data.availableDays.length : 3;
   const goalLabels: Record<string, string> = {
     weight: "Perte de poids",
     distance: `Courir ${data.raceDistance || data.raceType?.toUpperCase()}`,
@@ -794,7 +816,11 @@ function Step5Summary({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Entraînement</p>
-            <p className="font-semibold">{resolvedDaysPerWeek} jours par semaine</p>
+            <p className="font-semibold">
+              {data.availableDays.length >= 2
+                ? `${resolvedDaysPerWeek} j : ${data.availableDays.join(", ")}`
+                : `${resolvedDaysPerWeek} jours par semaine`}
+            </p>
           </div>
         </div>
 
