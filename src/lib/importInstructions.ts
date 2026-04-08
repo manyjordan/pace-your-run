@@ -33,7 +33,7 @@ export const sourceConfig: Record<
 > = {
   strava: {
     label: "Strava",
-    description: "📱 Depuis l'app Strava → Paramètres → Télécharger vos données",
+    description: "Depuis l'app Strava → Paramètres → Télécharger vos données",
     icon: Archive,
     acceptedExtensions: ".zip",
     expectedText: "Archive ZIP Strava contenant des fichiers .gpx ou .fit",
@@ -57,7 +57,7 @@ export const sourceConfig: Record<
   },
   garmin: {
     label: "Garmin",
-    description: "📱 Depuis l'app Garmin Connect → Menu → Exporter une activité",
+    description: "Depuis l'app Garmin Connect → Menu → Exporter une activité",
     icon: Watch,
     acceptedExtensions: ".fit,.gpx,.zip",
     expectedText: "Fichier .fit, .gpx ou archive ZIP Garmin",
@@ -81,7 +81,7 @@ export const sourceConfig: Record<
   },
   nike: {
     label: "Nike Run Club",
-    description: "📱 Depuis l'app Nike → Profil → Paramètres → Exporter les données",
+    description: "Depuis l'app Nike → Profil → Paramètres → Exporter les données",
     icon: Footprints,
     acceptedExtensions: ".gpx",
     expectedText: "Fichier GPX exporté depuis Nike Run Club",
@@ -105,7 +105,7 @@ export const sourceConfig: Record<
   },
   apple: {
     label: "Apple Santé",
-    description: "📱 iPhone → Santé → Votre profil → Exporter les données",
+    description: "iPhone → Santé → Votre profil → Exporter les données",
     icon: Apple,
     acceptedExtensions: ".xml",
     expectedText: "Le fichier export.xml contenu dans l'export Apple Health",

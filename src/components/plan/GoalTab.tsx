@@ -1,4 +1,5 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,7 @@ import { DistanceSelector } from "@/components/goal/DistanceSelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, Scale, Route, Trophy, AlertCircle, Calendar as CalendarIcon, Zap } from "lucide-react";
+import { Target, Scale, Route, Trophy, AlertCircle, AlertTriangle, Info, Calendar as CalendarIcon, Zap } from "lucide-react";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
@@ -333,11 +334,6 @@ export default function GoalTab() {
     return details;
   }, [formData]);
 
-  const footerMessages = useMemo(() => {
-    if (saveError) return [saveError];
-    return warnings;
-  }, [saveError, warnings]);
-
   const updateField = <K extends keyof ProfileGoalData>(key: K, value: ProfileGoalData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
     setWarnings([]);
@@ -386,10 +382,10 @@ export default function GoalTab() {
         const weeklyLoss = weekToTarget > 0 ? diffKg / weekToTarget : 0;
 
         if (weeklyLoss > 1) {
-          warns.push(`⚠️ Perte de ${weeklyLoss.toFixed(1)} kg/semaine est trop rapide. Maximum recommandé : 0.5-1 kg/semaine`);
+          warns.push(`Perte de ${weeklyLoss.toFixed(1)} kg/semaine est trop rapide. Maximum recommandé : 0.5-1 kg/semaine`);
         }
         if (weekToTarget < 2) {
-          warns.push("⚠️ Délai trop court pour une perte de poids saine. Minimum recommandé : 2 semaines");
+          warns.push("Délai trop court pour une perte de poids saine. Minimum recommandé : 2 semaines");
         }
       }
     }
@@ -401,16 +397,16 @@ export default function GoalTab() {
       const targetTimeError = validateRaceTargetTime(raceKm, data.raceTargetTime);
 
       if (raceKm >= 42 && weeksToRace < 8) {
-        warns.push("⚠️ Un marathon en moins de 8 semaines n'est pas recommandé. Minimum 10-12 semaines de préparation.");
+        warns.push("Un marathon en moins de 8 semaines n'est pas recommandé. Minimum 10-12 semaines de préparation.");
       }
       if (raceKm >= 21 && weeksToRace < 6) {
-        warns.push("⚠️ Un semi-marathon en moins de 6 semaines n'est pas recommandé. Minimum 8-10 semaines.");
+        warns.push("Un semi-marathon en moins de 6 semaines n'est pas recommandé. Minimum 8-10 semaines.");
       }
       if (raceKm >= 10 && weeksToRace < 4) {
-        warns.push("⚠️ Un 10 km en moins de 4 semaines laisse peu de temps. Minimum 5-6 semaines recommandées.");
+        warns.push("Un 10 km en moins de 4 semaines laisse peu de temps. Minimum 5-6 semaines recommandées.");
       }
       if (targetTimeError) {
-        warns.push("⚠️ Le temps cible renseigné semble aberrant.");
+        warns.push("Le temps cible renseigné semble aberrant.");
       }
     }
 
@@ -456,7 +452,8 @@ export default function GoalTab() {
     if (formData.goalType === "race") {
       const targetTimeError = validateRaceTargetTime(Number(formData.raceDistanceKm), formData.raceTargetTime);
       if (targetTimeError) {
-        setSaveError("Le temps cible renseigné semble aberrant.");
+        setSaveError(null);
+        validateGoal(formData);
         return;
       }
     }
@@ -560,7 +557,7 @@ export default function GoalTab() {
               const Icon = goal.icon;
               const isSelected = formData.goalType === goal.type;
               return (
-                <ScrollReveal key={goal.type} delay={i * 0.06}>
+                <ScrollReveal key={goal.type} delay={i === 0 ? 0 : i < 3 ? 0.05 : 0}>
                   <button
                     onClick={() => handleGoalChange(goal.type)}
                     className={`w-full text-left rounded-xl border-2 p-4 transition-all ${
@@ -588,56 +585,72 @@ export default function GoalTab() {
 
       {/* Goal-specific info messages - seulement si en train de définir/changer */}
       {(isDefining || isChanging) && formData.goalType === "weight" && (
-        <ScrollReveal delay={0.06}>
-          <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 flex gap-2">
-            <AlertCircle className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-            <div className="text-xs text-foreground">
-              <p className="font-semibold mb-1">💡 Conseils pour une perte de poids saine</p>
-              <ul className="space-y-1 ml-2">
-                <li>• Objectif : <strong>0.5-1 kg par semaine</strong> maximum</li>
-                <li>• Durée minimale : <strong>2 semaines</strong> pour voir des résultats durables</li>
-                <li>• Exemple réaliste : passer de 75 kg à 70 kg en <strong>5-10 semaines</strong></li>
+        <ScrollReveal>
+          <Alert className="py-3 border-accent/40 bg-accent/5">
+            <Info className="h-4 w-4 text-accent" />
+            <AlertDescription className="text-sm text-foreground">
+              <p className="font-semibold mb-1">Conseils pour une perte de poids saine</p>
+              <ul className="mt-1 space-y-1 list-disc list-inside text-muted-foreground">
+                <li>
+                  Objectif : <strong>0.5-1 kg par semaine</strong> maximum
+                </li>
+                <li>
+                  Durée minimale : <strong>2 semaines</strong> pour voir des résultats durables
+                </li>
+                <li>
+                  Exemple réaliste : passer de 75 kg à 70 kg en <strong>5-10 semaines</strong>
+                </li>
               </ul>
-            </div>
-          </div>
+            </AlertDescription>
+          </Alert>
         </ScrollReveal>
       )}
 
       {(isDefining || isChanging) && formData.goalType === "race" && (
-        <ScrollReveal delay={0.06}>
-          <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 flex gap-2">
-            <AlertCircle className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-            <div className="text-xs text-foreground">
-              <p className="font-semibold mb-1">💡 Durée minimale de préparation recommandée</p>
-              <ul className="space-y-1 ml-2">
-                <li>• <strong>Marathon</strong> (42.195 km) : 10-12 semaines minimum</li>
-                <li>• <strong>Semi-marathon</strong> (21 km) : 8-10 semaines minimum</li>
-                <li>• <strong>10 km</strong> : 5-6 semaines minimum</li>
-                <li>• <strong>5 km</strong> : 4 semaines minimum</li>
+        <ScrollReveal>
+          <Alert className="py-3 border-accent/40 bg-accent/5">
+            <Info className="h-4 w-4 text-accent" />
+            <AlertDescription className="text-sm text-foreground">
+              <p className="font-semibold mb-1">Durée minimale de préparation recommandée</p>
+              <ul className="mt-1 space-y-1 list-disc list-inside text-muted-foreground">
+                <li>
+                  <strong>Marathon</strong> (42.195 km) : 10-12 semaines minimum
+                </li>
+                <li>
+                  <strong>Semi-marathon</strong> (21 km) : 8-10 semaines minimum
+                </li>
+                <li>
+                  <strong>10 km</strong> : 5-6 semaines minimum
+                </li>
+                <li>
+                  <strong>5 km</strong> : 4 semaines minimum
+                </li>
               </ul>
-            </div>
-          </div>
+            </AlertDescription>
+          </Alert>
         </ScrollReveal>
       )}
 
       {(isDefining || isChanging) && formData.goalType === "distance" && (
-        <ScrollReveal delay={0.06}>
-          <div className="rounded-lg border border-accent/30 bg-accent/10 p-3 flex gap-2">
-            <AlertCircle className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-            <div className="text-xs text-foreground">
-              <p className="font-semibold mb-1">💡 Progression de distance</p>
-              <ul className="space-y-1 ml-2">
-                <li>• Augmentez votre distance de <strong>10% par semaine</strong> maximum</li>
-                <li>• Minimum 4 semaines pour atteindre un nouvel objectif</li>
-                <li>• Prenez du repos tous les 3 semaines de progression</li>
+        <ScrollReveal>
+          <Alert className="py-3 border-accent/40 bg-accent/5">
+            <Info className="h-4 w-4 text-accent" />
+            <AlertDescription className="text-sm text-foreground">
+              <p className="font-semibold mb-1">Progression de distance</p>
+              <ul className="mt-1 space-y-1 list-disc list-inside text-muted-foreground">
+                <li>
+                  Augmentez votre distance de <strong>10% par semaine</strong> maximum
+                </li>
+                <li>Minimum 4 semaines pour atteindre un nouvel objectif</li>
+                <li>Prenez du repos tous les 3 semaines de progression</li>
               </ul>
-            </div>
-          </div>
+            </AlertDescription>
+          </Alert>
         </ScrollReveal>
       )}
 
       {(isDefining || isChanging) && formData.goalType === "weight" && (
-        <ScrollReveal delay={0.08}>
+        <ScrollReveal>
           <Card>
             <CardContent className="p-4 space-y-3">
               <div className="space-y-2">
@@ -703,7 +716,7 @@ export default function GoalTab() {
       )}
 
       {(isDefining || isChanging) && formData.goalType === "race" && (
-        <ScrollReveal delay={0.08}>
+        <ScrollReveal>
           <Card>
             <CardContent className="p-4 space-y-3">
               <div className="space-y-2">
@@ -780,7 +793,7 @@ export default function GoalTab() {
       )}
 
       {(isDefining || isChanging) && formData.goalType === "distance" && (
-        <ScrollReveal delay={0.08}>
+        <ScrollReveal>
           <Card>
             <CardContent className="p-4 space-y-3">
               <DistanceSelector
@@ -890,15 +903,23 @@ export default function GoalTab() {
               </Card>
             </ScrollReveal>
           )}
-          {footerMessages.length > 0 && (
+          {saveError && (
             <ScrollReveal>
-              <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
-                  {footerMessages.map((message, idx) => (
-                    <p key={`${message}-${idx}`}>{message}</p>
-                  ))}
-                </div>
+              <Alert variant="destructive" className="py-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-sm">{saveError}</AlertDescription>
+              </Alert>
+            </ScrollReveal>
+          )}
+          {warnings.length > 0 && (
+            <ScrollReveal>
+              <div className="space-y-2">
+                {warnings.map((warning, i) => (
+                  <Alert key={i} variant="destructive" className="py-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">{warning}</AlertDescription>
+                  </Alert>
+                ))}
               </div>
             </ScrollReveal>
           )}
@@ -910,15 +931,23 @@ export default function GoalTab() {
       )}
       {!(isDefining || isChanging) && (
         <>
-          {footerMessages.length > 0 && (
+          {saveError && (
             <ScrollReveal>
-              <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
-                <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-                <div className="text-xs text-red-700 dark:text-red-300 space-y-1">
-                  {footerMessages.map((message, idx) => (
-                    <p key={`${message}-${idx}`}>{message}</p>
-                  ))}
-                </div>
+              <Alert variant="destructive" className="py-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-sm">{saveError}</AlertDescription>
+              </Alert>
+            </ScrollReveal>
+          )}
+          {warnings.length > 0 && (
+            <ScrollReveal>
+              <div className="space-y-2">
+                {warnings.map((warning, i) => (
+                  <Alert key={i} variant="destructive" className="py-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">{warning}</AlertDescription>
+                  </Alert>
+                ))}
               </div>
             </ScrollReveal>
           )}

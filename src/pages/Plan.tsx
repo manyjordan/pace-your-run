@@ -22,7 +22,7 @@ export default function PlanPage() {
       </ScrollReveal>
 
       <Tabs key={mainTab} defaultValue={mainTab} className="space-y-4">
-        <ScrollReveal delay={0.05}>
+        <ScrollReveal>
           <TabsList className="w-full grid grid-cols-3">
             <TabsTrigger value="goal"><Target className="h-4 w-4 mr-1" /> Objectif</TabsTrigger>
             <TabsTrigger value="training"><Calendar className="h-4 w-4 mr-1" /> Plan</TabsTrigger>

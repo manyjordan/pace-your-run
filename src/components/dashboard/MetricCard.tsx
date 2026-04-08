@@ -95,7 +95,7 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
   );
 
   return (
-    <ScrollReveal key={metric.title} delay={index * 0.06}>
+    <ScrollReveal key={metric.title} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
       <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>

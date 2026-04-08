@@ -137,7 +137,7 @@ const HealthKitSync = () => {
       </ScrollReveal>
 
       {!isAvailable ? (
-        <ScrollReveal delay={0.1}>
+        <ScrollReveal>
           <Alert className="border-border bg-card">
             <Watch className="h-4 w-4 text-muted-foreground" />
             <AlertDescription>
@@ -146,7 +146,7 @@ const HealthKitSync = () => {
           </Alert>
         </ScrollReveal>
       ) : !isAuthorized ? (
-        <ScrollReveal delay={0.1}>
+        <ScrollReveal>
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <div>
               <h2 className="text-lg font-semibold">Connecter Apple Santé</h2>
@@ -171,7 +171,7 @@ const HealthKitSync = () => {
         </ScrollReveal>
       ) : (
         <>
-          <ScrollReveal delay={0.1}>
+          <ScrollReveal>
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <div>
                 <h2 className="text-lg font-semibold">Synchroniser vos courses</h2>
@@ -207,7 +207,7 @@ const HealthKitSync = () => {
             </div>
           </ScrollReveal>
 
-          <ScrollReveal delay={0.2}>
+          <ScrollReveal>
             <div className="rounded-xl border border-border bg-card p-5 space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -234,7 +234,7 @@ const HealthKitSync = () => {
         </>
       )}
 
-      <ScrollReveal delay={0.3}>
+      <ScrollReveal>
         <CollapsibleDisclaimer
           variant="info"
           summary="Les courses Apple Santé importées apparaissent dans votre historique Pace."

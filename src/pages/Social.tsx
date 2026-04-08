@@ -24,7 +24,9 @@ import {
   Bell,
   Check,
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { useCallback, useEffect, useState } from "react";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import GPSMap from "@/components/GPSMap";
 import { ForumSection } from "@/components/social/ForumSection";
@@ -129,11 +131,10 @@ function inferPostType(title: string, description: string) {
 }
 
 function ranWithBadgeText(description: string): string | null {
-  if (!description.includes("Couru avec")) return null;
-  const m = description.match(/Couru avec\s+(.+?)\s*🤝/);
-  if (m) return `🤝 Couru avec ${m[1].trim()}`;
   const idx = description.indexOf("Couru avec");
-  return `🤝 ${description.slice(idx).trim()}`;
+  if (idx < 0) return null;
+  const segment = description.slice(idx).trim().replace(/\s*🤝\s*$/, "");
+  return segment.startsWith("Couru avec") ? segment : null;
 }
 
 function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
@@ -194,6 +195,8 @@ export default function Social() {
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
+  const [likeAnimatingId, setLikeAnimatingId] = useState<string | null>(null);
+  const [likeBurstId, setLikeBurstId] = useState<string | null>(null);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationWithActor[]>([]);
@@ -236,6 +239,15 @@ export default function Social() {
 
   const handleToggleLike = async (post: FeedPost) => {
     if (!user) return;
+    if (likeBusyId) return;
+
+    const animKey = post.dbId ?? `activity-${post.activityId}`;
+    setLikeAnimatingId(animKey);
+    window.setTimeout(() => setLikeAnimatingId(null), 600);
+    if (!post.liked) {
+      setLikeBurstId(animKey);
+      window.setTimeout(() => setLikeBurstId(null), 600);
+    }
 
     if (!post.dbId) {
       setPosts((current) =>
@@ -266,7 +278,7 @@ export default function Social() {
   const handleShare = async (post: FeedPost) => {
     const shareData = {
       title: post.title ?? "Course Pace",
-      text: `${post.user} a couru ${post.stats.distance} en ${post.stats.duration} sur Pace 🏃`,
+      text: `${post.user} a couru ${post.stats.distance} en ${post.stats.duration} sur Pace`,
       url: window.location.origin,
     };
 
@@ -281,7 +293,7 @@ export default function Social() {
     } else {
       try {
         await navigator.clipboard.writeText(`${shareData.text} ${shareData.url}`);
-        toast({ title: "Lien copié dans le presse-papiers ✅" });
+        toast({ title: "Lien copié" });
       } catch {
         toast({
           title: "Partage non disponible",
@@ -496,7 +508,7 @@ export default function Social() {
       </ScrollReveal>
 
       <Tabs defaultValue="activity" className="space-y-6">
-        <ScrollReveal delay={0.04}>
+        <ScrollReveal>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="activity">
               <Users className="mr-1.5 h-4 w-4" /> Activité
@@ -509,7 +521,7 @@ export default function Social() {
 
         <TabsContent value="activity" className="space-y-4">
           {showFriendSearch && (
-            <ScrollReveal delay={0.04}>
+            <ScrollReveal>
               <Card>
                 <CardContent className="space-y-3 p-4">
                   <div className="relative">
@@ -573,7 +585,7 @@ export default function Social() {
             </ScrollReveal>
           )}
 
-          <ScrollReveal delay={0.08}>
+          <ScrollReveal>
             <Card>
               <CardContent className="space-y-3 p-4">
                 <div className="flex gap-3">
@@ -601,7 +613,7 @@ export default function Social() {
 
           {isLoadingPosts
             ? Array.from({ length: 3 }, (_, i) => (
-                <ScrollReveal key={`skeleton-${i}`} delay={0.1 + i * 0.06}>
+                <ScrollReveal key={`skeleton-${i}`}>
                   <Card className="overflow-hidden">
                     <CardContent className="space-y-3 p-4">
                       <div className="flex items-center gap-3">
@@ -628,7 +640,7 @@ export default function Social() {
                 </ScrollReveal>
               ))
             : postsError ? (
-                <ScrollReveal delay={0.1}>
+                <ScrollReveal>
                   <Card className="border-destructive/30 bg-destructive/5">
                     <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
@@ -648,7 +660,7 @@ export default function Social() {
                   </Card>
                 </ScrollReveal>
               ) : posts.length === 0 ? (
-                <ScrollReveal delay={0.1}>
+                <ScrollReveal>
                   <Card className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
                     <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
                       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]">
@@ -674,7 +686,7 @@ export default function Social() {
               ) : posts.map((post, i) => {
                 const ranWithLine = ranWithBadgeText(post.description ?? "");
                 return (
-                <ScrollReveal key={post.dbId ?? post.activityId} delay={0.1 + i * 0.06}>
+                <ScrollReveal key={post.dbId ?? post.activityId}>
                   <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
                     <CardContent className="space-y-3 p-4">
                       {post.feedReason === "friend_liked" && post.friendWhoLiked ? (
@@ -756,19 +768,67 @@ export default function Social() {
                       </Button>
 
                       <div className="flex items-center gap-1 border-t border-border pt-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
+                        <button
+                          type="button"
                           disabled={likeBusyId === post.dbId}
-                          className={post.liked ? "text-red-500" : "text-muted-foreground"}
+                          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
                           onClick={(event) => {
                             event.stopPropagation();
                             void handleToggleLike(post);
                           }}
                         >
-                          <Heart className={`mr-1 h-4 w-4 ${post.liked ? "fill-current" : ""}`} />
-                          {post.likes}
-                        </Button>
+                          <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                            <AnimatePresence>
+                              {likeBurstId === (post.dbId ?? `activity-${post.activityId}`) ? (
+                                <>
+                                  {[0, 1, 2, 3].map((i) => (
+                                    <motion.div
+                                      key={i}
+                                      className="absolute inset-0 rounded-full border border-red-400"
+                                      initial={{ scale: 0.5, opacity: 0.8 }}
+                                      animate={{ scale: 2.5, opacity: 0 }}
+                                      exit={{ opacity: 0 }}
+                                      transition={{
+                                        duration: 0.5,
+                                        delay: i * 0.05,
+                                        ease: "easeOut",
+                                      }}
+                                    />
+                                  ))}
+                                </>
+                              ) : null}
+                            </AnimatePresence>
+                            <motion.div
+                              className="relative z-[1]"
+                              animate={
+                                likeAnimatingId === (post.dbId ?? `activity-${post.activityId}`)
+                                  ? {
+                                      scale: [1, 1.4, 0.9, 1.1, 1],
+                                      rotate: [0, -10, 10, -5, 0],
+                                    }
+                                  : { scale: 1, rotate: 0 }
+                              }
+                              transition={{ duration: 0.5, ease: "easeInOut" }}
+                            >
+                              <Heart
+                                className={cn(
+                                  "h-4 w-4 transition-colors duration-200",
+                                  post.liked
+                                    ? "fill-red-500 text-red-500"
+                                    : "text-muted-foreground hover:text-red-400",
+                                )}
+                              />
+                            </motion.div>
+                          </div>
+                          <span
+                            className={cn(
+                              "tabular-nums transition-colors duration-200",
+                              post.liked ? "text-red-500" : "text-muted-foreground",
+                            )}
+                          >
+                            {post.likes}
+                          </span>
+                        </button>
                         <Button
                           variant="ghost"
                           size="sm"

@@ -508,12 +508,17 @@ function Step3Level({
   setData: (data: OnboardingData) => void;
   onNext: () => void;
 }) {
-  const levels = [
-    { 
-      id: "beginner", 
-      title: "Débutant", 
+  const levels: Array<{
+    id: "beginner" | "intermediate" | "advanced";
+    title: string;
+    desc: string;
+    example: string;
+  }> = [
+    {
+      id: "beginner",
+      title: "Débutant",
       desc: "Je cours moins de 20 km par semaine ou je débute",
-      example: "Ex: 2-3 sorties de 30 min"
+      example: "Ex: 2-3 sorties de 30 min",
     },
     {
       id: "intermediate",
@@ -521,11 +526,11 @@ function Step3Level({
       desc: "Je cours régulièrement 20-50 km par semaine",
       example: "Ex: 4 sorties, dont une longue sortie",
     },
-    { 
-      id: "advanced", 
-      title: "Avancé", 
+    {
+      id: "advanced",
+      title: "Avancé",
       desc: "Je cours plus de 50km par semaine",
-      example: "Ex: 5-6 sorties avec intervalles"
+      example: "Ex: 5-6 sorties avec intervalles",
     },
   ];
 
@@ -540,7 +545,7 @@ function Step3Level({
           <motion.button
             key={level.id}
             whileTap={{ scale: 0.97 }}
-            onClick={() => setData({ ...data, fitnessLevel: level.id as any })}
+            onClick={() => setData({ ...data, fitnessLevel: level.id })}
             className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
               data.fitnessLevel === level.id
                 ? "border-accent bg-accent/10 shadow-[0_0_0_2px_hsl(var(--accent))]"
@@ -591,7 +596,7 @@ function Step4Goal({
   const raceDistanceKm = Number(data.raceDistance || 0);
   const targetTimeError =
     data.goalType === "race" ? validateRaceTargetTime(raceDistanceKm, data.raceTargetTime || "") : null;
-  const goals = [
+  const goals: Array<{ id: "weight" | "distance" | "race"; title: string; desc: string }> = [
     {
       id: "weight",
       title: "Perdre du poids",
@@ -616,7 +621,7 @@ function Step4Goal({
           <motion.button
             key={goal.id}
             whileTap={{ scale: 0.97 }}
-            onClick={() => setData({ ...data, goalType: goal.id as any })}
+            onClick={() => setData({ ...data, goalType: goal.id })}
             className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
               data.goalType === goal.id
                 ? "border-accent bg-accent/10 shadow-[0_0_0_2px_hsl(var(--accent))]"
@@ -780,7 +785,7 @@ function Step5Summary({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold">Vous êtes prêt ! 🎉</h2>
+        <h2 className="text-3xl font-bold">Vous êtes prêt</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           Voici un résumé de votre configuration
         </p>

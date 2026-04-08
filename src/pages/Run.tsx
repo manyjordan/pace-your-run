@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -30,10 +31,11 @@ import {
   getProfilesByIds,
   saveRun,
   updatePostAudience,
+  updatePostDescription,
+  updateRunRanWith,
   type RunGpsPoint,
   type RunRow,
 } from "@/lib/database";
-import { supabase } from "@/lib/supabase";
 import {
   connectHeartRateMonitor,
   disconnectHeartRateMonitor,
@@ -111,6 +113,29 @@ function paceMinutesPerKmForLastKm(trace: GPSPoint[], endKm: number): number | n
   return seconds / 60;
 }
 
+function generateDefaultTitle(): string {
+  const now = new Date();
+  const hour = now.getHours();
+
+  const timeOfDay =
+    hour >= 5 && hour < 9
+      ? "matinale"
+      : hour >= 9 && hour < 12
+        ? "du matin"
+        : hour >= 12 && hour < 14
+          ? "de midi"
+          : hour >= 14 && hour < 18
+            ? "de l'après-midi"
+            : hour >= 18 && hour < 21
+              ? "du soir"
+              : "nocturne";
+
+  const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
+  const day = days[now.getDay()];
+
+  return `Course ${timeOfDay} — ${day}`;
+}
+
 /* ── Run component ── */
 export default function Run() {
   const { user } = useAuth();
@@ -122,6 +147,7 @@ export default function Run() {
   const [gpsTrace, setGpsTrace] = useState<GPSPoint[]>([]);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsError, setGpsError] = useState<string>("");
+  const [title, setTitle] = useState("");
   const [runSummary, setRunSummary] = useState<{
     distance: number;
     duration: number;
@@ -130,6 +156,7 @@ export default function Run() {
     elevation: number;
     averageHeartRate?: number;
     gpsTrace: GPSPoint[];
+    startedAt: string;
   } | null>(null);
   const [saveError, setSaveError] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
@@ -446,6 +473,7 @@ export default function Run() {
   }, [distance, elapsed, gpsTrace, status]);
 
   const start = () => {
+    setTitle("");
     setRunSummary(null);
     setCompletedActivity(null);
     setCompletedPost(null);
@@ -505,9 +533,16 @@ export default function Run() {
         elevation: finalElevation,
         averageHeartRate: finalAverageHeartRate,
         gpsTrace: finalGpsTrace,
+        startedAt: finalStartedAt,
       });
 
-      const activityName = "Nouvelle course enregistrée";
+      // Set default title when run ends, only if user hasn't typed one
+      const resolvedTitle = title.trim() || generateDefaultTitle();
+      if (!title.trim()) {
+        setTitle(resolvedTitle);
+      }
+
+      const activityName = resolvedTitle;
       const activityDescription = `Je viens de terminer ${finalDistance.toFixed(2)} km en ${formatTime(finalElapsed)}.`;
       const postNumericId = Date.now();
       const syntheticRun: RunRow = {
@@ -551,100 +586,8 @@ export default function Run() {
       setShowCompletedActivityDetail(true);
 
       if (user) {
-        const title = activityName;
-        const description = activityDescription;
-        const runData = {
-          distance_km: finalDistance,
-          duration_seconds: finalElapsed,
-          moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,
-          average_pace: finalAvgPace,
-          average_heartrate: finalAverageHeartRate ?? null,
-          elevation_gain: finalElevation,
-          gps_trace: finalGpsTrace,
-          run_type: "run" as const,
-          started_at: runStartedAtRef.current,
-          title,
-        };
-
-        try {
-          setIsSaving(true);
-          setSaveError("");
-
-          const savedRun = await saveRun(user.id, runData);
-
-          const createdPost = await createPost(user.id, savedRun.id, title, description, postAudienceRef.current);
-          setCompletedPostId(createdPost.id);
-          window.dispatchEvent(new Event("pace-community-updated"));
-
-          const ranWithIds = await detectSimultaneousRuns(
-            user.id,
-            runStartedAtRef.current ?? finalStartedAt,
-            finalElapsed,
-            finalGpsTrace,
-          ).catch(() => []);
-
-          if (ranWithIds.length > 0) {
-            toast({
-              title: "Course partagée détectée ! 🤝",
-              description: `Il semblerait que vous ayez couru avec ${ranWithIds.length} ami(s) !`,
-            });
-
-            await supabase
-              .from("runs")
-              .update({ ran_with: ranWithIds })
-              .eq("id", savedRun.id)
-              .catch(() => {});
-
-            const ranWithProfiles = await getProfilesByIds(ranWithIds).catch(() => []);
-            const names = ranWithProfiles
-              .map((p) => p.first_name ?? p.full_name ?? p.username ?? "Un ami")
-              .join(", ");
-
-            const updatedDescription = `${description} Couru avec ${names} 🤝`;
-
-            await supabase
-              .from("social_posts")
-              .update({ description: updatedDescription })
-              .eq("id", createdPost.id)
-              .catch(() => {});
-          }
-        } catch (error) {
-          console.error("[Run] operation failed:", error);
-          import("@sentry/react")
-            .then(({ captureException }) => {
-              captureException(error);
-            })
-            .catch(() => {});
-
-          if (isLikelyNetworkError(error)) {
-            console.error("Failed to save run online:", error);
-            try {
-              const existing = JSON.parse(localStorage.getItem(OFFLINE_RUNS_KEY) ?? "[]");
-              const queue = Array.isArray(existing) ? existing : [];
-              const offlineRun = {
-                ...runData,
-                offlinePostDescription: description,
-                offlinePostAudience: postAudienceRef.current,
-                savedOfflineAt: new Date().toISOString(),
-                id: crypto.randomUUID(),
-              };
-              localStorage.setItem(OFFLINE_RUNS_KEY, JSON.stringify([offlineRun, ...queue]));
-              toast({
-                title: "Course sauvegardée localement",
-                description: "Elle sera synchronisée automatiquement dès que vous serez reconnecté.",
-              });
-              setSaveError("");
-            } catch (error) {
-              console.error("[Run] save failed:", error);
-              import("@sentry/react").then(({ captureException }) => captureException(error)).catch(() => {});
-              setSaveError("Impossible d'enregistrer cette course pour le moment.");
-            }
-          } else {
-            setSaveError("Impossible d'enregistrer cette course pour le moment.");
-          }
-        } finally {
-          setIsSaving(false);
-        }
+        setCompletedPostId(null);
+        setSaveError("");
       } else {
         setSaveError("Impossible d'enregistrer cette course sans session active.");
       }
@@ -668,6 +611,99 @@ export default function Run() {
       window.speechSynthesis.cancel();
     }
   };
+
+  const persistCompletedRun = useCallback(async () => {
+    if (!user || !runSummary) return;
+
+    const activityTitle = title.trim() || generateDefaultTitle();
+    const description = `Je viens de terminer ${runSummary.distance.toFixed(2)} km en ${formatTime(runSummary.duration)}.`;
+    const runData = {
+      distance_km: runSummary.distance,
+      duration_seconds: runSummary.duration,
+      moving_time_seconds: runSummary.movingTime && runSummary.movingTime > 0 ? runSummary.movingTime : null,
+      average_pace: runSummary.avgPace,
+      average_heartrate: runSummary.averageHeartRate ?? null,
+      elevation_gain: runSummary.elevation,
+      gps_trace: runSummary.gpsTrace,
+      run_type: "run" as const,
+      started_at: runSummary.startedAt,
+      title: activityTitle,
+    };
+
+    try {
+      setIsSaving(true);
+      setSaveError("");
+
+      const savedRun = await saveRun(user.id, runData);
+
+      const createdPost = await createPost(user.id, savedRun.id, activityTitle, description, postAudienceRef.current);
+      setCompletedPostId(createdPost.id);
+      window.dispatchEvent(new Event("pace-community-updated"));
+
+      const ranWithIds = await detectSimultaneousRuns(
+        user.id,
+        runSummary.startedAt,
+        runSummary.duration,
+        runSummary.gpsTrace,
+      ).catch(() => []);
+
+      if (ranWithIds.length > 0) {
+        toast({
+          title: "Course partagée détectée",
+          description: `Il semblerait que vous ayez couru avec ${ranWithIds.length} ami(s) !`,
+        });
+
+        await updateRunRanWith(savedRun.id, user.id, ranWithIds).catch(() => {});
+
+        const ranWithProfiles = await getProfilesByIds(ranWithIds).catch(() => []);
+        const names = ranWithProfiles
+          .map((p) => p.first_name ?? p.full_name ?? p.username ?? "Un ami")
+          .join(", ");
+
+        const updatedDescription = `${description} · Couru avec ${names}`;
+
+        await updatePostDescription(createdPost.id, user.id, updatedDescription).catch(() => {});
+
+        setCompletedPost((p) => (p ? { ...p, description: updatedDescription } : null));
+      }
+    } catch (error) {
+      console.error("[Run] operation failed:", error);
+      import("@sentry/react")
+        .then(({ captureException }) => {
+          captureException(error);
+        })
+        .catch(() => {});
+
+      if (isLikelyNetworkError(error)) {
+        console.error("Failed to save run online:", error);
+        try {
+          const existing = JSON.parse(localStorage.getItem(OFFLINE_RUNS_KEY) ?? "[]");
+          const queue = Array.isArray(existing) ? existing : [];
+          const offlineRun = {
+            ...runData,
+            offlinePostDescription: description,
+            offlinePostAudience: postAudienceRef.current,
+            savedOfflineAt: new Date().toISOString(),
+            id: crypto.randomUUID(),
+          };
+          localStorage.setItem(OFFLINE_RUNS_KEY, JSON.stringify([offlineRun, ...queue]));
+          toast({
+            title: "Course sauvegardée localement",
+            description: "Elle sera synchronisée automatiquement dès que vous serez reconnecté.",
+          });
+          setSaveError("");
+        } catch (err) {
+          console.error("[Run] save failed:", err);
+          import("@sentry/react").then(({ captureException }) => captureException(err)).catch(() => {});
+          setSaveError("Impossible d'enregistrer cette course pour le moment.");
+        }
+      } else {
+        setSaveError("Impossible d'enregistrer cette course pour le moment.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, runSummary, title, formatTime, toast]);
 
   const handleAudienceChange = useCallback(
     async (value: "private" | "friends" | "public") => {
@@ -713,7 +749,7 @@ export default function Run() {
       </ScrollReveal>
 
       {gpsError && (
-        <ScrollReveal delay={0.05}>
+        <ScrollReveal>
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <p className="text-sm text-destructive">{gpsError}</p>
@@ -722,7 +758,7 @@ export default function Run() {
       )}
 
       {saveError && (
-        <ScrollReveal delay={0.05}>
+        <ScrollReveal>
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <p className="text-sm text-destructive">{saveError}</p>
@@ -732,7 +768,7 @@ export default function Run() {
 
       <div className="space-y-6">
         {status === "idle" && (
-          <ScrollReveal delay={0.04}>
+          <ScrollReveal>
             <Dialog>
               <DialogTrigger asChild>
                 <Button variant="outline" className="w-full justify-between border-accent/30 bg-card/95 px-4 py-6">
@@ -817,7 +853,7 @@ export default function Run() {
         )}
 
         {isRunActive && (
-          <ScrollReveal delay={0.045}>
+          <ScrollReveal>
             {hasLiveGpsTrace ? (
               <Card className="border-accent/30">
                 <CardContent className="space-y-3 p-4">
@@ -852,7 +888,7 @@ export default function Run() {
           </ScrollReveal>
         )}
 
-        <ScrollReveal delay={0.05}>
+        <ScrollReveal>
           <Card className="border-accent/30">
             <CardContent className="p-6 flex flex-col items-center space-y-6">
               <div className="text-6xl font-black tracking-tighter tabular-nums text-foreground" style={{ lineHeight: 1.1 }}>
@@ -889,7 +925,7 @@ export default function Run() {
                   {isRunActive && runPreferences.announceSplitSpeed && (
                     <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                       <Volume2 className="h-3 w-3 shrink-0" aria-hidden />
-                      <span>🔊 Annonces vocales actives</span>
+                      <span>Annonces vocales actives</span>
                     </div>
                   )}
                   <div className="text-xl font-bold tabular-nums">{displayDistance.toFixed(2)}</div>
@@ -946,7 +982,7 @@ export default function Run() {
         </ScrollReveal>
 
         {runSummary && status === "idle" && (
-          <ScrollReveal delay={0.1}>
+          <ScrollReveal>
             <Card className="border-accent/50 bg-accent/10">
               <CardContent className="p-5 space-y-3">
                 <div className="flex items-center justify-between gap-3">
@@ -996,6 +1032,21 @@ export default function Run() {
                   </div>
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="run-title">Nom de la course</Label>
+                  <Input
+                    id="run-title"
+                    value={title}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      setTitle(v);
+                      setCompletedActivity((a) => (a ? { ...a, title: v } : null));
+                      setCompletedPost((p) => (p ? { ...p, title: v } : null));
+                    }}
+                    placeholder="Nom de votre course"
+                    className="border-border"
+                  />
+                </div>
+                <div className="space-y-2">
                   <Label>Audience de cette course</Label>
                   <Select value={postAudience} onValueChange={(value) => void handleAudienceChange(value as "private" | "friends" | "public")}>
                     <SelectTrigger>
@@ -1016,6 +1067,16 @@ export default function Run() {
                   </p>
                   {isUpdatingAudience ? <p className="text-xs text-muted-foreground">Mise à jour de l'audience...</p> : null}
                 </div>
+                {user && !completedPostId ? (
+                  <Button
+                    type="button"
+                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                    disabled={isSaving}
+                    onClick={() => void persistCompletedRun()}
+                  >
+                    {isSaving ? "Enregistrement…" : "Enregistrer la course"}
+                  </Button>
+                ) : null}
                 {completedPost ? <ActivityPostCard post={completedPost} onOpen={() => setShowCompletedActivityDetail(true)} /> : null}
               </CardContent>
             </Card>
@@ -1023,7 +1084,7 @@ export default function Run() {
         )}
 
         {elapsed > 0 && status !== "idle" && (
-          <ScrollReveal delay={0.1}>
+          <ScrollReveal>
             <Card>
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Splits ({distanceUnitShortLabel.toUpperCase()})</h3><ChevronUp className="h-4 w-4 text-muted-foreground" /></div>

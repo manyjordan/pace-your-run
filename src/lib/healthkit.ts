@@ -1,15 +1,81 @@
 import { Capacitor } from "@capacitor/core";
 import type { ImportedRun } from "@/lib/parsers/gpxParser";
 
+type HealthKitWorkout = {
+  startDate: string;
+  endDate: string;
+  duration?: number;
+  totalDistance?: number;
+  totalEnergyBurned?: number;
+  workoutActivityType?: number;
+  sourceName?: string;
+  name?: string;
+  totalFlightsClimbed?: number;
+  averageHeartRate?: number;
+};
+
+type HealthKitHeartRateSample = {
+  startDate: string;
+  endDate: string;
+  value: number;
+  unit?: string;
+};
+
+type HealthKitRoutePoint = {
+  latitude: number;
+  longitude: number;
+  altitude?: number;
+  timestamp?: string;
+};
+
+/**
+ * Subset of @perfood/capacitor-healthkit used in this file (no official TS defs).
+ */
+type HealthKitModule = {
+  requestAuthorization: (options: {
+    permissions: { read: string[] };
+  }) => Promise<{ success?: boolean } | null | undefined>;
+  getWorkoutSamples: (options: {
+    startDate: Date;
+    endDate: Date;
+    limit?: number;
+  }) => Promise<{ samples?: HealthKitWorkout[] } | null | undefined>;
+  queryWorkouts?: (options: {
+    startDate: string;
+    endDate: string;
+    limit?: number;
+  }) => Promise<{ workouts: HealthKitWorkout[] }>;
+  queryHeartRateSamples?: (options: {
+    startDate: string;
+    endDate: string;
+    workout?: HealthKitWorkout;
+  }) => Promise<{ samples: HealthKitHeartRateSample[] }>;
+  queryRouteForWorkout?: (options: { workout: HealthKitWorkout }) => Promise<{ points: HealthKitRoutePoint[] }>;
+  monitorHeartRateSamples: (options: {
+    interval?: number;
+    onSampleReceived: (sample: HealthKitHeartRateSample) => void;
+    onError: (error: Error) => void;
+  }) => Promise<void>;
+  startHeartRateMonitoring?: (options: {
+    onSampleReceived: (sample: HealthKitHeartRateSample) => void;
+    onError: (error: Error) => void;
+  }) => Promise<void>;
+  stopHeartRateObservation: () => Promise<void>;
+  stopHeartRateMonitoring?: () => Promise<void>;
+  getAuthorizationStatus: (options: {
+    permissions: { read: string[] };
+  }) => Promise<{ authorized?: boolean } | null | undefined>;
+};
+
 // Track if HealthKit observer is active
 let isObserving = false;
 let heartRateCallback: ((bpm: number) => void) | null = null;
-let HealthKit: any = null;
+let HealthKit: HealthKitModule | null = null;
 
 /**
  * Lazy load HealthKit module only when needed
  */
-async function getHealthKit(): Promise<any> {
+async function getHealthKit(): Promise<HealthKitModule | null> {
   if (HealthKit !== null) {
     return HealthKit;
   }
@@ -21,7 +87,7 @@ async function getHealthKit(): Promise<any> {
   try {
     // Dynamically import only on native iOS
     const module = await import("@perfood/capacitor-healthkit");
-    HealthKit = module.HealthKit;
+    HealthKit = module.HealthKit as HealthKitModule;
     return HealthKit;
   } catch (e) {
     console.warn("HealthKit module not available:", e);
@@ -89,11 +155,11 @@ export async function fetchRecentRuns(limit: number = 200): Promise<ImportedRun[
 
     // Convert HealthKit workouts to ImportedRun format
     const runs: ImportedRun[] = result.samples
-      .filter((workout: any) => {
+      .filter((workout: HealthKitWorkout) => {
         // Filter for running workouts only
         return workout.workoutActivityType === 1; // 1 = Running in HealthKit
       })
-      .map((workout: any) => {
+      .map((workout: HealthKitWorkout) => {
         const startDate = new Date(workout.startDate);
         const endDate = new Date(workout.endDate);
         const durationMs = endDate.getTime() - startDate.getTime();
@@ -138,12 +204,12 @@ export async function startLiveHeartRate(callback: (bpm: number) => void): Promi
     // Start observing heart rate changes
     await hk.monitorHeartRateSamples({
       interval: 1000,
-      onSampleReceived: (sample: any) => {
+      onSampleReceived: (sample: HealthKitHeartRateSample) => {
         if (heartRateCallback && sample.value) {
           heartRateCallback(Math.round(sample.value));
         }
       },
-      onError: (error: any) => {
+      onError: (error: Error) => {
         console.error("Error observing heart rate:", error);
         isObserving = false;
         heartRateCallback = null;

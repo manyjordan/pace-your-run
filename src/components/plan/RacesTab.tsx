@@ -34,7 +34,7 @@ export default function RacesTab() {
       </div>
       <div className="space-y-3">
         {filtered.map((race, i) => (
-          <ScrollReveal key={race.name} delay={i * 0.06}>
+          <ScrollReveal key={race.name} delay={i === 0 ? 0 : i < 3 ? 0.05 : 0}>
             <div className="rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-lg">
               <div className="flex items-start justify-between">
                 <div>

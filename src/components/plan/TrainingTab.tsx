@@ -415,7 +415,7 @@ export default function TrainingTab() {
               const sessionBadge = getSessionBadge(session);
               
               return (
-                <ScrollReveal key={`${currentWeek}-${i}`} delay={i * 0.05}>
+                <ScrollReveal key={`${currentWeek}-${i}`} delay={i === 0 ? 0 : i < 3 ? 0.05 : 0}>
                   <div
                     role="button"
                     tabIndex={0}

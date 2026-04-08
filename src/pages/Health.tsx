@@ -116,7 +116,7 @@ const issuesData: Record<string, Issue> = {
       "Limitation permanente de l'activité physique si non traité",
     ],
     conseils: [
-      "⚠️ Vous devez faire une IRM pour confirmer le diagnostic",
+      "Vous devez faire une IRM pour confirmer le diagnostic",
       "Consultez un médecin ou orthopédiste rapidement",
       "Le repos seul ne suffit pas : la rééducation est essentielle",
       "Pendant la récupération, préférez le vélo ou la natation (sans impact)",
@@ -184,7 +184,7 @@ const issuesData: Record<string, Issue> = {
       "Arrêt prolongé et perte de capacités physiques",
     ],
     conseils: [
-      "⚠️ IRM ou radio indispensable pour confirmer",
+      "IRM ou radio indispensable pour confirmer",
       "Consultez un médecin du sport immédiatement",
       "Cessez la course : maintenez votre forme par natation/vélo",
       "Riche en protéines, calcium, vitamine D pour la cicatrisation",
@@ -456,7 +456,7 @@ const issuesData: Record<string, Issue> = {
       "Réduction permanente de capacité physique",
     ],
     conseils: [
-      "⚠️ Peut devenir chronique : consultez tôt",
+      "Peut devenir chronique : consultez tôt",
       "Repos et reprise très progressive (6-12 semaines)",
       "Renforcement excentrique obligatoire",
       "Évitez les pentes en début de récupération",

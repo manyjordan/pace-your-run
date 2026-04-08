@@ -365,6 +365,34 @@ export async function deleteRun(runId: string) {
   if (error) throw error;
 }
 
+export async function updateRunRanWith(
+  runId: string,
+  userId: string,
+  ranWith: string[],
+): Promise<void> {
+  await requireCurrentUserId(userId);
+  const { error } = await supabase
+    .from("runs")
+    .update({ ran_with: ranWith })
+    .eq("id", runId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function updatePostDescription(
+  postId: string,
+  userId: string,
+  description: string,
+): Promise<void> {
+  await requireCurrentUserId(userId);
+  const { error } = await supabase
+    .from("social_posts")
+    .update({ description })
+    .eq("id", postId)
+    .eq("user_id", userId);
+  if (error) throw error;
+}
+
 export async function getPublicPosts() {
   const currentUserId = await requireCurrentUserId();
 

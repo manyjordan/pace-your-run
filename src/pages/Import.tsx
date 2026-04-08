@@ -280,7 +280,7 @@ export default function ImportPage() {
         </div>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.03}>
+      <ScrollReveal>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Etape 1 — Choisissez votre source</CardTitle>
@@ -320,7 +320,7 @@ export default function ImportPage() {
         </Card>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.06}>
+      <ScrollReveal delay={0.05}>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Etape 2 — Instructions</CardTitle>
@@ -348,7 +348,7 @@ export default function ImportPage() {
         </Card>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.09}>
+      <ScrollReveal delay={0.05}>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Etape 3 — Déposez votre fichier</CardTitle>
@@ -407,7 +407,7 @@ export default function ImportPage() {
         </Card>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.12}>
+      <ScrollReveal>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Etape 4 — Prévisualisation et confirmation</CardTitle>
@@ -486,7 +486,7 @@ export default function ImportPage() {
         </Card>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.15}>
+      <ScrollReveal>
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Etape 5 — Progression de l'import</CardTitle>

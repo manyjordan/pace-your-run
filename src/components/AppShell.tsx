@@ -138,7 +138,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
     }
     if (synced > 0) {
       toast({
-        title: `${synced} course(s) synchronisée(s) ✅`,
+        title: `${synced} course(s) synchronisée(s)`,
       });
     }
   }, [user?.id, toast]);

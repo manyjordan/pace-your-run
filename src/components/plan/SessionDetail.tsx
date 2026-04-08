@@ -154,12 +154,12 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
             </div>
 
             <div>
-              <p className="text-sm font-semibold mb-1">🏃 Structure recommandée</p>
+              <p className="text-sm font-semibold mb-1">Structure recommandée</p>
               <p className="text-xs text-muted-foreground leading-relaxed">{guide.structure}</p>
             </div>
 
             <div>
-              <p className="text-sm font-semibold mb-2">✅ Bénéfices</p>
+              <p className="text-sm font-semibold mb-2">Bénéfices</p>
               <ul className="text-xs text-muted-foreground space-y-1">
                 {guide.benefits.map((b) => (
                   <li key={b} className="flex gap-2">
@@ -173,7 +173,7 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
             <div className="flex gap-2 bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50 p-2 rounded">
               <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
               <p className="text-xs text-blue-700 dark:text-blue-300">
-                💡 Écoutez votre corps. Si trop facile, augmentez légèrement. Si trop dur, c'est normal les premiers jours.
+                Écoutez votre corps. Si trop facile, augmentez légèrement. Si trop dur, c'est normal les premiers jours.
               </p>
             </div>
           </div>

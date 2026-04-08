@@ -101,7 +101,7 @@ export const ActivitySection = ({
   return (
     <div className="space-y-4">
       {items.map(({ run, post }, index) => (
-        <ScrollReveal key={run.id} delay={index * 0.04}>
+        <ScrollReveal key={run.id}>
           <ActivityPostCard post={post} onOpen={() => onOpenActivityDetail(run)} />
         </ScrollReveal>
       ))}

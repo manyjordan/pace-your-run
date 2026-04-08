@@ -64,6 +64,7 @@ import {
   Target,
   type LucideIcon,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -141,6 +142,8 @@ export function ForumSection() {
   const [isSavingReply, setIsSavingReply] = useState(false);
   const [deleteReplyId, setDeleteReplyId] = useState<string | null>(null);
   const [likeBusyThreadId, setLikeBusyThreadId] = useState<string | null>(null);
+  const [likeAnimatingThreadId, setLikeAnimatingThreadId] = useState<string | null>(null);
+  const [likeBurstThreadId, setLikeBurstThreadId] = useState<string | null>(null);
 
   const loadOverview = useCallback(async () => {
     setIsLoadingOverview(true);
@@ -292,6 +295,9 @@ export function ForumSection() {
     }
     if (likeBusyThreadId) return;
 
+    setLikeAnimatingThreadId(threadId);
+    window.setTimeout(() => setLikeAnimatingThreadId(null), 600);
+
     const fromList = threads.find((t) => t.id === threadId);
     const fromDetail = selectedThreadDetail?.id === threadId ? selectedThreadDetail : null;
     const base = fromList ?? fromDetail;
@@ -299,6 +305,11 @@ export function ForumSection() {
     const prevCount = base ? threadLikeCount(base) : 0;
     const nextLiked = !prevLiked;
     const nextCount = Math.max(0, nextLiked ? prevCount + 1 : prevCount - 1);
+
+    if (!prevLiked) {
+      setLikeBurstThreadId(threadId);
+      window.setTimeout(() => setLikeBurstThreadId(null), 600);
+    }
 
     applyThreadLikeOptimistic(threadId, nextLiked, nextCount);
     setLikeBusyThreadId(threadId);
@@ -487,7 +498,7 @@ export function ForumSection() {
       </ScrollReveal>
 
       {forumError ? (
-        <ScrollReveal delay={0.04}>
+        <ScrollReveal>
           <Card className="border-destructive/30 bg-destructive/5">
             <CardContent className="flex items-center gap-3 p-4">
               <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -505,7 +516,7 @@ export function ForumSection() {
       <div className="grid gap-4 md:grid-cols-2">
         {isLoadingOverview
           ? Array.from({ length: 4 }, (_, index) => (
-              <ScrollReveal key={`forum-category-skeleton-${index}`} delay={0.04 + index * 0.03}>
+              <ScrollReveal key={`forum-category-skeleton-${index}`}>
                 <Card className="border-accent/20 bg-card/95">
                   <CardContent className="space-y-3 p-5">
                     <Skeleton className="h-5 w-28" />
@@ -525,7 +536,7 @@ export function ForumSection() {
               const isActive = selectedCategoryId === category.id;
 
               return (
-                <ScrollReveal key={category.id} delay={0.04 + index * 0.04}>
+                <ScrollReveal key={category.id}>
                   <button
                     type="button"
                     onClick={() => setSelectedCategoryId((current) => (current === category.id ? "all" : category.id))}
@@ -575,7 +586,7 @@ export function ForumSection() {
       </div>
 
       <div className="space-y-4">
-        <ScrollReveal delay={0.12}>
+        <ScrollReveal>
           <div className="flex items-center justify-between gap-3">
             <div>
               <h3 className="text-sm font-semibold">Discussions</h3>
@@ -595,7 +606,7 @@ export function ForumSection() {
 
         {isLoadingOverview
           ? Array.from({ length: 3 }, (_, index) => (
-              <ScrollReveal key={`forum-thread-skeleton-${index}`} delay={0.14 + index * 0.04}>
+              <ScrollReveal key={`forum-thread-skeleton-${index}`}>
                 <Card className="border-accent/20 bg-card/95">
                   <CardContent className="space-y-3 p-5">
                     <div className="flex gap-2">
@@ -610,7 +621,7 @@ export function ForumSection() {
               </ScrollReveal>
             ))
           : threads.length === 0 ? (
-              <ScrollReveal delay={0.14}>
+              <ScrollReveal>
                 <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
                   <CardContent className="space-y-3 p-6 text-center">
                     <p className="text-sm font-semibold">Aucune discussion pour le moment</p>
@@ -631,7 +642,7 @@ export function ForumSection() {
                 const isEditing = editingThreadId === thread.id;
 
                 return (
-                  <ScrollReveal key={thread.id} delay={0.14 + index * 0.04}>
+                  <ScrollReveal key={thread.id}>
                     <Card className="relative border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)] transition-colors hover:border-accent/40">
                       <CardContent className="space-y-3 p-5">
                         {isOwner ? (
@@ -742,11 +753,9 @@ export function ForumSection() {
                         )}
 
                         <div className="flex justify-end border-t border-border/60 pt-3">
-                          <Button
+                          <button
                             type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                            className="flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
                             disabled={likeBusyThreadId === thread.id}
                             onClick={(e) => {
                               e.preventDefault();
@@ -754,14 +763,56 @@ export function ForumSection() {
                               void handleToggleThreadLike(thread.id);
                             }}
                           >
-                            <Heart
+                            <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                              <AnimatePresence>
+                                {likeBurstThreadId === thread.id ? (
+                                  <>
+                                    {[0, 1, 2, 3].map((i) => (
+                                      <motion.div
+                                        key={i}
+                                        className="absolute inset-0 rounded-full border border-red-400"
+                                        initial={{ scale: 0.5, opacity: 0.8 }}
+                                        animate={{ scale: 2.5, opacity: 0 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{
+                                          duration: 0.5,
+                                          delay: i * 0.05,
+                                          ease: "easeOut",
+                                        }}
+                                      />
+                                    ))}
+                                  </>
+                                ) : null}
+                              </AnimatePresence>
+                              <motion.div
+                                className="relative z-[1]"
+                                animate={
+                                  likeAnimatingThreadId === thread.id
+                                    ? {
+                                        scale: [1, 1.4, 0.9, 1.1, 1],
+                                        rotate: [0, -10, 10, -5, 0],
+                                      }
+                                    : { scale: 1, rotate: 0 }
+                                }
+                                transition={{ duration: 0.5, ease: "easeInOut" }}
+                              >
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4 shrink-0",
+                                    liked ? "fill-red-500 text-red-500" : "text-muted-foreground fill-none",
+                                  )}
+                                />
+                              </motion.div>
+                            </div>
+                            <span
                               className={cn(
-                                "h-4 w-4 shrink-0",
-                                liked ? "fill-red-500 text-red-500" : "text-muted-foreground fill-none",
+                                "text-sm font-medium tabular-nums transition-colors duration-200",
+                                liked ? "text-red-500" : "text-foreground",
                               )}
-                            />
-                            <span className="text-sm font-medium tabular-nums text-foreground">{likeCount}</span>
-                          </Button>
+                            >
+                              {likeCount}
+                            </span>
+                          </button>
                         </div>
                       </CardContent>
                     </Card>
@@ -823,26 +874,66 @@ export function ForumSection() {
                     </div>
                     <p className="text-sm leading-6 text-foreground">{selectedThreadDetail.content}</p>
                     <div className="flex justify-end border-t border-border/60 pt-3">
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 gap-1.5 px-2 text-muted-foreground hover:text-foreground"
+                        className="flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
                         disabled={likeBusyThreadId === selectedThreadDetail.id}
                         onClick={() => void handleToggleThreadLike(selectedThreadDetail.id)}
                       >
-                        <Heart
+                        <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                          <AnimatePresence>
+                            {likeBurstThreadId === selectedThreadDetail.id ? (
+                              <>
+                                {[0, 1, 2, 3].map((i) => (
+                                  <motion.div
+                                    key={i}
+                                    className="absolute inset-0 rounded-full border border-red-400"
+                                    initial={{ scale: 0.5, opacity: 0.8 }}
+                                    animate={{ scale: 2.5, opacity: 0 }}
+                                    exit={{ opacity: 0 }}
+                                    transition={{
+                                      duration: 0.5,
+                                      delay: i * 0.05,
+                                      ease: "easeOut",
+                                    }}
+                                  />
+                                ))}
+                              </>
+                            ) : null}
+                          </AnimatePresence>
+                          <motion.div
+                            className="relative z-[1]"
+                            animate={
+                              likeAnimatingThreadId === selectedThreadDetail.id
+                                ? {
+                                    scale: [1, 1.4, 0.9, 1.1, 1],
+                                    rotate: [0, -10, 10, -5, 0],
+                                  }
+                                : { scale: 1, rotate: 0 }
+                            }
+                            transition={{ duration: 0.5, ease: "easeInOut" }}
+                          >
+                            <Heart
+                              className={cn(
+                                "h-4 w-4 shrink-0",
+                                likedThreadIds.includes(selectedThreadDetail.id)
+                                  ? "fill-red-500 text-red-500"
+                                  : "text-muted-foreground fill-none",
+                              )}
+                            />
+                          </motion.div>
+                        </div>
+                        <span
                           className={cn(
-                            "h-4 w-4 shrink-0",
+                            "text-sm font-medium tabular-nums transition-colors duration-200",
                             likedThreadIds.includes(selectedThreadDetail.id)
-                              ? "fill-red-500 text-red-500"
-                              : "text-muted-foreground fill-none",
+                              ? "text-red-500"
+                              : "text-foreground",
                           )}
-                        />
-                        <span className="text-sm font-medium tabular-nums text-foreground">
+                        >
                           {threadLikeCount(selectedThreadDetail)}
                         </span>
-                      </Button>
+                      </button>
                     </div>
                   </CardContent>
                 </Card>

@@ -166,11 +166,11 @@ const SettingsPage = () => {
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Réglages</h1>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.04}>
+      <ScrollReveal>
         <ProfileContent compact showDetails={false} />
       </ScrollReveal>
 
-      <ScrollReveal delay={0.06}>
+      <ScrollReveal>
         <SettingsSection title="Apparence" icon={Palette}>
           <div className="flex items-center justify-between rounded-lg p-3">
             <div>
@@ -188,7 +188,7 @@ const SettingsPage = () => {
         </SettingsSection>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.08}>
+      <ScrollReveal>
         <SettingsSection title="Données" icon={Database}>
           <NavigationRow
             icon={Upload}
@@ -199,7 +199,7 @@ const SettingsPage = () => {
         </SettingsSection>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.16}>
+      <ScrollReveal>
         <SettingsSection title="Appareils connectés" icon={Watch}>
           <NavigationRow
             icon={Apple}
@@ -217,7 +217,7 @@ const SettingsPage = () => {
         </SettingsSection>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.24}>
+      <ScrollReveal>
         <SettingsSection title="Légal" icon={FileText}>
           <NavigationRow
             icon={FileText}
@@ -233,7 +233,7 @@ const SettingsPage = () => {
         </SettingsSection>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.32}>
+      <ScrollReveal>
         <SettingsSection title="Zone de danger" icon={AlertTriangle} destructive>
           <div className="flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 p-3">
             <div>

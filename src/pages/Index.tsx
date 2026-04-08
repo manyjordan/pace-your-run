@@ -163,7 +163,7 @@ const Dashboard = () => {
       </ScrollReveal>
 
       {!isLoading && runCount < 3 && (
-        <ScrollReveal delay={0.02}>
+        <ScrollReveal>
           <div className="rounded-2xl border border-accent/30 bg-card px-5 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
@@ -185,10 +185,12 @@ const Dashboard = () => {
       )}
 
       <Tabs defaultValue="dashboard" className="space-y-6">
-        <ScrollReveal delay={0.05}>
+        <ScrollReveal>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="dashboard">
-              <Activity className="h-4 w-4 mr-1.5" /> Tableau de bord
+              <Activity className="h-4 w-4 mr-1.5" />
+              <span className="hidden sm:inline">Tableau de bord</span>
+              <span className="sm:hidden">Accueil</span>
             </TabsTrigger>
             <TabsTrigger value="performance">
               <TrendingUp className="h-4 w-4 mr-1.5" /> Performance

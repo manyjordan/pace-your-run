@@ -457,7 +457,7 @@ function ProfileDetails({
 
   return (
     <>
-      <ScrollReveal delay={0.1}>
+      <ScrollReveal>
         <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
           <CardHeader>
             <CardTitle className="text-lg">Mon objectif</CardTitle>
@@ -531,7 +531,7 @@ function ProfileDetails({
         </Card>
       </ScrollReveal>
 
-      <ScrollReveal delay={0.15}>
+      <ScrollReveal>
         <div className="space-y-3">
           <h3 className="px-4 text-lg font-bold">Mes statistiques</h3>
           <StatisticsGrid runs={runs} />
@@ -539,7 +539,7 @@ function ProfileDetails({
       </ScrollReveal>
 
       {goalData.selectedPlanId && (
-        <ScrollReveal delay={0.2}>
+        <ScrollReveal>
           <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             <CardHeader>
               <CardTitle className="text-lg">Mon plan actuel</CardTitle>

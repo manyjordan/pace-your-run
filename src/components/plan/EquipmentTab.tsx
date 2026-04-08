@@ -316,7 +316,7 @@ export default function EquipmentTab() {
 
       <TabsContent value="shoes" className="space-y-3">
         {shoes.map((shoe, index) => (
-          <ScrollReveal key={shoe.name} delay={index * 0.06}>
+          <ScrollReveal key={shoe.name} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
             <Card>
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -364,7 +364,7 @@ export default function EquipmentTab() {
 
       <TabsContent value="nutrition" className="space-y-3">
         {nutritionSections.map((section, sectionIndex) => (
-          <ScrollReveal key={section.title} delay={sectionIndex * 0.06}>
+          <ScrollReveal key={section.title} delay={sectionIndex === 0 ? 0 : sectionIndex < 3 ? 0.05 : 0}>
             <Card>
               <CardContent className="space-y-4 p-4">
                 <div>
@@ -421,7 +421,7 @@ export default function EquipmentTab() {
 
       <TabsContent value="gear" className="space-y-3">
         {gear.map((item, index) => (
-          <ScrollReveal key={item.name} delay={index * 0.06}>
+          <ScrollReveal key={item.name} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
             <Card>
               <CardContent className="space-y-3 p-4">
                 <div className="flex items-start justify-between gap-2">

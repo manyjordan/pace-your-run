@@ -129,8 +129,8 @@ export const DashboardSection = ({
 
   return (
     <div className="space-y-6">
-      {filteredMetrics.map((metric) => (
-        <ScrollReveal key={metric.title} delay={Math.random() * 0.1}>
+      {filteredMetrics.map((metric, index) => (
+        <ScrollReveal key={metric.title} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
           <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             <div className="mb-4">
               <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
@@ -169,19 +169,21 @@ export const DashboardSection = ({
                         </div>
                         <span className="text-sm font-semibold tabular-nums">{run.distance_km.toFixed(1)} km</span>
                       </div>
-                      <div className="mt-3 flex gap-6 text-xs">
-                        <div className="flex items-center gap-1.5">
-                          <Route className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="tabular-nums">{run.distance_km.toFixed(1)} km</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span className="tabular-nums">
-                            {Math.floor(run.duration_seconds / 3600) > 0
-                              ? `${Math.floor(run.duration_seconds / 3600)}h ${String(Math.floor((run.duration_seconds % 3600) / 60)).padStart(2, "0")}m`
-                              : `${Math.round(run.duration_seconds / 60)} min`}
-                          </span>
-                        </div>
+                      <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Clock className="h-3.5 w-3.5" />
+                        <span className="tabular-nums">
+                          {Math.floor(run.duration_seconds / 3600) > 0
+                            ? `${Math.floor(run.duration_seconds / 3600)}h ${String(Math.floor((run.duration_seconds % 3600) / 60)).padStart(2, "0")}min`
+                            : `${Math.round(run.duration_seconds / 60)} min`}
+                        </span>
+                        {run.average_pace && (
+                          <>
+                            <span className="text-border">·</span>
+                            <span className="tabular-nums">
+                              {Math.floor(run.average_pace)}:{String(Math.round((run.average_pace % 1) * 60)).padStart(2, "0")} /km
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -196,7 +198,7 @@ export const DashboardSection = ({
         </ScrollReveal>
 
         {computedUpcomingSessions.length > 0 ? (
-          <ScrollReveal delay={0.08}>
+          <ScrollReveal>
             <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-sm font-semibold">Séances à venir</h2>
