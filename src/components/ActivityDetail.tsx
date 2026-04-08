@@ -1,9 +1,9 @@
 import { useMemo } from "react";
-import { BarChart3, Clock, Heart, Mountain, Route, TrendingUp, X } from "lucide-react";
+import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import GPSMap from "@/components/GPSMap";
 import type { RunRow } from "@/lib/database";
-import { formatDistance, formatDuration, formatPace, type GPSTracePoint } from "@/lib/strava";
+import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/strava";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -34,7 +34,7 @@ function normalizeActivityDetailInput(input: RunRow): NormalizedActivity {
     id: r.id,
     name: r.title ?? "Course",
     distance: r.distance_km * 1000,
-    moving_time: r.duration_seconds,
+    moving_time: r.moving_time_seconds ?? r.duration_seconds,
     elapsed_time: r.duration_seconds,
     total_elevation_gain: r.elevation_gain ?? 0,
     average_heartrate: r.average_heartrate ?? undefined,
@@ -366,6 +366,7 @@ export function ActivityDetail({
       startDate: new Date(resolvedActivity.start_date),
     };
   }, [fallbackTrace, normalizedAllActivities, resolvedActivity]);
+  const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">
@@ -400,17 +401,42 @@ export function ActivityDetail({
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-lime" />
-              <span className="text-xs text-muted-foreground">Durée</span>
+              <span className="text-xs text-muted-foreground">Durée totale</span>
             </div>
-            <p className="mt-2 text-lg font-bold">{formatDuration(resolvedActivity.moving_time)}</p>
+            <p className="mt-2 text-lg font-bold">{formatDuration(resolvedActivity.elapsed_time)}</p>
           </div>
+          {showMovingMetrics ? (
+            <div className="rounded-lg border border-accent/20 bg-card p-3">
+              <div className="flex items-center gap-1.5">
+                <Play className="h-4 w-4 text-lime" />
+                <span className="text-xs text-muted-foreground">Temps de course</span>
+              </div>
+              <p className="mt-2 text-lg font-bold text-accent">{formatDuration(resolvedActivity.moving_time)}</p>
+            </div>
+          ) : null}
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <div className="flex items-center gap-1.5">
-              <TrendingUp className="h-4 w-4 text-lime" />
-              <span className="text-xs text-muted-foreground">Allure moyenne</span>
+              <Zap className="h-4 w-4 text-lime" />
+              <span className="text-xs text-muted-foreground">{showMovingMetrics ? "Allure de course" : "Allure moyenne"}</span>
             </div>
-            <p className="mt-2 text-lg font-bold">{analysis.avgPace}</p>
+            <p className="mt-2 text-lg font-bold">
+              {formatPaceFromSeconds(
+                showMovingMetrics ? resolvedActivity.moving_time : resolvedActivity.elapsed_time,
+                resolvedActivity.distance,
+              )}
+            </p>
           </div>
+          {showMovingMetrics ? (
+            <div className="rounded-lg border border-accent/20 bg-card p-3">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="h-4 w-4 text-lime" />
+                <span className="text-xs text-muted-foreground">Allure moyenne</span>
+              </div>
+              <p className="mt-2 text-lg font-bold">
+                {formatPaceFromSeconds(resolvedActivity.elapsed_time, resolvedActivity.distance)}
+              </p>
+            </div>
+          ) : null}
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <div className="flex items-center gap-1.5">
               <Mountain className="h-4 w-4 text-lime" />

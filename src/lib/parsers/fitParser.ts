@@ -1,4 +1,4 @@
-import { calculateDistanceFromTrace, type ImportedRun } from "./gpxParser";
+import { calculateDistanceFromTrace, computeMovingTime, type ImportedRun } from "./gpxParser";
 
 const FIT_EPOCH_MS = Date.UTC(1989, 11, 31, 0, 0, 0);
 
@@ -291,11 +291,13 @@ export function parseFitArrayBuffer(buffer: ArrayBuffer, fileName?: string): Imp
         : calculateElevationGainFromRecords(records);
 
     const titleDate = new Date(startedAt).toLocaleDateString("fr-FR");
+    const movingTimeSeconds = computeMovingTime(gpsTrace);
 
     return {
       title: `Course importee ${titleDate}`,
       distance_km: distanceKm,
       duration_seconds: durationSeconds,
+      moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,
       elevation_gain: elevationGain,
       average_heartrate:
         typeof sessionAvgHeartRate === "number"

@@ -245,6 +245,7 @@ export default function ImportPage() {
             title: run.title,
             distance_km: run.distance_km,
             duration_seconds: run.duration_seconds,
+            moving_time_seconds: run.moving_time_seconds ?? null,
             elevation_gain: run.elevation_gain,
             average_heartrate: run.average_heartrate ?? null,
             gps_trace: run.gps_trace,
@@ -489,7 +490,6 @@ export default function ImportPage() {
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Etape 5 — Progression de l'import</CardTitle>
-            <CardDescription>Les activites sont inserees une par une dans Supabase, sans doublons.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Progress value={progress} />

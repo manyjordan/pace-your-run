@@ -2,6 +2,7 @@ export type ImportedRun = {
   title: string;
   distance_km: number;
   duration_seconds: number;
+  moving_time_seconds?: number | null;
   elevation_gain: number;
   average_heartrate?: number;
   gps_trace: Array<{ lat: number; lng: number; time: number }>;
@@ -18,6 +19,7 @@ type GpxPoint = {
 };
 
 const EARTH_RADIUS_KM = 6371;
+const MOVING_SPEED_THRESHOLD_KMH = 0.8;
 
 function toArray<T>(list: ArrayLike<T>): T[] {
   return Array.from(list);
@@ -73,6 +75,26 @@ export function calculateDistanceFromTrace(points: Array<{ lat: number; lng: num
     total += haversineDistanceKm(points[i - 1], points[i]);
   }
   return total;
+}
+
+export function computeMovingTime(trace: Array<{ lat: number; lng: number; time: number }>): number {
+  if (trace.length < 2) return 0;
+  let movingSeconds = 0;
+
+  for (let i = 1; i < trace.length; i += 1) {
+    const prev = trace[i - 1];
+    const curr = trace[i];
+    const dtSeconds = (curr.time - prev.time) / 1000;
+    if (dtSeconds <= 0 || dtSeconds > 300) continue;
+
+    const distKm = calculateDistanceFromTrace([prev, curr]);
+    const speedKmh = (distKm / dtSeconds) * 3600;
+    if (speedKmh >= MOVING_SPEED_THRESHOLD_KMH) {
+      movingSeconds += dtSeconds;
+    }
+  }
+
+  return Math.round(movingSeconds);
 }
 
 function calculateElevationGain(points: GpxPoint[]) {
@@ -184,6 +206,7 @@ export function parseGpxText(text: string, fileName?: string): ImportedRun {
     .filter((value): value is number => typeof value === "number" && value > 0);
 
   const creator = doc.documentElement.getAttribute("creator");
+  const movingTimeSeconds = computeMovingTime(gpsTrace);
 
   return {
     title,
@@ -193,6 +216,7 @@ export function parseGpxText(text: string, fileName?: string): ImportedRun {
     average_heartrate: heartRates.length
       ? Math.round(heartRates.reduce((sum, hr) => sum + hr, 0) / heartRates.length)
       : undefined,
+    moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,
     gps_trace: gpsTrace,
     started_at: new Date(startedAtMs).toISOString(),
     source: detectSource(fileName ?? creator ?? ""),

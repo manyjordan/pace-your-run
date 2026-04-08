@@ -42,6 +42,7 @@ export type RunRow = {
   elevation_gain: number | null;
   gps_trace: Json | null;
   id: string;
+  moving_time_seconds?: number | null;
   ran_with?: string[] | null;
   run_type: string | null;
   started_at: string | null;
@@ -56,6 +57,7 @@ export type RunInput = {
   duration_seconds: number;
   elevation_gain?: number | null;
   gps_trace?: RunGpsPoint[];
+  moving_time_seconds?: number | null;
   ran_with?: string[];
   run_type?: string | null;
   started_at?: string | null;
@@ -292,6 +294,7 @@ export async function saveRun(userId: string, runData: RunInput) {
       duration_seconds: runData.duration_seconds,
       elevation_gain: runData.elevation_gain ?? null,
       gps_trace: (runData.gps_trace ?? []) as Json,
+      moving_time_seconds: runData.moving_time_seconds ?? null,
       ran_with: runData.ran_with ?? [],
       run_type: runData.run_type ?? "run",
       started_at: runData.started_at ?? new Date().toISOString(),

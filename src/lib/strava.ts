@@ -46,6 +46,16 @@ export function formatPace(distanceMeters: number, movingTimeSeconds: number) {
   return `${wholeMinutes}:${String(safeSeconds).padStart(2, "0")} /km`;
 }
 
+export function formatPaceFromSeconds(durationSeconds: number, distanceMeters: number): string {
+  if (!durationSeconds || !distanceMeters) return "--:-- /km";
+  const distanceKm = distanceMeters > 100 ? distanceMeters / 1000 : distanceMeters;
+  const minutesPerKm = durationSeconds / 60 / distanceKm;
+  const wholeMinutes = Math.floor(minutesPerKm);
+  const seconds = Math.round((minutesPerKm - wholeMinutes) * 60);
+  const safeSeconds = seconds === 60 ? 59 : seconds;
+  return `${wholeMinutes}:${String(safeSeconds).padStart(2, "0")} /km`;
+}
+
 export function formatRelativeTime(dateString: string) {
   const diffMs = Date.now() - new Date(dateString).getTime();
   const diffMinutes = Math.max(1, Math.round(diffMs / 60000));

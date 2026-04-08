@@ -42,11 +42,13 @@ import {
 } from "@/lib/bluetooth";
 import {
   formatDuration as formatSocialDuration,
+  formatPaceFromSeconds,
   formatPace as formatSocialPace,
   formatRelativeTime,
   getInitials,
   type CommunityPost,
 } from "@/lib/strava";
+import { computeMovingTime } from "@/lib/parsers/gpxParser";
 import {
   convertDistanceFromKm,
   convertPaceFromMinutesPerKm,
@@ -123,6 +125,7 @@ export default function Run() {
   const [runSummary, setRunSummary] = useState<{
     distance: number;
     duration: number;
+    movingTime?: number;
     avgPace: number;
     elevation: number;
     averageHeartRate?: number;
@@ -482,6 +485,7 @@ export default function Run() {
     const finalDistance = distance;
     const finalElapsed = elapsed;
     const finalGpsTrace = gpsTrace;
+    const movingTimeSeconds = computeMovingTime(finalGpsTrace);
     const finalStartedAt = runStartedAtRef.current ?? new Date().toISOString();
     const finalElevation = calculateElevationGain(finalGpsTrace);
     const finalAvgPace = finalDistance > 0 ? finalElapsed / 60 / finalDistance : 0;
@@ -496,6 +500,7 @@ export default function Run() {
       setRunSummary({
         distance: finalDistance,
         duration: finalElapsed,
+        movingTime: movingTimeSeconds > 0 ? movingTimeSeconds : undefined,
         avgPace: finalAvgPace,
         elevation: finalElevation,
         averageHeartRate: finalAverageHeartRate,
@@ -510,6 +515,7 @@ export default function Run() {
         user_id: user?.id ?? null,
         distance_km: finalDistance,
         duration_seconds: finalElapsed,
+        moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,
         elevation_gain: finalElevation,
         average_pace: finalAvgPace,
         average_heartrate: finalAverageHeartRate ?? null,
@@ -550,6 +556,7 @@ export default function Run() {
         const runData = {
           distance_km: finalDistance,
           duration_seconds: finalElapsed,
+          moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,
           average_pace: finalAvgPace,
           average_heartrate: finalAverageHeartRate ?? null,
           elevation_gain: finalElevation,
@@ -954,6 +961,40 @@ export default function Run() {
                     : "Connectez une ceinture cardiaque pour mesurer votre FC"}
                 </p>
                 {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
+                <div className="space-y-3 rounded-lg border border-border/60 bg-background/60 p-3">
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold tabular-nums">
+                        {formatSocialDuration(runSummary.duration)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Temps total</div>
+                    </div>
+                    {runSummary.movingTime && Math.abs(runSummary.duration - runSummary.movingTime) > 30 ? (
+                      <div className="text-center border-l border-border pl-4">
+                        <div className="text-2xl font-bold tabular-nums text-accent">
+                          {formatSocialDuration(runSummary.movingTime)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Temps de course</div>
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-center">
+                      <div className="text-lg font-semibold tabular-nums">
+                        {formatPaceFromSeconds(runSummary.duration, runSummary.distance)}
+                      </div>
+                      <div className="text-xs text-muted-foreground">Allure moyenne</div>
+                    </div>
+                    {runSummary.movingTime && Math.abs(runSummary.duration - runSummary.movingTime) > 30 ? (
+                      <div className="text-center border-l border-border pl-4">
+                        <div className="text-lg font-semibold tabular-nums text-accent">
+                          {formatPaceFromSeconds(runSummary.movingTime, runSummary.distance)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">Allure de course</div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
                 <div className="space-y-2">
                   <Label>Audience de cette course</Label>
                   <Select value={postAudience} onValueChange={(value) => void handleAudienceChange(value as "private" | "friends" | "public")}>

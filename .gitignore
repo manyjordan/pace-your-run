@@ -28,3 +28,4 @@ generate-apple-secret.mjs
 *.sln
 *.sw?
 .env
+.env.local
