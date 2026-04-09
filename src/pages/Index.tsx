@@ -1,18 +1,23 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, List, TrendingUp } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getRuns, type RunGpsPoint, type RunRow } from "@/lib/database";
 import { normalizeGoalData } from "@/lib/goalHelpers";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
-import { PerformanceSection } from "@/components/dashboard/PerformanceSection";
-import { ActivitySection } from "@/components/dashboard/ActivitySection";
 import { SkeletonHeroBanner } from "@/components/dashboard/SkeletonHeroBanner";
 import { SkeletonMetricCard } from "@/components/dashboard/SkeletonMetricCard";
 import { buildMetricData, buildGoalAwareWeeklyInsight } from "@/lib/dashboardHelpers";
+
+const PerformanceSection = lazy(() =>
+  import("@/components/dashboard/PerformanceSection").then((module) => ({ default: module.PerformanceSection })),
+);
+const ActivitySection = lazy(() =>
+  import("@/components/dashboard/ActivitySection").then((module) => ({ default: module.ActivitySection })),
+);
 
 type ProfileGoalData = {
   goalType: "weight" | "race" | "distance";
@@ -216,14 +221,18 @@ const Dashboard = () => {
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Chargement...</p>
           ) : (
-            <PerformanceSection runs={recentRuns} />
+            <Suspense fallback={<div className="h-32 animate-pulse rounded-xl bg-muted" />}>
+              <PerformanceSection runs={recentRuns} />
+            </Suspense>
           )}
         </TabsContent>
         <TabsContent value="activities">
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Chargement...</p>
           ) : (
-            <ActivitySection runs={recentRuns} athleteName={athleteName} onOpenActivityDetail={openRunDetail} />
+            <Suspense fallback={<div className="h-32 animate-pulse rounded-xl bg-muted" />}>
+              <ActivitySection runs={recentRuns} athleteName={athleteName} onOpenActivityDetail={openRunDetail} />
+            </Suspense>
           )}
         </TabsContent>
       </Tabs>

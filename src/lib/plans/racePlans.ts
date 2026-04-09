@@ -340,7 +340,7 @@ export const racePlans: TrainingPlan[] = [
       week: 1,
       sessions: [
       { day: "Mardi", type: "Sortie facile", distance: 9.8, pace: "5:00/km", duration: 49, description: "Base, semaine 1.", intensity: "easy" },
-      { day: "Mercredi", type: "Intervalles courts", distance: 9.8, pace: "3:45/km", duration: 37, description: "12×400 m, semaine 1.", intensity: "interval" },
+      { day: "Mercredi", type: "Intervalles courts", distance: 9.8, pace: "3:45/km", duration: 37, description: "12×400 m, semaine 1.", intensity: "interval", warmupMinutes: 15, cooldownMinutes: 10, intervals: { reps: 12, distanceM: 400, pace: "3:45", recoverySeconds: 60, recoveryType: "jog", recoveryPace: "5:45" } },
       { day: "Jeudi", type: "Récupération active", distance: 9.8, pace: "5:15/km", duration: 51, description: "Récup, semaine 1.", intensity: "easy" },
       { day: "Vendredi", type: "Séance seuil", distance: 9.8, pace: "4:15/km", duration: 42, description: "35′ continus, semaine 1.", intensity: "tempo" },
       { day: "Dimanche", type: "Sortie longue", distance: 14.6, pace: "5:30/km", duration: 80, description: "Spécifique demi, semaine 1.", intensity: "moderate" }
@@ -352,7 +352,7 @@ export const racePlans: TrainingPlan[] = [
       week: 2,
       sessions: [
       { day: "Mardi", type: "Sortie facile", distance: 10.5, pace: "5:00/km", duration: 53, description: "Base, semaine 2.", intensity: "easy" },
-      { day: "Mercredi", type: "Intervalles courts", distance: 10.5, pace: "3:45/km", duration: 39, description: "12×400 m, semaine 2.", intensity: "interval" },
+      { day: "Mercredi", type: "Intervalles courts", distance: 10.5, pace: "3:45/km", duration: 39, description: "12×400 m, semaine 2.", intensity: "interval", warmupMinutes: 15, cooldownMinutes: 10, intervals: { reps: 12, distanceM: 400, pace: "3:45", recoverySeconds: 60, recoveryType: "jog", recoveryPace: "5:45" } },
       { day: "Jeudi", type: "Récupération active", distance: 10.5, pace: "5:15/km", duration: 55, description: "Récup, semaine 2.", intensity: "easy" },
       { day: "Vendredi", type: "Séance seuil", distance: 10.5, pace: "4:15/km", duration: 45, description: "35′ continus, semaine 2.", intensity: "tempo" },
       { day: "Dimanche", type: "Sortie longue", distance: 15.8, pace: "5:30/km", duration: 87, description: "Spécifique demi, semaine 2.", intensity: "moderate" }
@@ -1088,7 +1088,7 @@ export const racePlans: TrainingPlan[] = [
       week: 1,
       sessions: [
       { day: "Mardi", type: "Sortie facile", distance: 14.3, pace: "5:00/km", duration: 72, description: "Volume modéré, semaine 1.", intensity: "easy" },
-      { day: "Mercredi", type: "Intervalles longs", distance: 14.3, pace: "3:45/km", duration: 54, description: "5×1000 m cible 10 km, semaine 1.", intensity: "interval" },
+      { day: "Mercredi", type: "Intervalles longs", distance: 14.3, pace: "3:45/km", duration: 54, description: "5×1000 m cible 10 km, semaine 1.", intensity: "interval", warmupMinutes: 15, cooldownMinutes: 15, intervals: { reps: 5, distanceM: 1000, pace: "3:45", recoverySeconds: 120, recoveryType: "jog", recoveryPace: "5:45" } },
       { day: "Jeudi", type: "Récupération active", distance: 14.3, pace: "5:15/km", duration: 75, description: "Très lent, semaine 1.", intensity: "easy" },
       { day: "Dimanche", type: "Sortie longue", distance: 21.4, pace: "5:30/km", duration: 118, description: "Inclure 40′ allure marathon, semaine 1.", intensity: "moderate" }
       ],
@@ -1099,7 +1099,7 @@ export const racePlans: TrainingPlan[] = [
       week: 2,
       sessions: [
       { day: "Mardi", type: "Sortie facile", distance: 15.1, pace: "5:00/km", duration: 76, description: "Volume modéré, semaine 2.", intensity: "easy" },
-      { day: "Mercredi", type: "Intervalles longs", distance: 15.1, pace: "3:45/km", duration: 57, description: "5×1000 m cible 10 km, semaine 2.", intensity: "interval" },
+      { day: "Mercredi", type: "Intervalles longs", distance: 15.1, pace: "3:45/km", duration: 57, description: "5×1000 m cible 10 km, semaine 2.", intensity: "interval", warmupMinutes: 15, cooldownMinutes: 15, intervals: { reps: 5, distanceM: 1000, pace: "3:45", recoverySeconds: 120, recoveryType: "jog", recoveryPace: "5:45" } },
       { day: "Jeudi", type: "Récupération active", distance: 15.1, pace: "5:15/km", duration: 79, description: "Très lent, semaine 2.", intensity: "easy" },
       { day: "Dimanche", type: "Sortie longue", distance: 22.7, pace: "5:30/km", duration: 125, description: "Inclure 40′ allure marathon, semaine 2.", intensity: "moderate" }
       ],
@@ -1279,7 +1279,7 @@ export const racePlans: TrainingPlan[] = [
       week: 1,
       sessions: [
       { day: "Mardi", type: "Sortie facile", distance: 13.3, pace: "5:00/km", duration: 67, description: "Endurance, semaine 1.", intensity: "easy" },
-      { day: "Mercredi", type: "Intervalles longs", distance: 13.3, pace: "3:45/km", duration: 50, description: "6×1000 m, semaine 1.", intensity: "interval" },
+      { day: "Mercredi", type: "Intervalles longs", distance: 13.3, pace: "3:45/km", duration: 50, description: "6×1000 m, semaine 1.", intensity: "interval", warmupMinutes: 15, cooldownMinutes: 15, intervals: { reps: 6, distanceM: 1000, pace: "3:45", recoverySeconds: 120, recoveryType: "jog", recoveryPace: "5:45" } },
       { day: "Jeudi", type: "Récupération active", distance: 13.3, pace: "5:15/km", duration: 70, description: "Récup, semaine 1.", intensity: "easy" },
       { day: "Vendredi", type: "Allure spécifique marathon", distance: 13.3, pace: "4:15/km", duration: 57, description: "2×20′ marathon, semaine 1.", intensity: "tempo" },
       { day: "Dimanche", type: "Sortie longue", distance: 19.9, pace: "5:30/km", duration: 109, description: "Spécifique, semaine 1.", intensity: "moderate" }
@@ -1291,7 +1291,7 @@ export const racePlans: TrainingPlan[] = [
       week: 2,
       sessions: [
       { day: "Mardi", type: "Sortie facile", distance: 14.1, pace: "5:00/km", duration: 71, description: "Endurance, semaine 2.", intensity: "easy" },
-      { day: "Mercredi", type: "Intervalles longs", distance: 14.1, pace: "3:45/km", duration: 53, description: "6×1000 m, semaine 2.", intensity: "interval" },
+      { day: "Mercredi", type: "Intervalles longs", distance: 14.1, pace: "3:45/km", duration: 53, description: "6×1000 m, semaine 2.", intensity: "interval", warmupMinutes: 15, cooldownMinutes: 15, intervals: { reps: 6, distanceM: 1000, pace: "3:45", recoverySeconds: 120, recoveryType: "jog", recoveryPace: "5:45" } },
       { day: "Jeudi", type: "Récupération active", distance: 14.1, pace: "5:15/km", duration: 74, description: "Récup, semaine 2.", intensity: "easy" },
       { day: "Vendredi", type: "Allure spécifique marathon", distance: 14.1, pace: "4:15/km", duration: 60, description: "2×20′ marathon, semaine 2.", intensity: "tempo" },
       { day: "Dimanche", type: "Sortie longue", distance: 21.1, pace: "5:30/km", duration: 116, description: "Spécifique, semaine 2.", intensity: "moderate" }

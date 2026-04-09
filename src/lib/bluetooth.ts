@@ -1,5 +1,16 @@
 const HEART_RATE_SERVICE = 0x180d;
 const HEART_RATE_MEASUREMENT = 0x2a37;
+const KNOWN_HR_DEVICES = [
+  "HRM",
+  "Polar",
+  "Garmin",
+  "Wahoo",
+  "TICKR",
+  "Suunto",
+  "Decathlon",
+  "Kalenji",
+  "ANT",
+];
 
 export type BluetoothConnection = {
   deviceName: string;
@@ -93,8 +104,13 @@ export async function connectHeartRateMonitor(): Promise<BluetoothConnection> {
     deviceDisconnectHandler,
   };
 
+  const deviceLabel = device.name?.trim() ?? "";
+  const matchedKnown = KNOWN_HR_DEVICES.find((known) =>
+    deviceLabel.toLowerCase().includes(known.toLowerCase())
+  );
+
   return {
-    deviceName: device.name?.trim() || "Capteur cardiaque",
+    deviceName: deviceLabel || (matchedKnown ? `${matchedKnown} HR` : "Capteur cardiaque"),
     disconnect: () => disconnectHeartRateMonitor(),
     onHeartRate: (callback: (bpm: number) => void) => {
       heartRateCallbacks.add(callback);

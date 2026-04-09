@@ -1,6 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import {
   Watch,
@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import {
@@ -30,6 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ProfileContent } from "@/components/profile/ProfileContent";
 import { useToast } from "@/hooks/use-toast";
+import { getDefaultRunPreferences, loadRunPreferences, saveRunPreferences, type RunPreferences } from "@/lib/runPreferences";
 
 type NavigationRowProps = {
   icon: React.ComponentType<{ className?: string }>;
@@ -83,9 +85,14 @@ const SettingsPage = () => {
   const [signOutDialogOpen, setSignOutDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [runPreferences, setRunPreferences] = useState<RunPreferences>(() => getDefaultRunPreferences());
   const { signOut, session } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    setRunPreferences(loadRunPreferences(session?.user?.id ?? null));
+  }, [session?.user?.id]);
 
   const handleSignOut = async () => {
     setSigningOut(true);
@@ -114,29 +121,10 @@ const SettingsPage = () => {
       if (refreshError || !refreshData.session) {
         throw new Error("Session expirée. Reconnectez-vous puis réessayez.");
       }
-
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/delete-account`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${refreshData.session.access_token}`,
-            "apikey": supabaseAnonKey,
-          },
-          body: JSON.stringify({ userId: refreshData.session.user.id }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.details || errorData.error || `Erreur ${response.status}`
-        );
-      }
+      const { error: fnError } = await supabase.functions.invoke("delete-account", {
+        body: { userId: refreshData.session.user.id },
+      });
+      if (fnError) throw fnError;
 
       toast({
         title: "Compte supprimé",
@@ -218,6 +206,27 @@ const SettingsPage = () => {
       </ScrollReveal>
 
       <ScrollReveal>
+        <SettingsSection title="Réglages de course" icon={Watch}>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="space-y-1">
+              <p className="text-sm font-medium">Alertes d&apos;allure</p>
+              <p className="text-xs text-muted-foreground">
+                Vous prévient vocalement si votre allure s&apos;écarte de l&apos;objectif lors d&apos;une séance planifiée. Maximum toutes les 15 secondes.
+              </p>
+            </div>
+            <Switch
+              checked={runPreferences.paceAlerts}
+              onCheckedChange={(checked) => {
+                const updated = { ...runPreferences, paceAlerts: checked };
+                setRunPreferences(updated);
+                saveRunPreferences(updated, session?.user?.id ?? null);
+              }}
+            />
+          </div>
+        </SettingsSection>
+      </ScrollReveal>
+
+      <ScrollReveal>
         <SettingsSection title="Légal" icon={FileText}>
           <NavigationRow
             icon={FileText}
@@ -230,6 +239,12 @@ const SettingsPage = () => {
             label="Conditions d'utilisation"
             onClick={() => navigate("/terms")}
           />
+          <a
+            href="/legal"
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Mentions légales
+          </a>
         </SettingsSection>
       </ScrollReveal>
 

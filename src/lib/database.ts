@@ -50,6 +50,16 @@ export type RunRow = {
   user_id: string | null;
 };
 
+export type RouteRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  distance_km: number;
+  elevation_gain: number;
+  gps_trace: RunGpsPoint[];
+  created_at: string | null;
+};
+
 export type RunInput = {
   average_heartrate?: number | null;
   average_pace?: number | null;
@@ -353,6 +363,46 @@ export async function getRuns(userId: string) {
 
   if (error) throw error;
   return (data ?? []) as RunRow[];
+}
+
+export async function saveRoute(
+  userId: string,
+  route: {
+    name: string;
+    distance_km: number;
+    elevation_gain: number;
+    gps_trace: RunGpsPoint[];
+  },
+): Promise<RouteRow> {
+  await requireCurrentUserId(userId);
+  const { data, error } = await supabase
+    .from("routes")
+    .insert({ user_id: userId, ...route })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as RouteRow;
+}
+
+export async function getRoutes(userId: string): Promise<RouteRow[]> {
+  await requireCurrentUserId(userId);
+  const { data, error } = await supabase
+    .from("routes")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as RouteRow[];
+}
+
+export async function deleteRoute(routeId: string, userId: string): Promise<void> {
+  await requireCurrentUserId(userId);
+  const { error } = await supabase
+    .from("routes")
+    .delete()
+    .eq("id", routeId)
+    .eq("user_id", userId);
+  if (error) throw error;
 }
 
 export async function deleteRun(runId: string) {

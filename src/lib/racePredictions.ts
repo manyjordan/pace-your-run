@@ -277,3 +277,99 @@ export function getRacePrediction(
     consensusSeconds,
   };
 }
+
+export type VO2maxEstimate = {
+  value: number;
+  level: "very_low" | "low" | "moderate" | "good" | "excellent" | "superior";
+  levelLabel: string;
+  trend: "up" | "down" | "stable" | null;
+  trendValue: number | null;
+  basedOnRun: {
+    distanceKm: number;
+    durationSeconds: number;
+    startedAt: string | null;
+  } | null;
+};
+
+export function estimateVO2maxFromRuns(runs: RunRow[]): VO2maxEstimate | null {
+  const eligible = runs.filter((r) => r.distance_km >= 3 && r.duration_seconds > 0);
+  if (eligible.length === 0) return null;
+
+  const best = eligible.reduce((a, b) =>
+    a.duration_seconds / a.distance_km < b.duration_seconds / b.distance_km ? a : b,
+  );
+
+  const vo2 = estimateVO2(best.distance_km, best.duration_seconds);
+  const clamped = Math.round(Math.min(85, Math.max(25, vo2)));
+
+  const getLevel = (v: number): VO2maxEstimate["level"] => {
+    if (v < 35) return "very_low";
+    if (v < 42) return "low";
+    if (v < 49) return "moderate";
+    if (v < 56) return "good";
+    if (v < 63) return "excellent";
+    return "superior";
+  };
+
+  const levelLabels: Record<VO2maxEstimate["level"], string> = {
+    very_low: "Très faible",
+    low: "Faible",
+    moderate: "Moyen",
+    good: "Bon",
+    excellent: "Excellent",
+    superior: "Supérieur",
+  };
+
+  const level = getLevel(clamped);
+
+  const now = Date.now();
+  const fourWeeksAgo = now - 28 * 24 * 60 * 60 * 1000;
+  const eightWeeksAgo = now - 56 * 24 * 60 * 60 * 1000;
+
+  const recentRuns = eligible.filter(
+    (r) => r.started_at && new Date(r.started_at).getTime() >= fourWeeksAgo,
+  );
+  const olderRuns = eligible.filter((r) => {
+    const t = r.started_at ? new Date(r.started_at).getTime() : 0;
+    return t >= eightWeeksAgo && t < fourWeeksAgo;
+  });
+
+  let trend: VO2maxEstimate["trend"] = null;
+  let trendValue: number | null = null;
+
+  if (recentRuns.length > 0 && olderRuns.length > 0) {
+    const recentBest = recentRuns.reduce((a, b) =>
+      a.duration_seconds / a.distance_km < b.duration_seconds / b.distance_km ? a : b,
+    );
+    const olderBest = olderRuns.reduce((a, b) =>
+      a.duration_seconds / a.distance_km < b.duration_seconds / b.distance_km ? a : b,
+    );
+    const recentVO2 = Math.round(
+      Math.min(85, Math.max(25, estimateVO2(recentBest.distance_km, recentBest.duration_seconds))),
+    );
+    const olderVO2 = Math.round(
+      Math.min(85, Math.max(25, estimateVO2(olderBest.distance_km, olderBest.duration_seconds))),
+    );
+    const diff = recentVO2 - olderVO2;
+    if (Math.abs(diff) >= 1) {
+      trend = diff > 0 ? "up" : "down";
+      trendValue = Math.abs(diff);
+    } else {
+      trend = "stable";
+      trendValue = 0;
+    }
+  }
+
+  return {
+    value: clamped,
+    level,
+    levelLabel: levelLabels[level],
+    trend,
+    trendValue,
+    basedOnRun: {
+      distanceKm: best.distance_km,
+      durationSeconds: best.duration_seconds,
+      startedAt: best.started_at,
+    },
+  };
+}

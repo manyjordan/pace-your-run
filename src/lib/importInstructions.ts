@@ -3,7 +3,11 @@ import {
   ShieldCheck,
   FileArchive,
   Upload,
+  Download,
+  Settings,
+  User,
   Watch,
+  Activity,
   FileText,
   Footprints,
   Smartphone,
@@ -18,7 +22,7 @@ export type SourceInstruction = {
   icon: typeof Archive;
 };
 
-export type ImportSource = "strava" | "garmin" | "nike" | "apple" | "gpx";
+export type ImportSource = "strava" | "garmin" | "nike" | "apple" | "gpx" | "suunto";
 
 export const sourceConfig: Record<
   ImportSource,
@@ -33,24 +37,29 @@ export const sourceConfig: Record<
 > = {
   strava: {
     label: "Strava",
-    description: "Depuis l'app Strava → Paramètres → Télécharger vos données",
+    description: "Importe ton historique complet depuis l'archive Strava",
     icon: Archive,
-    acceptedExtensions: ".zip",
-    expectedText: "Archive ZIP Strava contenant des fichiers .gpx ou .fit",
+    acceptedExtensions: ".zip,.csv",
+    expectedText: "Archive ZIP Strava ou fichier activities.csv",
     instructions: [
       {
-        title: "Ouvrez l'app Strava",
-        description: "Sur votre téléphone, appuyez sur votre profil en bas à droite, puis allez dans Paramètres.",
-        icon: ShieldCheck,
+        title: "Ouvrir les paramètres Strava",
+        description: "Connecte-toi sur strava.com depuis un navigateur. Clique sur ta photo de profil en haut à droite, puis sur Paramètres.",
+        icon: Settings,
       },
       {
-        title: "Trouvez « Télécharger vos données »",
-        description: "Descendez jusqu'à trouver cette option. Appuyez dessus pour demander votre archive.",
-        icon: FileArchive,
+        title: "Accéder à Mon compte",
+        description: "Dans le menu de gauche tout en bas, clique sur Mon compte, puis cherche la section Télécharger ou supprimer ton compte.",
+        icon: User,
       },
       {
-        title: "Recevez et importez le ZIP",
-        description: "Strava vous envoie un email avec votre archive. Ouvrez-le et importez le fichier ZIP ici.",
+        title: "Demander ton archive",
+        description: "Clique sur Commencer à côté de Télécharger tes données, puis sur Demander ton archive. Tu recevras un email dans les 24h.",
+        icon: Download,
+      },
+      {
+        title: "Importer dans Pace",
+        description: "Une fois l'email reçu, télécharge l'archive ZIP et importe-la ici. Tu peux aussi importer uniquement le fichier activities.csv pour un import rapide sans trace GPS.",
         icon: Upload,
       },
     ],
@@ -123,6 +132,35 @@ export const sourceConfig: Record<
       {
         title: "Ouvrez le ZIP et importez export.xml",
         description: "Décompressez le fichier, trouvez export.xml et importez-le directement ici avec votre téléphone.",
+        icon: Upload,
+      },
+    ],
+  },
+  suunto: {
+    label: "Suunto",
+    description: "Importe tes activités depuis l'app Suunto",
+    icon: Watch,
+    acceptedExtensions: ".fit,.gpx",
+    expectedText: "Fichier FIT ou GPX exporté depuis l'app Suunto",
+    instructions: [
+      {
+        title: "Ouvrir l'app Suunto",
+        description: "Ouvre l'app Suunto sur ton téléphone et connecte ta montre.",
+        icon: Smartphone,
+      },
+      {
+        title: "Accéder à ton activité",
+        description: "Sélectionne une activité dans ton historique et appuie sur les trois points en haut à droite.",
+        icon: Activity,
+      },
+      {
+        title: "Exporter le fichier FIT",
+        description: "Appuie sur Exporter ou Partager, puis sélectionne le format FIT. Enregistre le fichier sur ton téléphone.",
+        icon: Download,
+      },
+      {
+        title: "Importer dans Pace",
+        description: "Reviens ici et importe le fichier FIT. Pace importera automatiquement ta course avec trace GPS et fréquence cardiaque.",
         icon: Upload,
       },
     ],

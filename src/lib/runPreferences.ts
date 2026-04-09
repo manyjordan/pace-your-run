@@ -5,12 +5,16 @@ export type RunPreferences = {
   distanceUnit: DistanceUnit;
   announceSplitSpeed: boolean;
   cumulativeTimeAnnouncement: CumulativeTimeAnnouncement;
+  paceAlerts: boolean;
+  paceAlertThresholdSeconds: number;
 };
 
 const DEFAULT_RUN_PREFERENCES: RunPreferences = {
   distanceUnit: "km",
   announceSplitSpeed: false,
   cumulativeTimeAnnouncement: "off",
+  paceAlerts: true,
+  paceAlertThresholdSeconds: 15,
 };
 
 function getStorageKey(userId?: string | null) {
@@ -40,6 +44,13 @@ export function loadRunPreferences(userId?: string | null): RunPreferences {
         parsed.cumulativeTimeAnnouncement === "10"
           ? parsed.cumulativeTimeAnnouncement
           : "off",
+      paceAlerts: parsed.paceAlerts !== false,
+      paceAlertThresholdSeconds:
+        typeof parsed.paceAlertThresholdSeconds === "number" &&
+        Number.isFinite(parsed.paceAlertThresholdSeconds) &&
+        parsed.paceAlertThresholdSeconds > 0
+          ? Math.round(parsed.paceAlertThresholdSeconds)
+          : 15,
     };
   } catch {
     return DEFAULT_RUN_PREFERENCES;

@@ -448,7 +448,14 @@ export default function TrainingTab() {
                     />
                     <div className="w-12 text-xs font-semibold text-muted-foreground">{session.day}</div>
                     <div className="flex-1 text-left">
-                      <p className={`text-sm font-semibold ${isCompleted ? "line-through text-muted-foreground" : ""}`}>{session.type}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-sm font-semibold ${isCompleted ? "line-through text-muted-foreground" : ""}`}>{session.type}</p>
+                        {session.intervals && (
+                          <Badge variant="outline" className="border-accent/40 px-1.5 py-0 text-[10px] text-accent">
+                            Fractionné
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">{session.distance.toFixed(1)} km · {session.pace} · {session.duration} min</p>
                     </div>
                     <Badge
@@ -493,7 +500,12 @@ export default function TrainingTab() {
 
       {/* Détails de la séance */}
       {selectedSession && (
-        <SessionDetail session={selectedSession} onClose={() => setSelectedSession(null)} />
+        <SessionDetail
+          session={selectedSession}
+          planName={selectedPlan.name}
+          weekNumber={currentWeek}
+          onClose={() => setSelectedSession(null)}
+        />
       )}
     </div>
   );

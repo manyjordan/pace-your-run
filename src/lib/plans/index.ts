@@ -25,12 +25,17 @@ export function mapSessionsToDays(plan: TrainingPlan, availableDays: string[]): 
 
   return {
     ...plan,
-    weeklySchedule: plan.weeklySchedule.map((week) => ({
-      ...week,
-      sessions: week.sessions.map((session, index) => ({
-        ...session,
-        day: sortedDays[index % sortedDays.length] ?? session.day,
-      })),
-    })),
+    weeklySchedule: plan.weeklySchedule.map((week) => {
+      const sessions = week.sessions.slice(0, sortedDays.length);
+
+      return {
+        ...week,
+        sessions: sessions.map((session, index) => ({
+          ...session,
+          day: sortedDays[index]!,
+        })),
+        totalDistance: Number(sessions.reduce((sum, s) => sum + s.distance, 0).toFixed(1)),
+      };
+    }),
   };
 }

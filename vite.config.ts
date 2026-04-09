@@ -92,15 +92,26 @@ export default defineConfig(({ mode }) => ({
     exclude: ["@perfood/capacitor-healthkit"],
   },
   build: {
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       external: ["@perfood/capacitor-healthkit"],
       output: {
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-ui": [
+            "framer-motion",
+            "@radix-ui/react-dialog",
+            "@radix-ui/react-tabs",
+            "@radix-ui/react-select",
+          ],
           "vendor-charts": ["recharts"],
-          "vendor-motion": ["framer-motion"],
-          "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-leaflet": ["leaflet"],
+          "vendor-supabase": ["@supabase/supabase-js"],
+          "vendor-dates": ["date-fns"],
+          "vendor-sentry": ["@sentry/react"],
+          "plans-weight": ["./src/lib/plans/weightPlans"],
+          "plans-distance": ["./src/lib/plans/distancePlans"],
+          "plans-race": ["./src/lib/plans/racePlans"],
         },
       },
     },

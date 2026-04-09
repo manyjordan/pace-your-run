@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
+﻿import { describe, it, expect } from "vitest";
 import { selectPlan, detectLevel } from "@/lib/planSelector";
+import { mapSessionsToDays } from "@/lib/plans";
 import type { RunRow } from "@/lib/database";
 
 describe("selectPlan", () => {
@@ -77,5 +78,35 @@ describe("detectLevel", () => {
     const runs: Partial<RunRow>[] = [{ id: "run-1", distance_km: 10, duration_seconds: 3600, started_at: null }];
     expect(() => detectLevel(runs as RunRow[])).not.toThrow();
     expect(detectLevel(runs as RunRow[])).toBe("beginner");
+  });
+});
+
+describe("mapSessionsToDays", () => {
+  it("never assigns two sessions on the same day", () => {
+    const plan = selectPlan({
+      goal: "distance",
+      targetDistance: "10k",
+      level: "intermediate",
+      daysPerWeek: 4,
+    });
+    const mapped = mapSessionsToDays(plan, ["Lundi", "Mercredi", "Vendredi"]);
+    for (const week of mapped.weeklySchedule) {
+      const days = week.sessions.map((s) => s.day);
+      const uniqueDays = new Set(days);
+      expect(uniqueDays.size).toBe(days.length);
+    }
+  });
+
+  it("truncates sessions to available days count", () => {
+    const plan = selectPlan({
+      goal: "race",
+      targetDistance: "marathon",
+      level: "advanced",
+      daysPerWeek: 5,
+    });
+    const mapped = mapSessionsToDays(plan, ["Lundi", "Mercredi", "Vendredi"]);
+    for (const week of mapped.weeklySchedule) {
+      expect(week.sessions.length).toBeLessThanOrEqual(3);
+    }
   });
 });

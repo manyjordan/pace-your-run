@@ -25,11 +25,9 @@ import {
   Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import GPSMap from "@/components/GPSMap";
-import { ForumSection } from "@/components/social/ForumSection";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   followUser,
@@ -60,6 +58,11 @@ import {
   getInitials,
   type CommunityPost,
 } from "@/lib/strava";
+
+const GPSMap = lazy(() => import("@/components/GPSMap"));
+const ForumSection = lazy(() =>
+  import("@/components/social/ForumSection").then((module) => ({ default: module.ForumSection })),
+);
 
 function buildFallbackTrace(seed: number) {
   const points = 24;
@@ -753,7 +756,15 @@ export default function Social() {
                         </div>
                       ) : null}
 
-                      {post.gpsTrace && post.gpsTrace.length > 0 && <GPSMap trace={post.gpsTrace} />}
+                      {post.gpsTrace && post.gpsTrace.length > 0 && (
+                        <Suspense
+                          fallback={
+                            <div className="h-[220px] animate-pulse rounded-lg bg-muted" />
+                          }
+                        >
+                          <GPSMap trace={post.gpsTrace} />
+                        </Suspense>
+                      )}
 
                       <Button
                         variant="outline"
@@ -857,7 +868,15 @@ export default function Social() {
         </TabsContent>
 
         <TabsContent value="forum">
-          <ForumSection />
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center py-12">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+              </div>
+            }
+          >
+            <ForumSection />
+          </Suspense>
         </TabsContent>
       </Tabs>
     </div>

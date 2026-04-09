@@ -1,5 +1,15 @@
 export type Intensity = "easy" | "moderate" | "tempo" | "interval" | "race";
 
+export type IntervalSet = {
+  reps: number;
+  distanceM?: number;
+  durationSeconds?: number;
+  pace: string;
+  recoverySeconds: number;
+  recoveryType: "walk" | "jog" | "rest";
+  recoveryPace?: string;
+};
+
 export type Session = {
   day: string;
   type: string;
@@ -8,6 +18,9 @@ export type Session = {
   duration: number;
   description: string;
   intensity: Intensity;
+  warmupMinutes?: number;
+  cooldownMinutes?: number;
+  intervals?: IntervalSet;
 };
 
 export type Week = {

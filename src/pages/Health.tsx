@@ -320,7 +320,7 @@ const issuesData: Record<string, Issue> = {
       "Arrêt prolongé et perte de forme",
     ],
     conseils: [
-      "⚠️ Radio ou IRM nécessaire pour confirmer",
+      "Radio ou IRM nécessaire pour confirmer",
       "Cessez IMMÉDIATEMENT la course",
       "Calcium, vitamine D, protéines pour cicatrisation",
       "Retour à la course graduel sur 3-4 mois",

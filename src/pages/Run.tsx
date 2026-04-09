@@ -1,7 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { ActivityPostCard } from "@/components/ActivityPostCard";
-import GPSMap from "@/components/GPSMap";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,12 +18,13 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2,
+  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2, Gauge, ChevronRight,
 } from "lucide-react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   createPost,
   detectSimultaneousRuns,
@@ -33,6 +33,7 @@ import {
   updatePostAudience,
   updatePostDescription,
   updateRunRanWith,
+  type RouteRow,
   type RunGpsPoint,
   type RunRow,
 } from "@/lib/database";
@@ -61,6 +62,10 @@ import {
   saveRunPreferences,
   type RunPreferences,
 } from "@/lib/runPreferences";
+import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib/activeSession";
+
+const GPSMap = lazy(() => import("@/components/GPSMap"));
+const RouteMap = lazy(() => import("@/components/RouteMap"));
 
 // Haversine formula: calculates distance between two lat/lng points in kilometers
 function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -75,6 +80,26 @@ function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
 }
 
 const OFFLINE_RUNS_KEY = "pace-offline-runs";
+const SELECTED_ROUTE_KEY = "pace-selected-route";
+
+function findClosestPointIndex(
+  trace: Array<{ lat: number; lng: number }>,
+  current: { lat: number; lng: number }
+): number {
+  let minDist = Infinity;
+  let closest = 0;
+  for (let i = 0; i < trace.length; i++) {
+    const d = Math.sqrt(
+      Math.pow(trace[i].lat - current.lat, 2) +
+      Math.pow(trace[i].lng - current.lng, 2)
+    );
+    if (d < minDist) {
+      minDist = d;
+      closest = i;
+    }
+  }
+  return closest;
+}
 
 function isLikelyNetworkError(error: unknown): boolean {
   if (typeof navigator !== "undefined" && !navigator.onLine) return true;
@@ -136,6 +161,18 @@ function generateDefaultTitle(): string {
   return `Course ${timeOfDay} — ${day}`;
 }
 
+function parsePaceToSeconds(pace: string): number {
+  const normalizedPace = pace.replace("/km", "").trim();
+  const parts = normalizedPace.split(":");
+  if (parts.length !== 2) return 0;
+
+  const minutes = Number(parts[0]);
+  const seconds = Number(parts[1]);
+  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return 0;
+
+  return minutes * 60 + seconds;
+}
+
 /* ── Run component ── */
 export default function Run() {
   const { user } = useAuth();
@@ -144,6 +181,13 @@ export default function Run() {
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
   const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
+  const [isTreadmill, setIsTreadmill] = useState(false);
+  const [treadmillSpeedKmh, setTreadmillSpeedKmh] = useState(10);
+  const [showTreadmillCorrection, setShowTreadmillCorrection] = useState(false);
+  const [correctedDistanceKm, setCorrectedDistanceKm] = useState("");
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [activeRoute, setActiveRoute] = useState<RouteRow | null>(null);
+  const [routeProgress, setRouteProgress] = useState(0);
   const [gpsTrace, setGpsTrace] = useState<GPSPoint[]>([]);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsError, setGpsError] = useState<string>("");
@@ -184,6 +228,9 @@ export default function Run() {
   const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
   const lastAnnouncedKmRef = useRef(0);
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
+  const routeArrivalAnnouncedRef = useRef(false);
+  const lastPaceAlertRef = useRef<number>(0);
+  const currentIntervalRepRef = useRef<number>(0);
 
   const formatTime = useCallback((s: number) => {
     const h = Math.floor(s / 3600);
@@ -391,10 +438,33 @@ export default function Run() {
   }, [postAudience]);
 
   useEffect(() => {
+    const session = loadActiveSession();
+    if (!session) return;
+    setActiveSession(session);
+    setTitle(session.session.type);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SELECTED_ROUTE_KEY);
+      if (stored) {
+        const route = JSON.parse(stored) as RouteRow;
+        setActiveRoute(route);
+      }
+    } catch {
+      // ignore invalid localStorage payload
+    }
+  }, []);
+
+  useEffect(() => {
     if (status === "running") {
-      const startOk = startGpsTracking();
-      if (startOk) {
+      if (isTreadmill) {
         intervalRef.current = setInterval(tick, 1000);
+      } else {
+        const startOk = startGpsTracking();
+        if (startOk) {
+          intervalRef.current = setInterval(tick, 1000);
+        }
       }
     } else if (status === "paused") {
       stopGpsTracking();
@@ -408,7 +478,51 @@ export default function Run() {
       if (intervalRef.current) clearInterval(intervalRef.current);
       if (status === "idle") stopGpsTracking();
     };
-  }, [status, tick, startGpsTracking, stopGpsTracking]);
+  }, [isTreadmill, status, tick, startGpsTracking, stopGpsTracking]);
+
+  useEffect(() => {
+    if (!isTreadmill || status !== "running") return;
+
+    const interval = setInterval(() => {
+      setDistance((prev) => Number((prev + treadmillSpeedKmh / 3600).toFixed(4)));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isTreadmill, status, treadmillSpeedKmh]);
+
+  useEffect(() => {
+    if (!activeRoute || isTreadmill || gpsTrace.length === 0) return;
+
+    const current = gpsTrace[gpsTrace.length - 1];
+    const closestIndex = findClosestPointIndex(activeRoute.gps_trace, current);
+    let coveredKm = 0;
+    for (let i = 1; i <= closestIndex; i++) {
+      coveredKm += haversineDistance(
+        activeRoute.gps_trace[i - 1].lat,
+        activeRoute.gps_trace[i - 1].lng,
+        activeRoute.gps_trace[i].lat,
+        activeRoute.gps_trace[i].lng,
+      );
+    }
+    setRouteProgress(Number(coveredKm.toFixed(2)));
+  }, [activeRoute, gpsTrace, isTreadmill]);
+
+  useEffect(() => {
+    if (!activeRoute || status !== "running" || routeArrivalAnnouncedRef.current) return;
+    if (activeRoute.distance_km <= 0) return;
+
+    if (routeProgress >= activeRoute.distance_km * 0.95) {
+      routeArrivalAnnouncedRef.current = true;
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        const utterance = new SpeechSynthesisUtterance("Vous approchez de l'arrivée");
+        utterance.lang = "fr-FR";
+        utterance.rate = 1.0;
+        utterance.volume = 1.0;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      }
+    }
+  }, [activeRoute, routeProgress, status]);
 
   useEffect(() => {
     return () => {
@@ -472,8 +586,51 @@ export default function Run() {
     window.speechSynthesis.speak(utterance);
   }, [distance, elapsed, gpsTrace, status]);
 
+  useEffect(() => {
+    if (status !== "running" || !activeSession || pace <= 0) return;
+
+    const prefs = speechPrefsRef.current;
+    if (!prefs.paceAlerts) return;
+
+    const now = Date.now();
+    const timeSinceLastAlert = (now - lastPaceAlertRef.current) / 1000;
+    if (timeSinceLastAlert < 15) return;
+
+    const targetPaceSeconds = parsePaceToSeconds(activeSession.session.pace);
+    if (targetPaceSeconds <= 0) return;
+
+    const currentPaceSeconds = pace * 60;
+    const diff = currentPaceSeconds - targetPaceSeconds;
+    const threshold = prefs.paceAlertThresholdSeconds;
+    if (Math.abs(diff) <= threshold) return;
+
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const targetMin = Math.floor(targetPaceSeconds / 60);
+    const targetSec = targetPaceSeconds % 60;
+    const currentMin = Math.floor(currentPaceSeconds / 60);
+    const currentSec = Math.round(currentPaceSeconds % 60);
+
+    const message = diff > 0
+      ? `Allure prévue ${targetMin} minutes ${targetSec > 0 ? `${targetSec} secondes` : ""}. Allure actuelle ${currentMin} minutes ${currentSec > 0 ? `${currentSec} secondes` : ""}. Accélérez légèrement.`
+      : `Allure prévue ${targetMin} minutes ${targetSec > 0 ? `${targetSec} secondes` : ""}. Allure actuelle ${currentMin} minutes ${currentSec > 0 ? `${currentSec} secondes` : ""}. Ralentissez légèrement.`;
+
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = "fr-FR";
+    utterance.rate = 1.0;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    lastPaceAlertRef.current = now;
+  }, [activeSession, pace, status]);
+
   const start = () => {
-    setTitle("");
+    if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
+      setIsTreadmill(false);
+      setTreadmillSpeedKmh(10);
+      setShowTreadmillCorrection(false);
+      setCorrectedDistanceKm("");
+    }
+    setTitle(activeSession?.session.type ?? "");
     setRunSummary(null);
     setCompletedActivity(null);
     setCompletedPost(null);
@@ -490,6 +647,10 @@ export default function Run() {
     runStartedAtRef.current = new Date().toISOString();
     speechPrefsRef.current = loadRunPreferences(user?.id);
     lastAnnouncedKmRef.current = 0;
+    lastPaceAlertRef.current = 0;
+    currentIntervalRepRef.current = 0;
+    setRouteProgress(0);
+    routeArrivalAnnouncedRef.current = false;
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -510,12 +671,14 @@ export default function Run() {
   };
 
   const stop = async () => {
-    const finalDistance = distance;
+    const finalDistance = isTreadmill && correctedDistanceKm && parseFloat(correctedDistanceKm) > 0
+      ? parseFloat(correctedDistanceKm)
+      : distance;
     const finalElapsed = elapsed;
-    const finalGpsTrace = gpsTrace;
-    const movingTimeSeconds = computeMovingTime(finalGpsTrace);
+    const finalGpsTrace = isTreadmill ? [] : gpsTrace;
+    const movingTimeSeconds = isTreadmill ? finalElapsed : computeMovingTime(finalGpsTrace);
     const finalStartedAt = runStartedAtRef.current ?? new Date().toISOString();
-    const finalElevation = calculateElevationGain(finalGpsTrace);
+    const finalElevation = isTreadmill ? 0 : calculateElevationGain(finalGpsTrace);
     const finalAvgPace = finalDistance > 0 ? finalElapsed / 60 / finalDistance : 0;
     const finalAverageHeartRate =
       heartRateSamplesRef.current.length > 0
@@ -524,11 +687,33 @@ export default function Run() {
         )
         : undefined;
 
+    if (isTreadmill && !showTreadmillCorrection) {
+      disconnectHeartRateMonitor();
+      stopGpsTracking();
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (status !== "idle" && finalElapsed > 0 && finalDistance > 0) {
+        setRunSummary({
+          distance: finalDistance,
+          duration: finalElapsed,
+          movingTime: finalElapsed,
+          avgPace: finalAvgPace,
+          elevation: 0,
+          averageHeartRate: finalAverageHeartRate,
+          gpsTrace: [],
+          startedAt: finalStartedAt,
+        });
+      }
+      setStatus("idle");
+      setShowTreadmillCorrection(true);
+      setCorrectedDistanceKm("");
+      return;
+    }
+
     if (status !== "idle" && finalElapsed > 0 && finalDistance > 0) {
       setRunSummary({
         distance: finalDistance,
         duration: finalElapsed,
-        movingTime: movingTimeSeconds > 0 ? movingTimeSeconds : undefined,
+        movingTime: isTreadmill ? finalElapsed : movingTimeSeconds > 0 ? movingTimeSeconds : undefined,
         avgPace: finalAvgPace,
         elevation: finalElevation,
         averageHeartRate: finalAverageHeartRate,
@@ -555,7 +740,7 @@ export default function Run() {
         average_pace: finalAvgPace,
         average_heartrate: finalAverageHeartRate ?? null,
         gps_trace: finalGpsTrace,
-        run_type: "run",
+        run_type: isTreadmill ? "treadmill" : "run",
         started_at: finalStartedAt,
         title: activityName,
         created_at: new Date().toISOString(),
@@ -607,6 +792,10 @@ export default function Run() {
     setGpsError("");
     setBluetoothError("");
     lastAnnouncedKmRef.current = 0;
+    setRouteProgress(0);
+    routeArrivalAnnouncedRef.current = false;
+    setShowTreadmillCorrection(false);
+    setCorrectedDistanceKm("");
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -620,12 +809,12 @@ export default function Run() {
     const runData = {
       distance_km: runSummary.distance,
       duration_seconds: runSummary.duration,
-      moving_time_seconds: runSummary.movingTime && runSummary.movingTime > 0 ? runSummary.movingTime : null,
+      moving_time_seconds: isTreadmill ? runSummary.duration : runSummary.movingTime && runSummary.movingTime > 0 ? runSummary.movingTime : null,
       average_pace: runSummary.avgPace,
       average_heartrate: runSummary.averageHeartRate ?? null,
-      elevation_gain: runSummary.elevation,
-      gps_trace: runSummary.gpsTrace,
-      run_type: "run" as const,
+      elevation_gain: isTreadmill ? 0 : runSummary.elevation,
+      gps_trace: isTreadmill ? [] : runSummary.gpsTrace,
+      run_type: (isTreadmill ? "treadmill" : "run") as const,
       started_at: runSummary.startedAt,
       title: activityTitle,
     };
@@ -639,13 +828,20 @@ export default function Run() {
       const createdPost = await createPost(user.id, savedRun.id, activityTitle, description, postAudienceRef.current);
       setCompletedPostId(createdPost.id);
       window.dispatchEvent(new Event("pace-community-updated"));
+      localStorage.removeItem(SELECTED_ROUTE_KEY);
+      setActiveRoute(null);
+      setRouteProgress(0);
+      clearActiveSession();
+      setActiveSession(null);
 
-      const ranWithIds = await detectSimultaneousRuns(
-        user.id,
-        runSummary.startedAt,
-        runSummary.duration,
-        runSummary.gpsTrace,
-      ).catch(() => []);
+      const ranWithIds = isTreadmill
+        ? []
+        : await detectSimultaneousRuns(
+            user.id,
+            runSummary.startedAt,
+            runSummary.duration,
+            runSummary.gpsTrace,
+          ).catch(() => []);
 
       if (ranWithIds.length > 0) {
         toast({
@@ -703,7 +899,7 @@ export default function Run() {
     } finally {
       setIsSaving(false);
     }
-  }, [user, runSummary, title, formatTime, toast]);
+  }, [user, runSummary, title, formatTime, isTreadmill, toast]);
 
   const handleAudienceChange = useCallback(
     async (value: "private" | "friends" | "public") => {
@@ -852,7 +1048,108 @@ export default function Run() {
           </ScrollReveal>
         )}
 
-        {isRunActive && (
+        {status === "idle" && (
+          <div className="flex w-full gap-2">
+            <button
+              onClick={() => setIsTreadmill(false)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-semibold transition-all",
+                !isTreadmill
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-border text-muted-foreground hover:border-accent/50"
+              )}
+            >
+              <MapPin className="h-4 w-4" />
+              Course extérieure
+            </button>
+            <button
+              onClick={() => setIsTreadmill(true)}
+              className={cn(
+                "flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-semibold transition-all",
+                isTreadmill
+                  ? "border-accent bg-accent/10 text-accent"
+                  : "border-border text-muted-foreground hover:border-accent/50"
+              )}
+            >
+              <Gauge className="h-4 w-4" />
+              Tapis roulant
+            </button>
+          </div>
+        )}
+
+        {activeSession && status === "idle" && (
+          <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/5 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">
+                  {activeSession.planName} · Semaine {activeSession.weekNumber}
+                </p>
+                <p className="text-sm font-semibold">{activeSession.session.type}</p>
+              </div>
+              <button
+                onClick={() => {
+                  clearActiveSession();
+                  setActiveSession(null);
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground"
+              >
+                Ignorer
+              </button>
+            </div>
+            <div className="flex gap-4 text-xs text-muted-foreground">
+              <span>{activeSession.session.distance} km</span>
+              <span>·</span>
+              <span>Allure cible : {activeSession.session.pace} /km</span>
+              {activeSession.session.intervals && (
+                <>
+                  <span>·</span>
+                  <span>
+                    {activeSession.session.intervals.reps} ×{" "}
+                    {activeSession.session.intervals.distanceM
+                      ? `${activeSession.session.intervals.distanceM}m`
+                      : `${activeSession.session.intervals.durationSeconds}s`}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {status === "idle" && (
+          <Link
+            to="/routes"
+            className="flex items-center gap-2 rounded-lg border border-accent/20 bg-card p-4 hover:border-accent/50 transition-colors"
+          >
+            <MapPin className="h-5 w-5 text-accent" />
+            <div>
+              <p className="text-sm font-semibold">Mes parcours</p>
+              <p className="text-xs text-muted-foreground">Importez et naviguez sur vos parcours GPX</p>
+            </div>
+            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />
+          </Link>
+        )}
+
+        {activeRoute && status === "idle" && (
+          <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold">{activeRoute.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {activeRoute.distance_km.toFixed(1)} km · {Math.round(activeRoute.elevation_gain)}m D+
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setActiveRoute(null);
+                localStorage.removeItem(SELECTED_ROUTE_KEY);
+              }}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Retirer
+            </button>
+          </div>
+        )}
+
+        {!isTreadmill && isRunActive && (
           <ScrollReveal>
             {hasLiveGpsTrace ? (
               <Card className="border-accent/30">
@@ -866,7 +1163,20 @@ export default function Run() {
                       {status === "running" ? "En direct" : "En pause"}
                     </Badge>
                   </div>
-                  <GPSMap trace={gpsTrace} isLive height={220} />
+                  <Suspense fallback={<div className="h-[220px] rounded-lg bg-muted animate-pulse" />}>
+                    {activeRoute ? (
+                      <RouteMap
+                        referenceTrace={activeRoute.gps_trace}
+                        liveTrace={gpsTrace}
+                        isLive
+                        height={220}
+                        progressKm={routeProgress}
+                        totalKm={activeRoute.distance_km}
+                      />
+                    ) : (
+                      <GPSMap trace={gpsTrace} isLive height={220} />
+                    )}
+                  </Suspense>
                 </CardContent>
               </Card>
             ) : (
@@ -888,6 +1198,40 @@ export default function Run() {
           </ScrollReveal>
         )}
 
+        {isTreadmill && status === "running" && (
+          <Card className="border-accent/30">
+            <CardContent className="p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">Vitesse tapis</p>
+                <p className="text-xs text-muted-foreground">
+                  {(60 / treadmillSpeedKmh).toFixed(1).replace(".", ":")} /km
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setTreadmillSpeedKmh((s) => Math.max(3, Number((s - 0.5).toFixed(1))))}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border text-lg font-bold hover:border-accent hover:text-accent transition-colors"
+                >
+                  -
+                </button>
+                <div className="flex-1 text-center">
+                  <span className="text-4xl font-black tabular-nums">{treadmillSpeedKmh.toFixed(1)}</span>
+                  <span className="ml-1 text-sm text-muted-foreground">km/h</span>
+                </div>
+                <button
+                  onClick={() => setTreadmillSpeedKmh((s) => Math.min(30, Number((s + 0.5).toFixed(1))))}
+                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border text-lg font-bold hover:border-accent hover:text-accent transition-colors"
+                >
+                  +
+                </button>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Distance calculée automatiquement depuis la vitesse
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <ScrollReveal>
           <Card className="border-accent/30">
             <CardContent className="p-6 flex flex-col items-center space-y-6">
@@ -899,7 +1243,7 @@ export default function Run() {
                   <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                     <MapPin className="h-3 w-3" />
                     Distance
-                    {isRunActive && (
+                    {isRunActive && !isTreadmill && (
                       <TooltipProvider delayDuration={150}>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -920,6 +1264,11 @@ export default function Run() {
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                    )}
+                    {isRunActive && isTreadmill && (
+                      <Badge variant="outline" className="border-muted-foreground/30 text-[10px] text-muted-foreground">
+                        Mode tapis
+                      </Badge>
                     )}
                   </div>
                   {isRunActive && runPreferences.announceSplitSpeed && (
@@ -952,8 +1301,11 @@ export default function Run() {
                         to="/plan?tab=equipment&section=gear"
                         className="text-[10px] text-accent underline underline-offset-2"
                       >
-                        Équipement requis : ceinture Bluetooth
+                        Équipement requis pour mesurer la fréquence cardiquage
                       </Link>
+                      <p className="mt-1 text-center text-xs text-muted-foreground">
+                        Compatible ceintures cardiaques Bluetooth et montres Suunto, Garmin, Polar
+                      </p>
                     </div>
                   )}
                 </div>
@@ -985,19 +1337,68 @@ export default function Run() {
           <ScrollReveal>
             <Card className="border-accent/50 bg-accent/10">
               <CardContent className="p-5 space-y-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="text-sm font-semibold">Récapitulatif de performance</h3>
-                  <Button variant="outline" size="sm" onClick={() => setShowCompletedActivityDetail(true)}>
-                    Ouvrir l'analyse
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {runSummary.averageHeartRate
-                    ? `FC moyenne : ${runSummary.averageHeartRate} bpm`
-                    : "Connectez une ceinture cardiaque pour mesurer votre FC"}
-                </p>
-                {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
-                <div className="space-y-3 rounded-lg border border-border/60 bg-background/60 p-3">
+                {isTreadmill && showTreadmillCorrection && (
+                  <div className="space-y-4 rounded-lg border border-border/60 bg-background/60 p-3">
+                    <div className="text-center space-y-1">
+                      <p className="text-sm font-semibold">Distance calculée</p>
+                      <p className="text-3xl font-black tabular-nums">{distance.toFixed(2)} km</p>
+                      <p className="text-xs text-muted-foreground">
+                        Basée sur {treadmillSpeedKmh} km/h pendant {Math.floor(elapsed / 60)}min
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">
+                        Corriger la distance si nécessaire
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0.1"
+                          max="100"
+                          value={correctedDistanceKm}
+                          onChange={(e) => setCorrectedDistanceKm(e.target.value)}
+                          placeholder={distance.toFixed(2)}
+                          className="w-full rounded-lg border border-border bg-background px-4 py-3 pr-12 text-lg font-bold tabular-nums focus:border-accent focus:outline-none"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">km</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Le tapis affiche parfois une distance différente - corrigez si besoin
+                      </p>
+                    </div>
+
+                    <Button
+                      className="w-full bg-accent text-accent-foreground"
+                      onClick={() => {
+                        if (correctedDistanceKm && parseFloat(correctedDistanceKm) > 0) {
+                          setDistance(parseFloat(correctedDistanceKm));
+                        }
+                        setShowTreadmillCorrection(false);
+                        void stop();
+                      }}
+                    >
+                      Confirmer et continuer
+                    </Button>
+                  </div>
+                )}
+
+                {(!isTreadmill || !showTreadmillCorrection) && (
+                  <>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold">Récapitulatif de performance</h3>
+                      <Button variant="outline" size="sm" onClick={() => setShowCompletedActivityDetail(true)}>
+                        Ouvrir l'analyse
+                      </Button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {runSummary.averageHeartRate
+                        ? `FC moyenne : ${runSummary.averageHeartRate} bpm`
+                        : "Connectez une ceinture cardiaque pour mesurer votre FC"}
+                    </p>
+                    {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
+                    <div className="space-y-3 rounded-lg border border-border/60 bg-background/60 p-3">
                   <div className="flex items-center gap-4">
                     <div className="text-center">
                       <div className="text-2xl font-bold tabular-nums">
@@ -1030,8 +1431,8 @@ export default function Run() {
                       </div>
                     ) : null}
                   </div>
-                </div>
-                <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                   <Label htmlFor="run-title">Nom de la course</Label>
                   <Input
                     id="run-title"
@@ -1045,8 +1446,8 @@ export default function Run() {
                     placeholder="Nom de votre course"
                     className="border-border"
                   />
-                </div>
-                <div className="space-y-2">
+                    </div>
+                    <div className="space-y-2">
                   <Label>Audience de cette course</Label>
                   <Select value={postAudience} onValueChange={(value) => void handleAudienceChange(value as "private" | "friends" | "public")}>
                     <SelectTrigger>
@@ -1066,18 +1467,20 @@ export default function Run() {
                         : "Cette course reste visible uniquement par vous."}
                   </p>
                   {isUpdatingAudience ? <p className="text-xs text-muted-foreground">Mise à jour de l'audience...</p> : null}
-                </div>
-                {user && !completedPostId ? (
-                  <Button
-                    type="button"
-                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                    disabled={isSaving}
-                    onClick={() => void persistCompletedRun()}
-                  >
-                    {isSaving ? "Enregistrement…" : "Enregistrer la course"}
-                  </Button>
-                ) : null}
-                {completedPost ? <ActivityPostCard post={completedPost} onOpen={() => setShowCompletedActivityDetail(true)} /> : null}
+                    </div>
+                    {user && !completedPostId ? (
+                      <Button
+                        type="button"
+                        className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
+                        disabled={isSaving}
+                        onClick={() => void persistCompletedRun()}
+                      >
+                        {isSaving ? "Enregistrement…" : "Enregistrer la course"}
+                      </Button>
+                    ) : null}
+                    {completedPost ? <ActivityPostCard post={completedPost} onOpen={() => setShowCompletedActivityDetail(true)} /> : null}
+                  </>
+                )}
               </CardContent>
             </Card>
           </ScrollReveal>

@@ -88,11 +88,27 @@ const TermsOfUse = () => {
               </p>
             </section>
 
-            {/* Section 10 */}
             <section className="space-y-3">
-              <h2 className="text-2xl font-semibold">10. Contact</h2>
+              <h2 className="text-2xl font-semibold">10. Données médicales et responsabilité</h2>
               <p className="text-muted-foreground">
-                <a href="mailto:many.jordan@gmail.com" className="text-accent hover:underline">many.jordan@gmail.com</a>
+                Les informations fournies par Pace (fréquence cardiaque, VO2max estimée, prévisions de course, conseils de santé) sont données à titre informatif uniquement. Elles ne constituent pas un avis médical et ne remplacent pas la consultation d'un professionnel de santé. Pace décline toute responsabilité en cas de blessure, malaise ou accident survenu lors d'une activité sportive enregistrée ou planifiée avec l'application.
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-2xl font-semibold">11. Contenu publié par les utilisateurs</h2>
+              <p className="text-muted-foreground">
+                En publiant du contenu sur le feed social ou le forum (texte, données de course, commentaires), vous accordez à Pace une licence non exclusive d'affichage de ce contenu aux autres utilisateurs de la plateforme. Vous restez propriétaire de vos données. Tout contenu illicite, offensant ou contraire aux présentes CGU peut être supprimé sans préavis.
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-2xl font-semibold">12. Contact</h2>
+              <p className="text-muted-foreground">
+                Pour toute question concernant les présentes conditions d'utilisation :
+              </p>
+              <p className="text-muted-foreground font-medium">
+                many.jordan@gmail.com
               </p>
             </section>
 

@@ -10,70 +10,67 @@ import { AppShell } from "@/components/AppShell";
 import { SplashScreen } from "@/components/SplashScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useState, useEffect, lazy, Suspense, useCallback } from "react";
-import Auth from "./pages/Auth.tsx";
-import EmailConfirmation from "./pages/EmailConfirmation.tsx";
-import Index from "./pages/Index.tsx";
-import Run from "./pages/Run.tsx";
-import Plan from "./pages/Plan.tsx";
-import PrivacyPolicy from "./pages/PrivacyPolicy.tsx";
-import TermsOfUse from "./pages/TermsOfUse.tsx";
-import SettingsPage from "./pages/Settings.tsx";
-import NotFound from "./pages/NotFound.tsx";
 
-// Lazy load heavy pages
-const Social = lazy(() => import("./pages/Social.tsx"));
-const Health = lazy(() => import("./pages/Health.tsx"));
-const ImportPage = lazy(() => import("./pages/Import.tsx"));
-const Onboarding = lazy(() => import("./pages/Onboarding.tsx"));
-const HealthKitSync = lazy(() => import("./pages/HealthKitSync.tsx"));
+const Index = lazy(() => import("@/pages/Index"));
+const Auth = lazy(() => import("@/pages/Auth"));
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const Run = lazy(() => import("@/pages/Run"));
+const Social = lazy(() => import("@/pages/Social"));
+const Plan = lazy(() => import("@/pages/Plan"));
+const RoutesPage = lazy(() => import("@/pages/Routes"));
+const Health = lazy(() => import("@/pages/Health"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Import = lazy(() => import("@/pages/Import"));
+const HealthKitSync = lazy(() => import("@/pages/HealthKitSync"));
+const PrivacyPolicy = lazy(() => import("@/pages/PrivacyPolicy"));
+const TermsOfUse = lazy(() => import("@/pages/TermsOfUse"));
+const LegalNotice = lazy(() => import("@/pages/LegalNotice"));
+const EmailConfirmation = lazy(() => import("@/pages/EmailConfirmation"));
+const NotFound = lazy(() => import("@/pages/NotFound"));
 
 const queryClient = new QueryClient();
 
 const LazyFallback = () => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
-    <div className="flex flex-col items-center gap-3">
-      <div className="relative">
-        <div className="animate-spin">
-          <div className="h-8 w-8 rounded-full border-4 border-accent/20 border-t-accent" />
-        </div>
-      </div>
-      <p className="text-xs text-muted-foreground">Chargement...</p>
-    </div>
+  <div className="flex min-h-screen items-center justify-center bg-background">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-accent border-t-transparent" />
   </div>
 );
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/auth" element={<Auth />} />
-      <Route path="/auth/confirm" element={<EmailConfirmation />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-      <Route path="/terms" element={<TermsOfUse />} />
-      <Route
-        path="*"
-        element={
-          <ProtectedRoute>
-            <AppShell>
-              <Suspense fallback={<LazyFallback />}>
+    <Suspense fallback={<LazyFallback />}>
+      <Routes>
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/auth/confirm" element={<EmailConfirmation />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfUse />} />
+        <Route path="/legal" element={<LegalNotice />} />
+        <Route
+          path="*"
+          element={
+            <ProtectedRoute>
+              <AppShell>
                 <Routes>
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<Index />} />
                   <Route path="/social" element={<Social />} />
                   <Route path="/run" element={<Run />} />
                   <Route path="/plan" element={<Plan />} />
+                  <Route path="/routes" element={<RoutesPage />} />
                   <Route path="/profile" element={<Navigate to="/settings" replace />} />
                   <Route path="/health" element={<Health />} />
-                  <Route path="/import" element={<ImportPage />} />
+                  <Route path="/import" element={<Import />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
-                  <Route path="/settings" element={<SettingsPage />} />
+                  <Route path="/settings" element={<Settings />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
-              </Suspense>
-            </AppShell>
-          </ProtectedRoute>
-        }
-      />
-    </Routes>
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+    </Suspense>
   );
 }
 

@@ -1,80 +1,19 @@
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
-import { Link } from "react-router-dom";
-import {
-  Activity,
-  Apple,
-  Archive,
-  CheckCircle2,
-  ChevronRight,
-  FileArchive,
-  FileText,
-  Footprints,
-  HeartPulse,
-  Loader2,
-  MapPinned,
-  ShieldCheck,
-  Smartphone,
-  Upload,
-  Watch,
-} from "lucide-react";
-
+import { useRef, useState, type ChangeEvent } from "react";
+import { Check, Loader2, Upload } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRuns, saveRun } from "@/lib/database";
 import { parseAppleHealthFile } from "@/lib/parsers/appleHealthParser";
 import { parseFitFile } from "@/lib/parsers/fitParser";
-import { parseGpxFile, type ImportedRun } from "@/lib/parsers/gpxParser";
+import { parseGpxFile } from "@/lib/parsers/gpxParser";
 import { parseStravaZipFile } from "@/lib/parsers/stravaZipParser";
+import { parseStravaCSV } from "@/lib/parsers/stravaCSVParser";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Progress } from "@/components/ui/progress";
-import { Separator } from "@/components/ui/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-
-type ImportSource = "strava" | "garmin" | "nike" | "apple" | "gpx";
-
-type PreviewRun = ImportedRun & {
-  previewId: string;
-};
-
-type ImportResult = {
-  imported: number;
-  duplicates: number;
-  failed: number;
-};
-
-import { sourceConfig, type SourceInstruction } from "@/lib/importInstructions";
-
-function formatFileSize(size: number) {
-  if (size < 1024) return `${size} o`;
-  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} Ko`;
-  return `${(size / (1024 * 1024)).toFixed(1)} Mo`;
-}
-
-function formatDuration(seconds: number) {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.round((seconds % 3600) / 60);
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, "0")}m`;
-  return `${minutes} min`;
-}
-
-function formatDate(value: string) {
-  return new Date(value).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
+import { sourceConfig, type ImportSource } from "@/lib/importInstructions";
 
 function normalizeStartedAt(value: string) {
   const normalized = new Date(value);
@@ -87,9 +26,7 @@ function normalizeStartedAt(value: string) {
 function safeNormalizeStartedAt(value: string | null | undefined) {
   if (!value) return null;
   const normalized = new Date(value);
-  if (Number.isNaN(normalized.getTime())) {
-    return null;
-  }
+  if (Number.isNaN(normalized.getTime())) return null;
   return normalized.toISOString();
 }
 
@@ -110,13 +47,8 @@ async function parseImportedRuns(source: ImportSource, file: File) {
     return parseStravaZipFile(file);
   }
 
-  if (lowerName.endsWith(".zip")) {
-    return parseStravaZipFile(file);
-  }
-
-  if (lowerName.endsWith(".gpx")) {
-    return [await parseGpxFile(file)];
-  }
+  if (lowerName.endsWith(".zip")) return parseStravaZipFile(file);
+  if (lowerName.endsWith(".gpx")) return [await parseGpxFile(file)];
 
   if (lowerName.endsWith(".fit")) {
     const parsed = await parseFitFile(file);
@@ -131,142 +63,134 @@ async function parseImportedRuns(source: ImportSource, file: File) {
 
 export default function ImportPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [source, setSource] = useState<ImportSource>("strava");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewRuns, setPreviewRuns] = useState<PreviewRun[]>([]);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [selectedSource, setSelectedSource] = useState<ImportSource | null>(null);
+  const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
+  const [stravaImportMode, setStravaImportMode] = useState<"zip" | "csv">("zip");
   const [isDragActive, setIsDragActive] = useState(false);
-  const [isParsing, setIsParsing] = useState(false);
-  const [parseError, setParseError] = useState<string | null>(null);
   const [isImporting, setIsImporting] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [importResult, setImportResult] = useState<ImportResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const currentSource = sourceConfig[source];
+  const selectedSourceConfig = selectedSource ? sourceConfig[selectedSource] : null;
 
-  const selectedCount = selectedIds.size;
+  const acceptedExtensions = selectedSource === "strava"
+    ? stravaImportMode === "zip"
+      ? ".zip"
+      : ".csv"
+    : selectedSourceConfig?.acceptedExtensions ?? "";
 
-  const selectionSummary = useMemo(() => {
-    if (!previewRuns.length) return "Aucune activite detectee";
-    return `${selectedCount} activites selectionnees sur ${previewRuns.length} trouvees`;
-  }, [previewRuns.length, selectedCount]);
-
-  async function handleFile(file: File) {
-    setSelectedFile(file);
-    setPreviewRuns([]);
-    setSelectedIds(new Set());
-    setParseError(null);
-    setImportResult(null);
-    setProgress(0);
-    setIsParsing(true);
-
-    try {
-      const parsed = await parseImportedRuns(source, file);
-      if (!parsed.length) {
-        throw new Error(`Aucune activite exploitable trouvee. Format attendu : ${currentSource.expectedText}.`);
-      }
-
-      const preview = parsed.map((run, index) => ({
-        ...run,
-        previewId: `${normalizeStartedAt(run.started_at)}-${index}`,
-      }));
-
-      setPreviewRuns(preview);
-      setSelectedIds(new Set(preview.map((run) => run.previewId)));
-    } catch (error) {
-      setParseError(
-        error instanceof Error
-          ? error.message
-          : `Impossible de lire le fichier. Format attendu : ${currentSource.expectedText}.`,
-      );
-    } finally {
-      setIsParsing(false);
-    }
-  }
-
-  async function onBrowseChange(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (file) {
-      await handleFile(file);
-    }
-  }
-
-  async function onDrop(event: React.DragEvent<HTMLDivElement>) {
-    event.preventDefault();
-    setIsDragActive(false);
-    const file = event.dataTransfer.files?.[0];
-    if (file) {
-      await handleFile(file);
-    }
-  }
-
-  function toggleRunSelection(previewId: string) {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(previewId)) {
-        next.delete(previewId);
-      } else {
-        next.add(previewId);
-      }
-      return next;
-    });
-  }
-
-  async function handleImport() {
-    if (!user || !previewRuns.length || !selectedCount) return;
-
-    setIsImporting(true);
-    setImportResult(null);
-    setProgress(0);
-
+  async function saveRunsBulk(runsToSave: Array<Record<string, unknown>>) {
+    if (!user?.id) return;
     const existingRuns = await getRuns(user.id);
     const existingStartedAt = new Set(
       existingRuns
         .map((run) => safeNormalizeStartedAt(run.started_at))
         .filter((value): value is string => Boolean(value)),
     );
-    const selectedRuns = previewRuns.filter((run) => selectedIds.has(run.previewId));
 
     let imported = 0;
-    let duplicates = 0;
-    let failed = 0;
+    let skipped = 0;
+    let errors = 0;
 
-    for (let index = 0; index < selectedRuns.length; index += 1) {
-      const run = selectedRuns[index];
-
+    for (let i = 0; i < runsToSave.length; i++) {
+      const run = runsToSave[i] as {
+        started_at?: string | null;
+        title?: string | null;
+        distance_km: number;
+        duration_seconds: number;
+        moving_time_seconds?: number | null;
+        elevation_gain?: number | null;
+        average_heartrate?: number | null;
+        average_pace?: number | null;
+        gps_trace?: Array<{ lat: number; lng: number; time: number }>;
+        run_type?: string | null;
+      };
       try {
+        if (!run.started_at) {
+          skipped++;
+          continue;
+        }
         const normalizedStart = normalizeStartedAt(run.started_at);
         if (existingStartedAt.has(normalizedStart)) {
-          duplicates += 1;
-        } else {
-          await saveRun(user.id, {
-            title: run.title,
-            distance_km: run.distance_km,
-            duration_seconds: run.duration_seconds,
-            moving_time_seconds: run.moving_time_seconds ?? null,
-            elevation_gain: run.elevation_gain,
-            average_heartrate: run.average_heartrate ?? null,
-            gps_trace: run.gps_trace,
-            started_at: normalizedStart,
-            run_type: `import:${run.source}`,
-          });
-          existingStartedAt.add(normalizedStart);
-          imported += 1;
+          skipped++;
+          continue;
         }
+
+        await saveRun(user.id, {
+          title: run.title ?? null,
+          distance_km: run.distance_km,
+          duration_seconds: run.duration_seconds,
+          moving_time_seconds: run.moving_time_seconds ?? null,
+          elevation_gain: run.elevation_gain ?? null,
+          average_heartrate: run.average_heartrate ?? null,
+          average_pace: run.average_pace ?? null,
+          gps_trace: run.gps_trace ?? [],
+          started_at: normalizedStart,
+          run_type: run.run_type ?? "run",
+        });
+        existingStartedAt.add(normalizedStart);
+        imported++;
       } catch {
-        failed += 1;
+        errors++;
       } finally {
-        setProgress(Math.round(((index + 1) / selectedRuns.length) * 100));
+        setProgress(Math.round(((i + 1) / runsToSave.length) * 100));
       }
     }
 
-    setImportResult({ imported, duplicates, failed });
-    if (imported > 0) {
-      window.dispatchEvent(new Event("pace-runs-updated"));
+    setImportResult({ imported, skipped, errors });
+    if (imported > 0) window.dispatchEvent(new Event("pace-runs-updated"));
+  }
+
+  async function handleFileImport(file: File) {
+    if (!selectedSource || !user?.id) return;
+    setError(null);
+    setIsImporting(true);
+    setProgress(0);
+    setImportResult(null);
+
+    try {
+      if (selectedSource === "strava" && stravaImportMode === "csv") {
+        const text = await file.text();
+        const result = parseStravaCSV(text);
+        await saveRunsBulk(result.runs);
+        setImportResult((current) => ({
+          imported: current?.imported ?? 0,
+          skipped: (current?.skipped ?? 0) + result.skipped,
+          errors: current?.errors ?? 0,
+        }));
+      } else {
+        const parsed = await parseImportedRuns(selectedSource, file);
+        await saveRunsBulk(
+          parsed.map((run) => ({
+            ...run,
+            run_type: `import:${run.source}`,
+          })),
+        );
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import impossible.");
+    } finally {
+      setIsImporting(false);
     }
-    setIsImporting(false);
+  }
+
+  async function onBrowseChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    await handleFileImport(file);
+    event.target.value = "";
+  }
+
+  async function onDrop(event: React.DragEvent<HTMLDivElement>) {
+    event.preventDefault();
+    setIsDragActive(false);
+    const file = event.dataTransfer.files?.[0];
+    if (!file) return;
+    await handleFileImport(file);
   }
 
   return (
@@ -275,252 +199,235 @@ export default function ImportPage() {
         <div className="rounded-2xl border border-accent/60 bg-accent px-5 py-5 text-accent-foreground shadow-[0_18px_44px_hsl(var(--accent)/0.2)]">
           <h1 className="text-2xl font-bold tracking-tight">Importer mon historique de course</h1>
           <p className="mt-2 text-sm text-accent-foreground/85">
-            Tout est analyse localement dans votre navigateur. Aucun fichier n'est envoye a un serveur externe.
+            Import guidé en 3 étapes. Analyse locale, aucun partage externe.
           </p>
         </div>
       </ScrollReveal>
 
-      <ScrollReveal>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Etape 1 — Choisissez votre source</CardTitle>
-            <CardDescription>Sélectionnez la provenance de vos données avant d'importer votre fichier.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-            {Object.entries(sourceConfig).map(([key, config]) => {
-              const Icon = config.icon;
-              const isSelected = source === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setSource(key as ImportSource);
-                    setSelectedFile(null);
-                    setPreviewRuns([]);
-                    setSelectedIds(new Set());
-                    setParseError(null);
-                    setImportResult(null);
-                  }}
-                  className={`rounded-xl border p-4 text-left transition-colors ${
-                    isSelected
-                      ? "border-accent bg-accent/10 shadow-[0_12px_24px_hsl(var(--accent)/0.08)]"
-                      : "border-border bg-card hover:border-accent/40 hover:bg-accent/5"
-                  }`}
-                >
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-accent/10 text-accent">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <p className="text-sm font-semibold">{config.label}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">{config.description}</p>
-                </button>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </ScrollReveal>
-
-      <ScrollReveal delay={0.05}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Etape 2 — Instructions</CardTitle>
-            <CardDescription>{currentSource.description}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {currentSource.instructions.map((instruction, index) => {
-              const Icon = instruction.icon;
-              return (
-                <div key={instruction.title} className="flex gap-4 rounded-xl border border-border p-4">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
-                    <span className="text-sm font-bold">{index + 1}</span>
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Icon className="h-4 w-4 text-accent" />
-                      <p className="text-sm font-semibold">{instruction.title}</p>
-                    </div>
-                    <p className="mt-1 text-sm text-muted-foreground">{instruction.description}</p>
-                  </div>
-                </div>
-              );
-            })}
-          </CardContent>
-        </Card>
-      </ScrollReveal>
-
-      <ScrollReveal delay={0.05}>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Etape 3 — Déposez votre fichier</CardTitle>
-            <CardDescription>Formats acceptés : {currentSource.acceptedExtensions}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div
-              onDragOver={(event) => {
-                event.preventDefault();
-                setIsDragActive(true);
-              }}
-              onDragLeave={() => setIsDragActive(false)}
-              onDrop={onDrop}
-              onClick={() => inputRef.current?.click()}
-              className={`cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-colors ${
-                isDragActive ? "border-accent bg-accent/10" : "border-border hover:border-accent/50 hover:bg-accent/5"
-              }`}
-            >
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
-                {isParsing ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
-              </div>
-              <p className="text-sm font-semibold">
-                {isParsing ? "Analyse du fichier en cours..." : "Glissez votre fichier ici ou cliquez pour parcourir"}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">Analyse locale uniquement. Format attendu : {currentSource.expectedText}</p>
-              <input
-                ref={inputRef}
-                type="file"
-                accept={currentSource.acceptedExtensions}
-                className="hidden"
-                onChange={onBrowseChange}
-              />
+      <div className="flex items-center gap-2 mb-6">
+        {[1, 2, 3].map((s) => (
+          <div key={s} className="flex items-center gap-2">
+            <div className={cn(
+              "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors",
+              currentStep >= s
+                ? "bg-accent text-accent-foreground"
+                : "bg-muted text-muted-foreground"
+            )}>
+              {currentStep > s ? <Check className="h-3.5 w-3.5" /> : s}
             </div>
+            {s < 3 && (
+              <div className={cn(
+                "h-0.5 w-8 transition-colors",
+                currentStep > s ? "bg-accent" : "bg-muted"
+              )} />
+            )}
+          </div>
+        ))}
+        <span className="ml-2 text-sm text-muted-foreground">
+          {currentStep === 1 ? "Source" : currentStep === 2 ? "Instructions" : "Import"}
+        </span>
+      </div>
 
-            {selectedFile && (
-              <div className="rounded-xl border border-border bg-muted/30 p-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline">{selectedFile.name}</Badge>
-                  <Badge variant="outline">{formatFileSize(selectedFile.size)}</Badge>
-                  {previewRuns.length > 0 && (
-                    <Badge variant="outline">
-                      {previewRuns.length} activite{previewRuns.length > 1 ? "s" : ""} trouvee{previewRuns.length > 1 ? "s" : ""}
-                    </Badge>
-                  )}
-                </div>
+      {importResult ? (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="space-y-4 text-center">
+              <div className="rounded-xl border border-accent/30 bg-accent/5 p-6">
+                <p className="text-3xl font-black text-accent">{importResult.imported}</p>
+                <p className="text-sm text-muted-foreground mt-1">courses importées</p>
+                {importResult.skipped > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    {importResult.skipped} activités ignorées (vélo, marche, natation...)
+                  </p>
+                )}
               </div>
-            )}
-
-            {parseError && (
-              <Alert variant="destructive">
-                <AlertTitle>Impossible de lire le fichier</AlertTitle>
-                <AlertDescription>{parseError}</AlertDescription>
-              </Alert>
-            )}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setCurrentStep(1);
+                    setSelectedSource(null);
+                    setImportResult(null);
+                    setError(null);
+                    setProgress(0);
+                  }}
+                >
+                  Importer d'autres fichiers
+                </Button>
+                <Button
+                  className="flex-1 bg-accent text-accent-foreground"
+                  onClick={() => navigate("/")}
+                >
+                  Voir mes courses
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      </ScrollReveal>
+      ) : (
+        <>
+          {currentStep === 1 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Sélection de la source</CardTitle>
+                <CardDescription>Choisissez la plateforme de provenance</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {Object.entries(sourceConfig).map(([key, source]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        setSelectedSource(key as ImportSource);
+                        setError(null);
+                        setTimeout(() => setCurrentStep(2), 300);
+                      }}
+                      className={cn(
+                        "flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all",
+                        selectedSource === key
+                          ? "border-accent bg-accent/10"
+                          : "border-border hover:border-accent/50"
+                      )}
+                    >
+                      <source.icon className="h-6 w-6 text-accent" />
+                      <span className="text-sm font-semibold">{source.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-      <ScrollReveal>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Etape 4 — Prévisualisation et confirmation</CardTitle>
-            <CardDescription>{selectionSummary}</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!previewRuns.length ? (
-              <div className="rounded-xl border border-border p-6 text-center text-sm text-muted-foreground">
-                Importez un fichier pour afficher les activités détectées.
-              </div>
-            ) : (
-              <>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12">OK</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Distance</TableHead>
-                      <TableHead>Durée</TableHead>
-                      <TableHead>Source</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previewRuns.map((run) => (
-                      <TableRow key={run.previewId}>
-                        <TableCell>
-                          <Checkbox
-                            checked={selectedIds.has(run.previewId)}
-                            onCheckedChange={() => toggleRunSelection(run.previewId)}
-                            aria-label={`Selectionner ${run.title}`}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{formatDate(run.started_at)}</p>
-                            <p className="text-xs text-muted-foreground">{run.title}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>{run.distance_km.toFixed(2)} km</TableCell>
-                        <TableCell>{formatDuration(run.duration_seconds)}</TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className="capitalize">
-                            {run.source}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          {currentStep === 2 && selectedSourceConfig && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Instructions</CardTitle>
+                <CardDescription>{selectedSourceConfig.description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {selectedSourceConfig.instructions.map((instruction, i) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground">
+                        {i + 1}
+                      </div>
+                      <div className="flex-1 pt-1">
+                        <p className="text-sm font-semibold">{instruction.title}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{instruction.description}</p>
+                      </div>
+                    </div>
+                  ))}
 
-                <Separator />
-
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-muted-foreground">{selectionSummary}</p>
                   <Button
-                    onClick={handleImport}
-                    disabled={!user || !selectedCount || isImporting || isParsing}
-                    className="bg-accent text-accent-foreground"
+                    className="w-full mt-4 bg-accent text-accent-foreground"
+                    onClick={() => setCurrentStep(3)}
                   >
-                    {isImporting ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Import en cours...
-                      </>
-                    ) : (
-                      <>
-                        Importer {selectedCount} activite{selectedCount > 1 ? "s" : ""}
-                        <ChevronRight className="ml-2 h-4 w-4" />
-                      </>
-                    )}
+                    J'ai mon fichier, continuer
                   </Button>
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </ScrollReveal>
 
-      <ScrollReveal>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Etape 5 — Progression de l'import</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Progress value={progress} />
-            <p className="text-sm text-muted-foreground">
-              {isImporting
-                ? `Import en cours : ${progress}%`
-                : importResult
-                  ? `${importResult.imported} activites importees, ${importResult.duplicates} doublons ignores${importResult.failed ? `, ${importResult.failed} echec(s)` : ""}.`
-                  : "Aucun import lance pour le moment."}
-            </p>
+                  <button
+                    onClick={() => { setCurrentStep(1); setSelectedSource(null); }}
+                    className="w-full text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    Choisir une autre source
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-            {importResult && (
-              <div className="rounded-xl border border-accent/40 bg-accent/5 p-4">
-                <div className="flex items-center gap-2 text-accent">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <p className="text-sm font-semibold">Import termine</p>
+          {currentStep === 3 && selectedSourceConfig && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Import</CardTitle>
+                <CardDescription>Formats acceptés : {acceptedExtensions}</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {selectedSource === "strava" && (
+                  <div className="space-y-3 mb-4">
+                    <p className="text-sm font-medium">Choisissez votre type de fichier :</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setStravaImportMode("zip")}
+                        className={cn(
+                          "rounded-lg border-2 p-3 text-left transition-all",
+                          stravaImportMode === "zip" ? "border-accent bg-accent/10" : "border-border"
+                        )}
+                      >
+                        <p className="text-sm font-semibold">Archive ZIP</p>
+                        <p className="text-xs text-muted-foreground">Complet — avec traces GPS</p>
+                      </button>
+                      <button
+                        onClick={() => setStravaImportMode("csv")}
+                        className={cn(
+                          "rounded-lg border-2 p-3 text-left transition-all",
+                          stravaImportMode === "csv" ? "border-accent bg-accent/10" : "border-border"
+                        )}
+                      >
+                        <p className="text-sm font-semibold">activities.csv</p>
+                        <p className="text-xs text-muted-foreground">Rapide — sans traces GPS</p>
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setIsDragActive(true);
+                  }}
+                  onDragLeave={() => setIsDragActive(false)}
+                  onDrop={(e) => void onDrop(e)}
+                  onClick={() => inputRef.current?.click()}
+                  className={cn(
+                    "cursor-pointer rounded-2xl border-2 border-dashed p-8 text-center transition-colors",
+                    isDragActive ? "border-accent bg-accent/10" : "border-border hover:border-accent/50 hover:bg-accent/5"
+                  )}
+                >
+                  <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+                    {isImporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5" />}
+                  </div>
+                  <p className="text-sm font-semibold">
+                    {isImporting ? "Import en cours..." : "Glissez votre fichier ici ou cliquez pour parcourir"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Format attendu : {selectedSourceConfig.expectedText}</p>
+                  <input
+                    ref={inputRef}
+                    type="file"
+                    accept={acceptedExtensions}
+                    className="hidden"
+                    onChange={(e) => void onBrowseChange(e)}
+                  />
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {importResult.imported} activites importees, {importResult.duplicates} doublons ignores
-                  {importResult.failed ? ` et ${importResult.failed} activites non importees.` : "."}
-                </p>
-                <div className="mt-3">
-                  <Link to="/" className="text-sm font-medium text-accent underline-offset-4 hover:underline">
-                    Retour a l'accueil
-                  </Link>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </ScrollReveal>
+
+                {isImporting && (
+                  <div className="space-y-2">
+                    <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-accent transition-all" style={{ width: `${progress}%` }} />
+                    </div>
+                    <p className="text-xs text-muted-foreground text-center">{progress}%</p>
+                  </div>
+                )}
+
+                {error && (
+                  <Alert variant="destructive">
+                    <AlertTitle>Import impossible</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                <button
+                  onClick={() => setCurrentStep(2)}
+                  className="w-full text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Retour aux instructions
+                </button>
+              </CardContent>
+            </Card>
+          )}
+        </>
+      )}
     </div>
   );
 }

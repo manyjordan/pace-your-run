@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import GPSMap from "@/components/GPSMap";
 import type { RunRow } from "@/lib/database";
+import { Badge } from "@/components/ui/badge";
 import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/strava";
+
+const GPSMap = lazy(() => import("@/components/GPSMap"));
 
 type ActivitySplitMetric = {
   distance: number;
@@ -379,6 +381,11 @@ export function ActivityDetail({
 
       <div className="flex-1 overflow-y-auto space-y-4 px-4 pb-8 pt-16">
         <div className="rounded-lg border border-accent/20 bg-card p-4">
+          {activity.run_type === "treadmill" && (
+            <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">
+              Tapis roulant
+            </Badge>
+          )}
           <p className="text-xs font-medium text-muted-foreground">Date</p>
           <p className="mt-1 text-sm font-semibold">
             {analysis.startDate.toLocaleDateString("fr-FR", {
@@ -449,7 +456,9 @@ export function ActivityDetail({
         {analysis.trace && (
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
-            <GPSMap trace={analysis.trace} />
+            <Suspense fallback={<div className="h-[220px] rounded-lg bg-muted animate-pulse" />}>
+              <GPSMap trace={analysis.trace} />
+            </Suspense>
           </div>
         )}
 

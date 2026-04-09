@@ -75,18 +75,6 @@ export const handler = async (req: Request): Promise<Response> => {
       );
     };
 
-    const cleanupTable = async (
-      table: string,
-      column: string,
-      value: string,
-    ) => {
-      const { error } = await supabaseAdmin.from(table).delete().eq(column, value);
-
-      if (error && !isIgnorableCleanupError(error)) {
-        throw error;
-      }
-    };
-
     const deleteAvatarFolder = async () => {
       const { data, error } = await supabaseAdmin.storage
         .from("avatars")
@@ -116,69 +104,10 @@ export const handler = async (req: Request): Promise<Response> => {
       }
     };
 
-    const deleteSocialData = async () => {
-      const { data: userPosts, error: userPostsError } = await supabaseAdmin
-        .from("social_posts")
-        .select("id")
-        .eq("user_id", userId);
-
-      if (userPostsError && !isIgnorableCleanupError(userPostsError)) {
-        throw userPostsError;
-      }
-
-      const postIds = (userPosts ?? []).map((post) => post.id).filter(Boolean);
-
-      await cleanupTable("post_likes", "user_id", userId);
-
-      if (postIds.length > 0) {
-        const { error: likesByPostError } = await supabaseAdmin
-          .from("post_likes")
-          .delete()
-          .in("post_id", postIds);
-
-        if (likesByPostError && !isIgnorableCleanupError(likesByPostError)) {
-          throw likesByPostError;
-        }
-      }
-
-      await cleanupTable("social_posts", "user_id", userId);
-    };
-
-    const deleteForumData = async () => {
-      const { data: userThreads, error: userThreadsError } = await supabaseAdmin
-        .from("forum_threads")
-        .select("id")
-        .eq("user_id", userId);
-
-      if (userThreadsError && !isIgnorableCleanupError(userThreadsError)) {
-        throw userThreadsError;
-      }
-
-      const threadIds = (userThreads ?? []).map((thread) => thread.id).filter(Boolean);
-
-      await cleanupTable("forum_replies", "user_id", userId);
-
-      if (threadIds.length > 0) {
-        const { error: repliesByThreadError } = await supabaseAdmin
-          .from("forum_replies")
-          .delete()
-          .in("thread_id", threadIds);
-
-        if (repliesByThreadError && !isIgnorableCleanupError(repliesByThreadError)) {
-          throw repliesByThreadError;
-        }
-      }
-
-      await cleanupTable("forum_threads", "user_id", userId);
-    };
-
-    console.log("Step: cleaning up data");
-    await deleteAvatarFolder();
-    await deleteSocialData();
-    await deleteForumData();
-    await cleanupTable("training_plan_sessions", "user_id", userId);
-    await cleanupTable("runs", "user_id", userId);
-    await cleanupTable("profiles", "id", userId);
+    console.log("Step: deleting avatar storage");
+    await deleteAvatarFolder().catch((err) => {
+      console.warn("Avatar cleanup failed (non-fatal):", err);
+    });
 
     // Delete the auth user. All rows referencing auth.users(id) with ON DELETE CASCADE
     // are cleaned up automatically by Postgres.

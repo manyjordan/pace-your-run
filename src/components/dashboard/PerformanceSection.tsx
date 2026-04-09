@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
+import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import { getStartOfWeek } from "@/lib/dashboardHelpers";
@@ -140,6 +141,7 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
 
   return (
     <div className="space-y-6">
+      <VO2maxCard runs={runs} />
       <ScrollReveal>
         <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
           <div className="mb-4 flex items-start justify-between gap-4">

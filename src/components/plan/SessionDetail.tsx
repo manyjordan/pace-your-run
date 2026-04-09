@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Play, Clock, Map, Zap, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { saveActiveSession } from "@/lib/activeSession";
 import type { Session } from "@/lib/trainingPlans";
 
 const intensityColors: Record<string, string> = {
@@ -81,17 +82,27 @@ const sessionGuides: Record<string, { description: string; structure: string; be
   },
 };
 
-export default function SessionDetail({ session, onClose }: { session: Session; onClose: () => void }) {
+export default function SessionDetail({
+  session,
+  planName,
+  weekNumber,
+  onClose,
+}: {
+  session: Session;
+  planName?: string;
+  weekNumber?: number;
+  onClose: () => void;
+}) {
   const navigate = useNavigate();
   const guide = sessionGuides[session.type] || sessionGuides["Footing facile"];
   const sessionColor = intensityColors[session.intensity] || intensityColors.easy;
 
   const handleLaunchRun = () => {
-    sessionStorage.setItem("pace-session-context", JSON.stringify({
-      targetDistance: session.distance,
-      targetPace: session.pace,
-      sessionType: session.type,
-    }));
+    saveActiveSession({
+      session,
+      planName: planName ?? "Plan d'entraînement",
+      weekNumber: weekNumber ?? 1,
+    });
     navigate("/run");
     onClose();
   };
@@ -146,6 +157,68 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
             </div>
           </div>
 
+          {session.intervals && (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold">Structure de la séance</p>
+
+              {session.warmupMinutes && (
+                <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+                  <div className="h-8 w-1 rounded-full bg-blue-400" />
+                  <div>
+                    <p className="text-sm font-medium">Échauffement</p>
+                    <p className="text-xs text-muted-foreground">{session.warmupMinutes} min footing léger</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 rounded-lg border border-accent/20 bg-accent/10 p-3">
+                <div className="h-8 w-1 rounded-full bg-accent" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">
+                    {session.intervals.reps} ×{" "}
+                    {session.intervals.distanceM
+                      ? `${session.intervals.distanceM}m`
+                      : `${session.intervals.durationSeconds}s`}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Allure cible : {session.intervals.pace} /km
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+                <div className="h-8 w-1 rounded-full bg-yellow-400" />
+                <div>
+                  <p className="text-sm font-medium">
+                    Récupération entre chaque
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {session.intervals.recoverySeconds >= 60
+                      ? `${Math.floor(session.intervals.recoverySeconds / 60)}min`
+                      : `${session.intervals.recoverySeconds}s`}{" "}
+                    {session.intervals.recoveryType === "jog" ? "trot" :
+                      session.intervals.recoveryType === "walk" ? "marche" : "repos"}
+                    {session.intervals.recoveryPace && ` · ${session.intervals.recoveryPace} /km`}
+                  </p>
+                </div>
+              </div>
+
+              {session.cooldownMinutes && (
+                <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+                  <div className="h-8 w-1 rounded-full bg-blue-400" />
+                  <div>
+                    <p className="text-sm font-medium">Retour au calme</p>
+                    <p className="text-xs text-muted-foreground">{session.cooldownMinutes} min footing très léger</p>
+                  </div>
+                </div>
+              )}
+
+              <p className="pt-1 text-center text-xs text-muted-foreground">
+                Durée totale estimée : {session.warmupMinutes ?? 0} + {session.intervals.reps} × effort + récup + {session.cooldownMinutes ?? 0} min
+              </p>
+            </div>
+          )}
+
           {/* Guide détaillé */}
           <div className="space-y-3 bg-accent/5 rounded-lg p-4">
             <div>
@@ -184,7 +257,7 @@ export default function SessionDetail({ session, onClose }: { session: Session; 
               onClick={handleLaunchRun}
             >
               <Play className="h-4 w-4 mr-2" />
-              Lancer la séance
+              Lancer cette séance
             </Button>
             <Button variant="outline" className="w-full" onClick={onClose}>
               Fermer

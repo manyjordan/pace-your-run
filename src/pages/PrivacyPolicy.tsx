@@ -23,6 +23,10 @@ const PrivacyPolicy = () => {
                 <li>• <strong>Fréquence cardiaque</strong> (si capteur Bluetooth ou Apple Watch connecté)</li>
                 <li>• <strong>Données d'activité Strava</strong> (si compte connecté)</li>
                 <li>• <strong>Données Apple Santé</strong> (si autorisation accordée sur iPhone)</li>
+                <li>• <strong>Temps de déplacement effectif</strong> : durée de course hors pauses, calculée depuis la trace GPS</li>
+                <li>• <strong>Courses simultanées</strong> : si des amis ont couru au même endroit au même moment, leurs identifiants sont associés à votre course</li>
+                <li>• <strong>Données sociales</strong> : publications, likes, follows, commentaires de forum</li>
+                <li>• <strong>Données de fréquence cardiaque</strong> : si vous connectez une ceinture Bluetooth ou importez depuis Apple Santé</li>
               </ul>
             </section>
 
@@ -97,6 +101,19 @@ const PrivacyPolicy = () => {
               <h2 className="text-2xl font-semibold">9. Contact</h2>
               <p className="text-muted-foreground">
                 Pour toute question : <a href="mailto:many.jordan@gmail.com" className="text-accent hover:underline">many.jordan@gmail.com</a>
+              </p>
+            </section>
+
+            <section className="space-y-3">
+              <h2 className="text-2xl font-semibold">7. Contact</h2>
+              <p className="text-muted-foreground">
+                Pour toute question relative à vos données personnelles ou pour exercer vos droits (accès, rectification, suppression), contactez-nous à l'adresse suivante :
+              </p>
+              <p className="text-muted-foreground font-medium">
+                many.jordan@gmail.com
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Nous nous engageons à répondre dans un délai de 30 jours.
               </p>
             </section>
 

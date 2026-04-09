@@ -210,7 +210,7 @@ const gear: {
     rating: 4.5,
     price: "35 €",
     description:
-      "Ceinture cardiofréquencemètre Bluetooth Smart 4.0 et ANT+. Compatible avec toutes les applications sportives dont Pace.",
+      "Ceinture cardiofréquencemètre Bluetooth Smart 4.0 et ANT+. Compatible avec toutes les applications sportives dont Pace. Les montres Suunto compatibles Bluetooth (ainsi que Garmin/Polar) peuvent aussi transmettre la fréquence cardiaque.",
     tags: ["Bluetooth", "ANT+", "Running", "Précision"],
     url: "https://www.decathlon.fr/p/hrm-belt-ceinture-cardiofrequencemetre-ant-bluetooth/_/R-p-346657",
     badge: "Recommandé pour Pace",

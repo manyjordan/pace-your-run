@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { RACE_DISTANCES, formatPredictionTime, getRacePrediction } from "@/lib/racePredictions";
+﻿import { describe, expect, it } from "vitest";
+import {
+  RACE_DISTANCES,
+  formatPredictionTime,
+  getRacePrediction,
+  estimateVO2maxFromRuns,
+} from "@/lib/racePredictions";
 import type { RunRow } from "@/lib/database";
 
 function makeRun(distanceKm: number, durationSeconds: number, daysAgo = 7): RunRow {
@@ -159,3 +164,43 @@ describe("getRacePrediction", () => {
   });
 });
 
+describe("estimateVO2maxFromRuns", () => {
+  it("returns null with no runs", () => {
+    expect(estimateVO2maxFromRuns([])).toBeNull();
+  });
+
+  it("returns null with only short runs under 3km", () => {
+    expect(estimateVO2maxFromRuns([makeRun(2, 12 * 60)])).toBeNull();
+  });
+
+  it("returns a valid estimate with sufficient data", () => {
+    const result = estimateVO2maxFromRuns(goodRunnerRuns);
+    expect(result).not.toBeNull();
+    expect(result!.value).toBeGreaterThan(25);
+    expect(result!.value).toBeLessThan(85);
+  });
+
+  it("good runner has higher VO2max than slow runner", () => {
+    const fast = estimateVO2maxFromRuns(goodRunnerRuns)!;
+    const slow = estimateVO2maxFromRuns(slowRunnerRuns)!;
+    expect(fast.value).toBeGreaterThan(slow.value);
+  });
+
+  it("returns a valid level label in French", () => {
+    const result = estimateVO2maxFromRuns(goodRunnerRuns)!;
+    const validLabels = ["Très faible", "Faible", "Moyen", "Bon", "Excellent", "Supérieur"];
+    expect(validLabels).toContain(result.levelLabel);
+  });
+
+  it("basedOnRun contains valid data", () => {
+    const result = estimateVO2maxFromRuns(goodRunnerRuns)!;
+    expect(result.basedOnRun).not.toBeNull();
+    expect(result.basedOnRun!.distanceKm).toBeGreaterThan(0);
+    expect(result.basedOnRun!.durationSeconds).toBeGreaterThan(0);
+  });
+
+  it("trend is null when not enough historical data", () => {
+    const result = estimateVO2maxFromRuns([makeRun(5, 25 * 60)])!;
+    expect(result.trend).toBeNull();
+  });
+});

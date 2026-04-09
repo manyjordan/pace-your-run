@@ -3,6 +3,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Calendar, Route, Clock, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import { getPlanById } from "@/lib/trainingPlans";
+import { Badge } from "@/components/ui/badge";
 
 type ProfileGoalData = {
   goalType: "weight" | "race" | "distance";
@@ -157,6 +158,11 @@ export const DashboardSection = ({
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold">{run.title || "Course enregistrée"}</p>
+                          {run.run_type === "treadmill" && (
+                            <Badge variant="outline" className="mt-1 border-muted-foreground/30 text-xs text-muted-foreground">
+                              Tapis roulant
+                            </Badge>
+                          )}
                           <p className="text-xs text-muted-foreground">
                             {run.started_at
                               ? new Date(run.started_at).toLocaleDateString("fr-FR", {
