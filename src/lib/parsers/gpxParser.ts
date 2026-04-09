@@ -178,7 +178,7 @@ export function parseGpxText(text: string, fileName?: string): ImportedRun {
   const title =
     getFirstChildText(doc, "name") ??
     fileName?.replace(/\.[^.]+$/, "") ??
-    "Course importee";
+    "Course importée";
 
   const gpsTrace = points.map((point, index) => ({
     lat: point.lat,

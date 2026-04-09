@@ -7,8 +7,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getRuns, saveRun } from "@/lib/database";
 import { parseAppleHealthFile } from "@/lib/parsers/appleHealthParser";
 import { parseFitFile } from "@/lib/parsers/fitParser";
-import { parseGpxFile } from "@/lib/parsers/gpxParser";
-import { parseStravaZipFile } from "@/lib/parsers/stravaZipParser";
+import { parseGpxFile, type ImportedRun } from "@/lib/parsers/gpxParser";
+import { parseStravaZipFile, type StravaZipParseResult } from "@/lib/parsers/stravaZipParser";
 import { parseStravaCSV } from "@/lib/parsers/stravaCSVParser";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import { sourceConfig, type ImportSource } from "@/lib/importInstructions";
 function normalizeStartedAt(value: string) {
   const normalized = new Date(value);
   if (Number.isNaN(normalized.getTime())) {
-    throw new Error("Date d'activite invalide.");
+    throw new Error("Date d'activité invalide.");
   }
   return normalized.toISOString();
 }
@@ -30,32 +30,45 @@ function safeNormalizeStartedAt(value: string | null | undefined) {
   return normalized.toISOString();
 }
 
-async function parseImportedRuns(source: ImportSource, file: File) {
+type ParsedImportBundle = {
+  runs: ImportedRun[];
+  /** Skips reported by parsers (e.g. non-run files in Strava ZIP). */
+  parserSkipped?: number;
+};
+
+async function parseImportedRuns(source: ImportSource, file: File): Promise<ParsedImportBundle> {
   const lowerName = file.name.toLowerCase();
 
   if (source === "apple") {
     if (!lowerName.endsWith(".xml")) {
       throw new Error("Apple Sante attend le fichier export.xml.");
     }
-    return parseAppleHealthFile(file);
+    const runs = await parseAppleHealthFile(file);
+    return { runs };
   }
 
   if (source === "strava") {
     if (!lowerName.endsWith(".zip")) {
       throw new Error("Strava attend une archive ZIP complete.");
     }
-    return parseStravaZipFile(file);
+    const zipResult: StravaZipParseResult = await parseStravaZipFile(file);
+    return { runs: zipResult.runs, parserSkipped: zipResult.skipped };
   }
 
-  if (lowerName.endsWith(".zip")) return parseStravaZipFile(file);
-  if (lowerName.endsWith(".gpx")) return [await parseGpxFile(file)];
+  if (lowerName.endsWith(".zip")) {
+    const zipResult: StravaZipParseResult = await parseStravaZipFile(file);
+    return { runs: zipResult.runs, parserSkipped: zipResult.skipped };
+  }
+  if (lowerName.endsWith(".gpx")) {
+    return { runs: [await parseGpxFile(file)] };
+  }
 
   if (lowerName.endsWith(".fit")) {
     const parsed = await parseFitFile(file);
     if (!parsed) {
-      throw new Error("Le fichier FIT n'a pas pu etre lu. Verifiez qu'il s'agit bien d'un export Garmin valide.");
+      throw new Error("Le fichier FIT n'a pas pu être lu. Vérifiez qu'il s'agit bien d'un export Garmin valide.");
     }
-    return [parsed];
+    return { runs: [parsed] };
   }
 
   throw new Error("Format non pris en charge pour cette source.");
@@ -142,7 +155,10 @@ export default function ImportPage() {
     }
 
     setImportResult({ imported, skipped, errors });
-    if (imported > 0) window.dispatchEvent(new Event("pace-runs-updated"));
+    if (imported > 0) {
+      window.dispatchEvent(new Event("pace-runs-updated"));
+      window.dispatchEvent(new Event("pace-community-updated"));
+    }
   }
 
   async function handleFileImport(file: File) {
@@ -163,13 +179,20 @@ export default function ImportPage() {
           errors: current?.errors ?? 0,
         }));
       } else {
-        const parsed = await parseImportedRuns(selectedSource, file);
+        const { runs, parserSkipped = 0 } = await parseImportedRuns(selectedSource, file);
         await saveRunsBulk(
-          parsed.map((run) => ({
+          runs.map((run) => ({
             ...run,
             run_type: `import:${run.source}`,
           })),
         );
+        if (parserSkipped > 0) {
+          setImportResult((current) => ({
+            imported: current?.imported ?? 0,
+            skipped: (current?.skipped ?? 0) + parserSkipped,
+            errors: current?.errors ?? 0,
+          }));
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Import impossible.");

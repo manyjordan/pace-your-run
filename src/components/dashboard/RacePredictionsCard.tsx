@@ -93,6 +93,12 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
         </p>
       ) : (
         <div className="space-y-5">
+          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+            <p className="text-xs font-medium text-muted-foreground">Course de référence (Riegel, Jack Daniels)</p>
+            <p className="mt-1 text-sm font-medium text-foreground leading-snug">{prediction.reference.label}</p>
+            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{prediction.reference.explanation}</p>
+          </div>
+
           <Card className="border-lime-500/40 bg-lime-500/5 dark:bg-lime-500/10">
             <CardContent className="space-y-2 p-4">
               <p className="text-3xl font-bold tabular-nums text-lime-600 dark:text-lime-400">
@@ -100,7 +106,8 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
               </p>
               <p className="text-sm font-medium text-foreground">Estimation consensus</p>
               <p className="text-xs text-muted-foreground">
-                Basé sur vos {qualifyingCount} dernières courses éligibles (&gt; 3 km)
+                Basé sur vos {qualifyingCount} courses éligibles (&gt; 3 km). Le Riegel étendu combine encore vos 3
+                meilleures allures.
               </p>
             </CardContent>
           </Card>

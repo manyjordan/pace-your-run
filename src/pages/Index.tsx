@@ -10,7 +10,13 @@ import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
 import { SkeletonHeroBanner } from "@/components/dashboard/SkeletonHeroBanner";
 import { SkeletonMetricCard } from "@/components/dashboard/SkeletonMetricCard";
-import { buildMetricData, buildGoalAwareWeeklyInsight } from "@/lib/dashboardHelpers";
+import {
+  buildMetricData,
+  buildGoalAwareWeeklyInsight,
+  type MetricChartPeriod,
+} from "@/lib/dashboardHelpers";
+
+type DashboardPeriod = Extract<MetricChartPeriod, "3m" | "6m" | "1y" | "all">;
 
 const PerformanceSection = lazy(() =>
   import("@/components/dashboard/PerformanceSection").then((module) => ({ default: module.PerformanceSection })),
@@ -31,8 +37,12 @@ type ProfileGoalData = {
   goalSavedAt?: string;
 };
 
+/** Running activities for metrics: recorded runs, treadmill, trail, and imports (`import:strava`, etc.). */
 function isRunRow(run: RunRow): boolean {
-  return run.run_type?.toLowerCase().includes("run") ?? true;
+  const t = run.run_type?.toLowerCase() ?? "";
+  if (!t) return true;
+  if (t.startsWith("import:")) return true;
+  return t.includes("run");
 }
 
 function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | undefined {
@@ -60,6 +70,7 @@ const Dashboard = () => {
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
+  const [period, setPeriod] = useState<DashboardPeriod>("3m");
 
   const loadUserData = useCallback(async () => {
     if (!session?.user.id) {
@@ -127,11 +138,11 @@ const Dashboard = () => {
 
   const metricCards = useMemo(
     () => [
-      buildMetricData("Distance par semaine", runningRuns, "week", "3m"),
-      buildMetricData("Durée par semaine", runningRuns, "week", "3m"),
-      buildMetricData("Dénivelé par semaine", runningRuns, "week", "3m"),
+      buildMetricData("Distance par semaine", runningRuns, "week", period, "distance"),
+      buildMetricData("Durée par semaine", runningRuns, "week", period, "duration"),
+      buildMetricData("Dénivelé par semaine", runningRuns, "week", period, "elevation"),
     ],
-    [runningRuns],
+    [runningRuns, period],
   );
 
   const filteredMetrics = useMemo(() => metricCards, [metricCards]);
@@ -214,7 +225,13 @@ const Dashboard = () => {
               <SkeletonMetricCard />
             </div>
           ) : (
-            <DashboardSection recentRuns={recentRuns} userGoal={userGoal} filteredMetrics={filteredMetrics} />
+            <DashboardSection
+              recentRuns={recentRuns}
+              userGoal={userGoal}
+              filteredMetrics={filteredMetrics}
+              period={period}
+              onPeriodChange={setPeriod}
+            />
           )}
         </TabsContent>
         <TabsContent value="performance">

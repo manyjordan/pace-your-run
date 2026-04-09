@@ -1,0 +1,21 @@
+-- Run in Supabase SQL Editor (adjust to match your existing function body and return columns):
+--
+-- create or replace function get_personalized_feed(
+--   p_user_id uuid,
+--   p_limit int default 20,
+--   p_offset int default 0
+-- )
+-- returns table (
+--   -- same columns as your current get_personalized_feed
+-- )
+-- language sql
+-- stable
+-- security definer
+-- set search_path = public
+-- as $$
+--   -- existing SELECT ... from your current function
+--   limit p_limit offset p_offset;
+-- $$;
+
+-- Placeholder migration (no schema change until the function is updated in the dashboard).
+select 1;

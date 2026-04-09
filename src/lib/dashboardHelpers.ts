@@ -1,8 +1,19 @@
 import type { RunRow } from "@/lib/database";
 import { Route, Clock, Mountain } from "lucide-react";
 
+export type MetricKind = "distance" | "duration" | "elevation";
+
+/** Supported time windows for dashboard metric charts (buildMetricData). */
+export type MetricChartPeriod = "1m" | "3m" | "6m" | "1y" | "all";
+
 function runActivityDate(run: RunRow): string {
   return run.started_at ?? run.created_at ?? new Date().toISOString();
+}
+
+function inferMetricKind(title: string): MetricKind {
+  if (title.includes("Distance")) return "distance";
+  if (title.includes("Durée")) return "duration";
+  return "elevation";
 }
 
 type WeeklyMetricCard = {
@@ -12,10 +23,11 @@ type WeeklyMetricCard = {
   change: string;
   icon: typeof Route;
   color: string;
-  chartData: Array<{ week: string; value: number; showTick?: boolean }>;
+  metricKind: MetricKind;
+  chartData: Array<{ week: string; value: number; showTick?: boolean; barLabel?: string }>;
   comment: string;
   granularity?: "week" | "month" | "quarter";
-  period?: "1m" | "3m" | "1y" | "all";
+  period?: MetricChartPeriod;
 };
 
 type GoalSummaryData = {
@@ -51,17 +63,21 @@ export function getStartOfWeek(input: Date) {
   return date;
 }
 
-export function getMetricAmountForTitle(title: string, runs: RunRow[]) {
-  if (title.includes("Distance")) {
+export function getMetricAmountForKind(kind: MetricKind, runs: RunRow[]) {
+  if (kind === "distance") {
     return runs.reduce((sum, run) => sum + run.distance_km, 0);
   }
-  if (title.includes("Durée")) {
+  if (kind === "duration") {
     return runs.reduce((sum, run) => sum + run.duration_seconds / 3600, 0);
   }
   return runs.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
 }
 
-export function formatWeeklyGrowthSummary(title: string, runs: RunRow[]) {
+export function getMetricAmountForTitle(title: string, runs: RunRow[]) {
+  return getMetricAmountForKind(inferMetricKind(title), runs);
+}
+
+export function formatWeeklyGrowthSummary(kind: MetricKind, runs: RunRow[]) {
   const currentWeekStart = getStartOfWeek(new Date());
   const weeklyValues = Array.from({ length: 4 }, (_, index) => {
     const weekStart = new Date(currentWeekStart);
@@ -74,7 +90,7 @@ export function formatWeeklyGrowthSummary(title: string, runs: RunRow[]) {
       return activityDate >= weekStart && activityDate < weekEnd;
     });
 
-    return getMetricAmountForTitle(title, weekRuns);
+    return getMetricAmountForKind(kind, weekRuns);
   });
 
   const baseline = weeklyValues[0];
@@ -100,11 +116,15 @@ export function formatWeeklyGrowthSummary(title: string, runs: RunRow[]) {
   return `${percentage}% / sem sur 3 sem`;
 }
 
-export function formatMetricBarLabel(title: string, value: number) {
+export function formatMetricBarLabelForKind(kind: MetricKind, value: number) {
   if (value === 0) return "";
-  if (title.includes("Distance")) return `${Math.round(value)}`;
-  if (title.includes("Durée")) return `${Math.round(value)}`;
+  if (kind === "distance") return `${Math.round(value)}`;
+  if (kind === "duration") return `${Math.round(value)}`;
   return `${Math.round(value)}`;
+}
+
+export function formatMetricBarLabel(title: string, value: number) {
+  return formatMetricBarLabelForKind(inferMetricKind(title), value);
 }
 
 export function formatDistanceTooltipValue(value: number) {
@@ -118,16 +138,28 @@ export function formatHoursTooltipValue(value: number) {
   return `${hours}h${String(minutes).padStart(2, "0")}`;
 }
 
-export function formatDashboardTooltip(title: string, value: number): [string, string] {
-  if (title.includes("Distance")) {
+export function formatDashboardTooltipForKind(kind: MetricKind, value: number): [string, string] {
+  if (kind === "distance") {
     return [formatDistanceTooltipValue(value), "Distance en km"];
   }
 
-  if (title.includes("Durée")) {
+  if (kind === "duration") {
     return [formatHoursTooltipValue(value), "Durée en heure et minutes"];
   }
 
   return [`${Math.round(value)} m`, "Dénivelé en mètres"];
+}
+
+export function formatDashboardTooltip(title: string, value: number): [string, string] {
+  return formatDashboardTooltipForKind(inferMetricKind(title), value);
+}
+
+/** Short label above bars (strip redundant unit suffix where it matches the tooltip). */
+export function compactWeeklyBarTopLabel(kind: MetricKind, barLabel: string) {
+  if (!barLabel) return "";
+  if (kind === "distance") return barLabel.replace(" km", "");
+  if (kind === "elevation") return barLabel.replace(" m", "");
+  return barLabel;
 }
 
 export function formatWeeklyDurationLabel(seconds: number) {
@@ -145,7 +177,7 @@ export function formatWeeklyDurationLabel(seconds: number) {
 export function formatAxisDateLabel(
   start: Date,
   granularity: "week" | "month" | "quarter",
-  period: "1m" | "3m" | "1y" | "all",
+  period: MetricChartPeriod,
 ) {
   const month = start.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "");
   const monthLabel = `${month.charAt(0).toUpperCase()}${month.slice(1)}`;
@@ -181,7 +213,7 @@ export function trimLeadingZeroPeriods<T extends { value: number }>(series: T[])
 export function getAdaptiveTickStep(
   length: number,
   granularity: "week" | "month" | "quarter",
-  period?: "1m" | "3m" | "1y" | "all",
+  period?: MetricChartPeriod,
 ) {
   if (granularity === "week" && (period === "1y" || period === "all")) return 4;
   if (granularity === "month" && (period === "1y" || period === "all")) return 3;
@@ -204,7 +236,7 @@ export function getAdaptiveTickStep(
 export function annotateAdaptiveTicks<T extends { year?: string }>(
   series: T[],
   granularity: "week" | "month" | "quarter",
-  period?: "1m" | "3m" | "1y" | "all",
+  period?: MetricChartPeriod,
 ) {
   const step = getAdaptiveTickStep(series.length, granularity, period);
   return series.map((item, index) => {
@@ -275,8 +307,10 @@ export function buildMetricData(
   title: string,
   runs: RunRow[],
   granularity: "week" | "month" | "quarter",
-  period: "1m" | "3m" | "1y" | "all",
+  period: MetricChartPeriod,
+  metricKind?: MetricKind,
 ): WeeklyMetricCard {
+  const kind = metricKind ?? inferMetricKind(title);
   const now = new Date();
   let startDate = new Date();
 
@@ -284,6 +318,8 @@ export function buildMetricData(
     startDate.setMonth(now.getMonth() - 1);
   } else if (period === "3m") {
     startDate.setMonth(now.getMonth() - 3);
+  } else if (period === "6m") {
+    startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
   } else if (period === "1y") {
     startDate.setFullYear(now.getFullYear() - 1);
   } else {
@@ -382,8 +418,8 @@ export function buildMetricData(
   }
 
   const getMetricValue = (period: (typeof periods)[number]) => {
-    if (title.includes("Distance")) return period.distanceKm;
-    if (title.includes("Durée")) return period.durationSeconds;
+    if (kind === "distance") return period.distanceKm;
+    if (kind === "duration") return period.durationSeconds;
     return period.elevation;
   };
 
@@ -409,7 +445,7 @@ export function buildMetricData(
       return "Allez il est temps d'aller courir, l'amélioration en course à pieds se construit grâce à la régularité";
     }
 
-    if (percentChange > 20 && lastAverage > (title.includes("Distance") ? 30 : title.includes("Durée") ? 12000 : 200)) {
+    if (percentChange > 20 && lastAverage > (kind === "distance" ? 30 : kind === "duration" ? 12000 : 200)) {
       return "Attention à pas pousser trop rapidement avec le risque de se blesser, ça vaut le coup de levier un peu le pied pour laisser le temps au corps de récupérer";
     }
 
@@ -428,13 +464,13 @@ export function buildMetricData(
     return "Continue à travailler, chaque jour compte";
   };
 
-  const icon = title.includes("Distance") ? Route : title.includes("Durée") ? Clock : Mountain;
+  const icon = kind === "distance" ? Route : kind === "duration" ? Clock : Mountain;
   const color = "hsl(var(--accent))";
 
   let displayValue = "";
-  if (title.includes("Distance")) {
+  if (kind === "distance") {
     displayValue = `${currentValue.toFixed(1)} km`;
-  } else if (title.includes("Durée")) {
+  } else if (kind === "duration") {
     displayValue = formatWeeklyDurationLabel(currentValue);
   } else {
     displayValue = `${Math.round(currentValue)} m`;
@@ -442,22 +478,40 @@ export function buildMetricData(
 
   return {
     title,
-    unit: title.includes("Distance") ? "km" : title.includes("Durée") ? "h" : "m",
+    unit: kind === "distance" ? "km" : kind === "duration" ? "h" : "m",
     currentValue: displayValue,
-    change: formatWeeklyGrowthSummary(title, runs),
+    change: formatWeeklyGrowthSummary(kind, runs),
     icon,
     color,
-    chartData: annotateAdaptiveTicks(periods.map((p) => ({
-        week: p.label,
-        value: title.includes("Distance")
-          ? p.distanceKm
-          : title.includes("Durée")
-            ? Number((p.durationSeconds / 3600).toFixed(1))
-            : p.elevation,
-      })), granularity, period),
+    metricKind: kind,
+    chartData: annotateAdaptiveTicks(
+      periods.map((p) => {
+        const value =
+          kind === "distance"
+            ? p.distanceKm
+            : kind === "duration"
+              ? Number((p.durationSeconds / 3600).toFixed(1))
+              : p.elevation;
+        const barLabel =
+          kind === "distance"
+            ? p.distanceKm > 0
+              ? formatDistanceTooltipValue(p.distanceKm)
+              : ""
+            : kind === "duration"
+              ? p.durationSeconds > 0
+                ? formatHoursTooltipValue(p.durationSeconds / 3600)
+                : ""
+              : p.elevation > 0
+                ? `${Math.round(p.elevation)} m`
+                : "";
+        return { week: p.label, value, barLabel };
+      }),
+      granularity,
+      period,
+    ),
     comment: generateComment(currentValue, previousValue, allValues),
     granularity: granularity as "week" | "month" | "quarter",
-    period: period as "1m" | "3m" | "1y" | "all",
+    period,
   };
 }
 

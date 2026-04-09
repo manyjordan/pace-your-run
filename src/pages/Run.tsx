@@ -42,7 +42,7 @@ import {
   formatRelativeTime,
   getInitials,
   type CommunityPost,
-} from "@/lib/strava";
+} from "@/lib/runFormatters";
 import { computeMovingTime, haversineDistanceKm } from "@/lib/parsers/gpxParser";
 import {
   convertDistanceFromKm,

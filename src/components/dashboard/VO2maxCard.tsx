@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { TrendingUp, TrendingDown, Minus, Info } from "lucide-react";
 import { estimateVO2maxFromRuns, type VO2maxEstimate } from "@/lib/racePredictions";
 import type { RunRow } from "@/lib/database";
+import { formatDuration } from "@/lib/runFormatters";
 import { cn } from "@/lib/utils";
 
 const LEVEL_COLORS: Record<VO2maxEstimate["level"], string> = {
@@ -31,6 +32,9 @@ const LEVEL_BAR_WIDTHS: Record<VO2maxEstimate["level"], string> = {
   superior: "w-full",
 };
 
+const VO2_WINDOW_CAPTION =
+  "Estimation à partir de la distance et du temps cumulés sur les 3 dernières semaines (allure moyenne sur toutes vos sorties).";
+
 export function VO2maxCard({ runs }: { runs: RunRow[] }) {
   const estimate = useMemo(() => estimateVO2maxFromRuns(runs), [runs]);
 
@@ -42,7 +46,7 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
           <Info className="h-3.5 w-3.5 text-muted-foreground" />
         </div>
         <p className="text-sm text-muted-foreground">
-          Enregistrez au moins une course de 3 km pour estimer votre VO2max.
+          Enregistrez au moins 3 km cumulés sur les 3 dernières semaines pour estimer votre VO2max.
         </p>
       </div>
     );
@@ -58,13 +62,13 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
         {estimate.trend === "up" && (
           <div className="flex items-center gap-1 text-xs font-medium text-green-500">
             <TrendingUp className="h-3.5 w-3.5" />
-            +{estimate.trendValue} vs mois dernier
+            +{estimate.trendValue} vs 3 sem. précédentes
           </div>
         )}
         {estimate.trend === "down" && (
           <div className="flex items-center gap-1 text-xs font-medium text-red-500">
             <TrendingDown className="h-3.5 w-3.5" />
-            -{estimate.trendValue} vs mois dernier
+            -{estimate.trendValue} vs 3 sem. précédentes
           </div>
         )}
         {estimate.trend === "stable" && (
@@ -132,20 +136,19 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
         ))}
       </div>
 
-      {estimate.basedOnRun && (
-        <p className="text-xs text-muted-foreground">
-          Basé sur votre meilleure course — {estimate.basedOnRun.distanceKm.toFixed(1)} km
-          {estimate.basedOnRun.startedAt
-            ? ` · ${new Date(estimate.basedOnRun.startedAt).toLocaleDateString("fr-FR", {
-                day: "numeric",
-                month: "long",
-              })}`
-            : ""}
-        </p>
+      {estimate.basedOnWindow && (
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-foreground">{VO2_WINDOW_CAPTION}</p>
+          <p className="text-xs text-muted-foreground">
+            {estimate.basedOnWindow.runCount} sortie{estimate.basedOnWindow.runCount > 1 ? "s" : ""} ·{" "}
+            {estimate.basedOnWindow.totalDistanceKm.toFixed(1)} km ·{" "}
+            {formatDuration(estimate.basedOnWindow.totalDurationSeconds)} (fenêtre 3 semaines)
+          </p>
+        </div>
       )}
 
       <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground">
-        Estimation basée sur vos performances de course. Pas une mesure clinique.
+        Estimation indicative liée à la forme récente lorsque vous courez régulièrement. Pas une mesure clinique.
       </p>
     </div>
   );

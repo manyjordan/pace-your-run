@@ -1,5 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
-import L, { type DivIcon, type LatLngExpression, type Map as LeafletMap, type Marker, type Polyline } from "leaflet";
+import L, {
+  type DivIcon,
+  type LatLngExpression,
+  type Map as LeafletMap,
+  type Marker,
+  type Polyline,
+  type TileLayer,
+} from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 type GPSTrace = {
@@ -16,6 +23,18 @@ export type GPSMapProps = {
 };
 
 const LIME = "#84cc16";
+
+function cartoTileUrl(isDark: boolean): string {
+  return isDark
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png";
+}
+
+function cartoAttributionHtml(isDark: boolean): string {
+  return isDark
+    ? '© <a href="https://carto.com/">CARTO</a>'
+    : '© <a href="https://carto.com/">CARTO</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a>';
+}
 
 function createLiveMarkerIcon(): DivIcon {
   return L.divIcon({
@@ -48,6 +67,10 @@ export default function GPSMap({
 }: GPSMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<LeafletMap | null>(null);
+  const tileLayerRef = useRef<TileLayer | null>(null);
+  const attributionControlRef = useRef<ReturnType<typeof L.control.attribution> | null>(null);
+  const lastAttributionHtmlRef = useRef<string>("");
+  const prevThemeIsDarkRef = useRef<boolean>(false);
   const polylineRef = useRef<Polyline | null>(null);
   const currentMarkerRef = useRef<Marker | null>(null);
   const startMarkerRef = useRef<Marker | null>(null);
@@ -73,9 +96,38 @@ export default function GPSMap({
 
     mapRef.current = map;
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const isDark = document.documentElement.classList.contains("dark");
+    prevThemeIsDarkRef.current = isDark;
+
+    const tileLayer = L.tileLayer(cartoTileUrl(isDark), {
+      subdomains: "abcd",
       maxZoom: 19,
     }).addTo(map);
+    tileLayerRef.current = tileLayer;
+
+    const attrHtml = cartoAttributionHtml(isDark);
+    lastAttributionHtmlRef.current = attrHtml;
+    const attributionCtrl = L.control.attribution({
+      position: "bottomright",
+      prefix: false,
+    });
+    attributionCtrl.addTo(map);
+    attributionCtrl.addAttribution(attrHtml);
+    attributionControlRef.current = attributionCtrl;
+
+    const observer = new MutationObserver(() => {
+      if (!mapRef.current || !tileLayerRef.current || !attributionControlRef.current) return;
+      const nowDark = document.documentElement.classList.contains("dark");
+      if (nowDark === prevThemeIsDarkRef.current) return;
+      prevThemeIsDarkRef.current = nowDark;
+      tileLayerRef.current.setUrl(cartoTileUrl(nowDark));
+      const ctrl = attributionControlRef.current;
+      ctrl.removeAttribution(lastAttributionHtmlRef.current);
+      const nextHtml = cartoAttributionHtml(nowDark);
+      ctrl.addAttribution(nextHtml);
+      lastAttributionHtmlRef.current = nextHtml;
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
 
     const latLngs: LatLngExpression[] = displayedTrace.map((point) => [point.lat, point.lng]);
 
@@ -111,10 +163,14 @@ export default function GPSMap({
     previousTraceLengthRef.current = displayedTrace.length;
 
     return () => {
+      observer.disconnect();
       startMarkerRef.current = null;
       currentMarkerRef.current = null;
       polylineRef.current = null;
       previousTraceLengthRef.current = 0;
+      tileLayerRef.current = null;
+      attributionControlRef.current = null;
+      lastAttributionHtmlRef.current = "";
       map.remove();
       mapRef.current = null;
     };

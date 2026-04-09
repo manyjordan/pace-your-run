@@ -9,7 +9,7 @@ import {
   getInitials,
   type CommunityPost,
   type GPSTracePoint,
-} from "@/lib/strava";
+} from "@/lib/runFormatters";
 import { ActivityPostCard } from "@/components/ActivityPostCard";
 
 function hashStringToNumber(value: string) {
@@ -90,9 +90,9 @@ export const ActivitySection = ({
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-accent/20 bg-card p-5 text-sm text-muted-foreground">
-        Aucune activité trouvée, si tu as de l&apos;historique réalisée sur d&apos;autres applications ou supports,{" "}
+        Aucune activité trouvée. Si tu as des courses enregistrées sur d&apos;autres applications ou supports,{" "}
         <Link to="/import" className="font-medium text-accent underline underline-offset-4">
-          importe les données. Clique ici pour savoir comment faire
+          importe tes données. Clique ici pour savoir comment faire
         </Link>
       </div>
     );

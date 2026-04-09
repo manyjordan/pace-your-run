@@ -1,4 +1,4 @@
-ï»¿import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   RACE_DISTANCES,
   formatPredictionTime,
@@ -95,7 +95,7 @@ describe("getRacePrediction", () => {
     expect(result?.targetDistanceKm).toBe(10);
     expect(result?.targetLabel).toBe("10 km");
     expect(result?.consensusSeconds).toBeGreaterThan(0);
-    expect(result?.predictions.length).toBe(4);
+    expect(result?.predictions.length).toBe(3);
   });
 
   it("consensus is within min/max range", () => {
@@ -121,15 +121,13 @@ describe("getRacePrediction", () => {
     expect(slow!.consensusSeconds).toBeGreaterThan(fast!.consensusSeconds);
   });
 
-  it("all 4 models are present", () => {
+  it("all 3 models are present", () => {
     const result = getRacePrediction(goodRunnerRuns, 10, "10 km");
     expect(result).not.toBeNull();
     const modelNames = result!.predictions.map((p) => p.model);
     expect(modelNames.filter((name) => name.startsWith("Riegel")).length).toBe(2);
-    expect(modelNames).toContain("Cameron");
     expect(modelNames.some((name) => name.includes("Daniels"))).toBe(true);
-    expect(modelNames.filter((name) => name.startsWith("Riegel")).length).toBe(2);
-    expect(modelNames.length).toBe(4);
+    expect(modelNames.length).toBe(3);
   });
 
   it("all predictions have valid confidence levels", () => {
@@ -188,15 +186,16 @@ describe("estimateVO2maxFromRuns", () => {
 
   it("returns a valid level label in French", () => {
     const result = estimateVO2maxFromRuns(goodRunnerRuns)!;
-    const validLabels = ["TrÃ¨s faible", "Faible", "Moyen", "Bon", "Excellent", "SupÃ©rieur"];
+    const validLabels = ["Très faible", "Faible", "Moyen", "Bon", "Excellent", "Supérieur"];
     expect(validLabels).toContain(result.levelLabel);
   });
 
-  it("basedOnRun contains valid data", () => {
+  it("basedOnWindow contains valid cumulative data", () => {
     const result = estimateVO2maxFromRuns(goodRunnerRuns)!;
-    expect(result.basedOnRun).not.toBeNull();
-    expect(result.basedOnRun!.distanceKm).toBeGreaterThan(0);
-    expect(result.basedOnRun!.durationSeconds).toBeGreaterThan(0);
+    expect(result.basedOnWindow).not.toBeNull();
+    expect(result.basedOnWindow!.totalDistanceKm).toBeGreaterThan(0);
+    expect(result.basedOnWindow!.totalDurationSeconds).toBeGreaterThan(0);
+    expect(result.basedOnWindow!.runCount).toBeGreaterThan(0);
   });
 
   it("trend is null when not enough historical data", () => {

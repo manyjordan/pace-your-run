@@ -16,7 +16,7 @@ import {
   type ForumThreadDetailRecord,
   type ForumThreadRecord,
 } from "@/lib/database";
-import { formatRelativeTime, getInitials } from "@/lib/strava";
+import { formatRelativeTime, getInitials } from "@/lib/runFormatters";
 import { cn } from "@/lib/utils";
 import {
   AlertDialog,
@@ -144,43 +144,88 @@ export function ForumSection() {
   const [likeBusyThreadId, setLikeBusyThreadId] = useState<string | null>(null);
   const [likeAnimatingThreadId, setLikeAnimatingThreadId] = useState<string | null>(null);
   const [likeBurstThreadId, setLikeBurstThreadId] = useState<string | null>(null);
+  const [threadsPage, setThreadsPage] = useState(0);
+  const [hasMoreThreads, setHasMoreThreads] = useState(true);
+  const [isLoadingMoreThreads, setIsLoadingMoreThreads] = useState(false);
 
-  const loadOverview = useCallback(async () => {
-    setIsLoadingOverview(true);
-    setForumError(null);
+  const THREADS_PAGE_SIZE = 15;
 
-    try {
-      const [categoriesData, threadsData] = await Promise.all([
-        getForumCategories(),
-        getForumThreads(selectedCategoryId === "all" ? undefined : selectedCategoryId),
-      ]);
+  const loadThreads = useCallback(
+    async (categoryId: string, pageNum = 0) => {
+      if (pageNum === 0) {
+        setThreads([]);
+      }
+      if (pageNum === 0) {
+        setIsLoadingOverview(true);
+      } else {
+        setIsLoadingMoreThreads(true);
+      }
+      setForumError(null);
 
-      setCategories(categoriesData);
-      setThreads(threadsData);
+      try {
+        const newThreads = await getForumThreads(
+          categoryId === "all" ? undefined : categoryId,
+          THREADS_PAGE_SIZE,
+          pageNum * THREADS_PAGE_SIZE,
+        );
 
-      if (user?.id && threadsData.length > 0) {
-        try {
-          const liked = await getForumLikedThreadIds(
-            threadsData.map((t) => t.id),
-            user.id,
-          );
-          setLikedThreadIds(liked);
-        } catch {
+        if (pageNum === 0) {
+          setThreads(newThreads);
+        } else {
+          setThreads((prev) => [...prev, ...newThreads]);
+        }
+        setHasMoreThreads(newThreads.length === THREADS_PAGE_SIZE);
+
+        if (user?.id && newThreads.length > 0) {
+          try {
+            const liked = await getForumLikedThreadIds(
+              newThreads.map((t) => t.id),
+              user.id,
+            );
+            if (pageNum === 0) {
+              setLikedThreadIds(liked);
+            } else {
+              setLikedThreadIds((prev) => [...new Set([...prev, ...liked])]);
+            }
+          } catch {
+            if (pageNum === 0) {
+              setLikedThreadIds([]);
+            }
+          }
+        } else if (pageNum === 0) {
           setLikedThreadIds([]);
         }
-      } else {
-        setLikedThreadIds([]);
+      } catch {
+        setForumError("Impossible de charger le forum pour le moment.");
+      } finally {
+        setIsLoadingOverview(false);
+        setIsLoadingMoreThreads(false);
       }
+    },
+    [user?.id],
+  );
+
+  const loadOverview = useCallback(async () => {
+    setThreadsPage(0);
+    setHasMoreThreads(true);
+    setForumError(null);
+    setIsLoadingOverview(true);
+
+    try {
+      const categoriesData = await getForumCategories();
+      setCategories(categoriesData);
 
       if (!newThreadCategoryId && categoriesData.length > 0) {
         setNewThreadCategoryId(categoriesData[0].id);
       }
     } catch {
       setForumError("Impossible de charger le forum pour le moment.");
-    } finally {
       setIsLoadingOverview(false);
+      return;
     }
-  }, [newThreadCategoryId, selectedCategoryId, user?.id]);
+
+    await loadThreads(selectedCategoryId, 0);
+  }, [loadThreads, newThreadCategoryId, selectedCategoryId]);
 
   const loadThreadDetail = useCallback(async (threadId: string) => {
     setIsLoadingThread(true);
@@ -539,7 +584,11 @@ export function ForumSection() {
                 <ScrollReveal key={category.id}>
                   <button
                     type="button"
-                    onClick={() => setSelectedCategoryId((current) => (current === category.id ? "all" : category.id))}
+                    onClick={() => {
+                      setThreadsPage(0);
+                      setHasMoreThreads(true);
+                      setSelectedCategoryId((current) => (current === category.id ? "all" : category.id));
+                    }}
                     className="text-left"
                   >
                     <Card
@@ -597,7 +646,15 @@ export function ForumSection() {
               </p>
             </div>
             {selectedCategoryId !== "all" ? (
-              <Button variant="ghost" size="sm" onClick={() => setSelectedCategoryId("all")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setThreadsPage(0);
+                  setHasMoreThreads(true);
+                  setSelectedCategoryId("all");
+                }}
+              >
                 Voir tout
               </Button>
             ) : null}
@@ -633,7 +690,8 @@ export function ForumSection() {
                 </Card>
               </ScrollReveal>
             ) : (
-              threads.map((thread, index) => {
+              <>
+                {threads.map((thread, index) => {
                 const author = formatAuthorName(thread.profile?.full_name, thread.profile?.username);
                 const initials = getInitials(author);
                 const isOwner = Boolean(user?.id && thread.user_id === user.id);
@@ -818,7 +876,28 @@ export function ForumSection() {
                     </Card>
                   </ScrollReveal>
                 );
-              })
+                })}
+
+                {hasMoreThreads && !isLoadingMoreThreads && threads.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = threadsPage + 1;
+                      setThreadsPage(next);
+                      void loadThreads(selectedCategoryId, next);
+                    }}
+                    className="w-full rounded-xl border border-border py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    Voir plus de sujets
+                  </button>
+                )}
+
+                {isLoadingMoreThreads && (
+                  <div className="flex justify-center py-4">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                  </div>
+                )}
+              </>
             )}
       </div>
 

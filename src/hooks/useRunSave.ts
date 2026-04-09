@@ -11,7 +11,7 @@ import {
   type RouteRow,
 } from "@/lib/database";
 import { clearActiveSession, type ActiveSession } from "@/lib/activeSession";
-import type { CommunityPost } from "@/lib/strava";
+import type { CommunityPost } from "@/lib/runFormatters";
 
 const OFFLINE_RUNS_KEY = "pace-offline-runs";
 

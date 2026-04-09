@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import GPSMap from "@/components/GPSMap";
-import type { CommunityPost } from "@/lib/strava";
+import type { CommunityPost } from "@/lib/runFormatters";
 import { Clock, MapPin, MessageCircle, Share2, Trophy, Zap } from "lucide-react";
 
 type ActivityPostCardProps = {

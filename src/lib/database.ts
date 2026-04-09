@@ -551,12 +551,31 @@ export async function getFollowing(userId: string): Promise<string[]> {
   return (data ?? []).map((row) => row.following_id as string);
 }
 
-export async function getPersonalizedFeed(userId: string): Promise<PersonalizedFeedPost[]> {
+/**
+ * Run in Supabase SQL Editor: add `p_offset int default 0` to `get_personalized_feed`
+ * and end the query with `limit p_limit offset p_offset` (same return columns as before).
+ *
+ * Example:
+ *   create or replace function get_personalized_feed(
+ *     p_user_id uuid,
+ *     p_limit int default 20,
+ *     p_offset int default 0
+ *   ) returns table ( ... ) language sql stable security definer as $$
+ *     ... existing select ...
+ *     limit p_limit offset p_offset;
+ *   $$;
+ */
+export async function getPersonalizedFeed(
+  userId: string,
+  limit = 20,
+  offset = 0,
+): Promise<PersonalizedFeedPost[]> {
   await requireCurrentUserId(userId);
 
   const { data, error } = await supabase.rpc("get_personalized_feed", {
     p_user_id: userId,
-    p_limit: 50,
+    p_limit: limit,
+    p_offset: offset,
   });
 
   if (error) throw error;
@@ -895,13 +914,15 @@ export async function getForumCategories() {
   }) as ForumCategoryRecord[];
 }
 
-export async function getForumThreads(categoryId?: string) {
+export async function getForumThreads(categoryId?: string, limit = 20, offset = 0) {
+  const rangeEnd = offset + limit - 1;
+
   let threadsQuery = supabase
     .from("forum_threads")
     .select("*")
     .order("is_pinned", { ascending: false })
     .order("updated_at", { ascending: false })
-    .limit(100);
+    .range(offset, rangeEnd);
 
   if (categoryId) {
     threadsQuery = threadsQuery.eq("category_id", categoryId);

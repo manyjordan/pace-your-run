@@ -7,6 +7,19 @@ export type PredictionResult = {
   confidence: "high" | "medium" | "low";
 };
 
+/** Course utilisée pour Riegel et Jack Daniels (pas pour Riegel étendu). */
+export type PredictionReferenceInfo = {
+  distanceKm: number;
+  durationSeconds: number;
+  startedAt: string | null;
+  title: string | null;
+  paceSecondsPerKm: number;
+  /** Ligne lisible : titre, distance, allure, date */
+  label: string;
+  /** Pourquoi cette course a été choisie */
+  explanation: string;
+};
+
 export type RacePrediction = {
   targetDistanceKm: number;
   targetLabel: string;
@@ -14,6 +27,7 @@ export type RacePrediction = {
   rangeMinSeconds: number;
   rangeMaxSeconds: number;
   consensusSeconds: number;
+  reference: PredictionReferenceInfo;
 };
 
 export const RACE_DISTANCES = [
@@ -25,7 +39,6 @@ export const RACE_DISTANCES = [
 ] as const;
 
 const RIEGEL_EXP = 1.06;
-const CAMERON_EXP_BASE = 1.07;
 const EXTENDED_RIEGEL_EXP = 1.08;
 
 const MIN_DISTANCE_KM = 3;
@@ -39,7 +52,7 @@ function paceSecondsPerKm(r: RunRow): number {
   return r.duration_seconds / r.distance_km;
 }
 
-/** Best single performance: fastest pace among eligible runs. */
+/** Meilleure performance : allure la plus rapide parmi les courses éligibles. */
 function bestReferenceRun(runs: RunRow[]): RunRow | null {
   const e = eligibleRuns(runs);
   if (e.length === 0) return null;
@@ -55,6 +68,42 @@ function bestReferenceRun(runs: RunRow[]): RunRow | null {
   return best;
 }
 
+export function formatPacePerKm(secondsPerKm: number): string {
+  const p = Math.max(0, secondsPerKm);
+  const m = Math.floor(p / 60);
+  const s = Math.round(p % 60);
+  const safeS = s === 60 ? 59 : s;
+  return `${m}:${String(safeS).padStart(2, "0")} /km`;
+}
+
+function formatReferenceDate(iso: string | null): string {
+  if (!iso) return "date inconnue";
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return "date inconnue";
+  return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+}
+
+function buildReferenceInfo(run: RunRow, targetDistanceKm: number): PredictionReferenceInfo {
+  const pace = paceSecondsPerKm(run);
+  const title = run.title?.trim() || "Course";
+  const label = `${title} · ${run.distance_km.toFixed(1)} km · ${formatPacePerKm(pace)} · ${formatReferenceDate(run.started_at)}`;
+
+  const explanation =
+    `Référence : votre meilleure allure parmi les courses de plus de ${MIN_DISTANCE_KM} km (temps au kilomètre le plus rapide). ` +
+    `Cette sortie sert aux extrapolations Riegel et Jack Daniels pour viser environ ${targetDistanceKm.toFixed(1)} km. ` +
+    "Le modèle Riegel étendu combine encore vos 3 meilleures allures.";
+
+  return {
+    distanceKm: run.distance_km,
+    durationSeconds: run.duration_seconds,
+    startedAt: run.started_at,
+    title: run.title,
+    paceSecondsPerKm: pace,
+    label,
+    explanation,
+  };
+}
+
 /** Up to 3 best runs by pace (for extended Riegel). */
 function topThreeBestRuns(runs: RunRow[]): RunRow[] {
   const e = [...eligibleRuns(runs)].sort((a, b) => paceSecondsPerKm(a) - paceSecondsPerKm(b));
@@ -68,11 +117,6 @@ function distanceConfidence(referenceKm: number, targetKm: number): "high" | "me
 
 function predictRiegel(T1: number, D1: number, D2: number): number {
   return T1 * Math.pow(D2 / D1, RIEGEL_EXP);
-}
-
-function predictCameron(T1: number, D1: number, D2: number): number {
-  const exp = CAMERON_EXP_BASE - 0.0065 * D2;
-  return T1 * Math.pow(D2 / D1, exp);
 }
 
 function predictExtendedRiegel(runs: RunRow[], D2: number): { seconds: number; usedCount: number } {
@@ -225,8 +269,9 @@ export function getRacePrediction(
 
   const distConf = distanceConfidence(D1, D2);
 
+  const reference = buildReferenceInfo(ref, targetDistanceKm);
+
   const riegelSec = predictRiegel(T1, D1, D2);
-  const cameronSec = predictCameron(T1, D1, D2);
   const danielsSec = predictDaniels(ref, D2);
   const { seconds: extendedSec, usedCount } = predictExtendedRiegel(runs, D2);
 
@@ -237,12 +282,6 @@ export function getRacePrediction(
       model: "Riegel",
       description: "Extrapolation classique par loi de puissance (exposant 1,06).",
       predictedSeconds: riegelSec,
-      confidence: distConf,
-    },
-    {
-      model: "Cameron",
-      description: "Variante avec exposant dépendant de la distance cible (souvent meilleure sur le long).",
-      predictedSeconds: cameronSec,
       confidence: distConf,
     },
     {
@@ -265,8 +304,8 @@ export function getRacePrediction(
   const rangeMinSeconds = Math.min(...secs);
   const rangeMaxSeconds = Math.max(...secs);
 
-  const consensusSeconds =
-    0.3 * riegelSec + 0.3 * cameronSec + 0.2 * danielsSec + 0.2 * extendedSec;
+  /** Consensus : 3/7 Riegel, 2/7 Jack Daniels, 2/7 Riegel étendu. */
+  const consensusSeconds = (3 * riegelSec + 2 * danielsSec + 2 * extendedSec) / 7;
 
   return {
     targetDistanceKm,
@@ -275,8 +314,12 @@ export function getRacePrediction(
     rangeMinSeconds,
     rangeMaxSeconds,
     consensusSeconds,
+    reference,
   };
 }
+
+/** Cumul sur une fenêtre glissante de 3 semaines (distance + durée de toutes les sorties). */
+export type VO2maxBasis = "rolling_3w_cumulative";
 
 export type VO2maxEstimate = {
   value: number;
@@ -284,23 +327,73 @@ export type VO2maxEstimate = {
   levelLabel: string;
   trend: "up" | "down" | "stable" | null;
   trendValue: number | null;
-  basedOnRun: {
-    distanceKm: number;
-    durationSeconds: number;
-    startedAt: string | null;
+  vo2Basis: VO2maxBasis;
+  /** Cumul sur les 3 dernières semaines ayant servi au calcul. */
+  basedOnWindow: {
+    totalDistanceKm: number;
+    totalDurationSeconds: number;
+    runCount: number;
   } | null;
 };
 
+const VO2_ROLLING_WEEKS = 3;
+const VO2_WINDOW_MS = VO2_ROLLING_WEEKS * 7 * 24 * 60 * 60 * 1000;
+const VO2_MIN_CUMULATIVE_KM = 3;
+
+function runActivityTimeMs(r: RunRow): number | null {
+  const raw = r.started_at ?? r.created_at;
+  if (!raw) return null;
+  const t = new Date(raw).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * Somme des sorties dans l’intervalle de dates.
+ * Si `endInclusive` est false, les activités avec `t === tEnd` sont exclues (fin ouverte).
+ */
+function aggregateRunsInTimeRange(
+  runs: RunRow[],
+  tStartInclusive: number,
+  tEnd: number,
+  endInclusive: boolean,
+): { km: number; sec: number; count: number } {
+  let km = 0;
+  let sec = 0;
+  let count = 0;
+  for (const r of runs) {
+    const t = runActivityTimeMs(r);
+    if (t === null || t < tStartInclusive) continue;
+    if (endInclusive) {
+      if (t > tEnd) continue;
+    } else if (t >= tEnd) {
+      continue;
+    }
+    if (r.distance_km <= 0 || r.duration_seconds <= 0) continue;
+    km += r.distance_km;
+    sec += r.duration_seconds;
+    count += 1;
+  }
+  return { km, sec, count };
+}
+
+function clampVo2Display(vo2: number): number {
+  return Math.round(Math.min(85, Math.max(25, vo2)));
+}
+
+/**
+ * VO2max indicative : formule Daniels appliquée au volume cumulé (distance + durée totales)
+ * sur les 3 dernières semaines — allure moyenne sur l’ensemble des sorties, pas une seule course.
+ */
 export function estimateVO2maxFromRuns(runs: RunRow[]): VO2maxEstimate | null {
-  const eligible = runs.filter((r) => r.distance_km >= 3 && r.duration_seconds > 0);
-  if (eligible.length === 0) return null;
+  const now = Date.now();
+  const recentStart = now - VO2_WINDOW_MS;
+  const prevStart = now - 2 * VO2_WINDOW_MS;
 
-  const best = eligible.reduce((a, b) =>
-    a.duration_seconds / a.distance_km < b.duration_seconds / b.distance_km ? a : b,
-  );
+  const recent = aggregateRunsInTimeRange(runs, recentStart, now, true);
+  if (recent.km < VO2_MIN_CUMULATIVE_KM || recent.count === 0) return null;
 
-  const vo2 = estimateVO2(best.distance_km, best.duration_seconds);
-  const clamped = Math.round(Math.min(85, Math.max(25, vo2)));
+  const vo2 = estimateVO2(recent.km, recent.sec);
+  const clamped = clampVo2Display(vo2);
 
   const getLevel = (v: number): VO2maxEstimate["level"] => {
     if (v < 35) return "very_low";
@@ -322,34 +415,14 @@ export function estimateVO2maxFromRuns(runs: RunRow[]): VO2maxEstimate | null {
 
   const level = getLevel(clamped);
 
-  const now = Date.now();
-  const fourWeeksAgo = now - 28 * 24 * 60 * 60 * 1000;
-  const eightWeeksAgo = now - 56 * 24 * 60 * 60 * 1000;
-
-  const recentRuns = eligible.filter(
-    (r) => r.started_at && new Date(r.started_at).getTime() >= fourWeeksAgo,
-  );
-  const olderRuns = eligible.filter((r) => {
-    const t = r.started_at ? new Date(r.started_at).getTime() : 0;
-    return t >= eightWeeksAgo && t < fourWeeksAgo;
-  });
+  const previous = aggregateRunsInTimeRange(runs, prevStart, recentStart, false);
 
   let trend: VO2maxEstimate["trend"] = null;
   let trendValue: number | null = null;
 
-  if (recentRuns.length > 0 && olderRuns.length > 0) {
-    const recentBest = recentRuns.reduce((a, b) =>
-      a.duration_seconds / a.distance_km < b.duration_seconds / b.distance_km ? a : b,
-    );
-    const olderBest = olderRuns.reduce((a, b) =>
-      a.duration_seconds / a.distance_km < b.duration_seconds / b.distance_km ? a : b,
-    );
-    const recentVO2 = Math.round(
-      Math.min(85, Math.max(25, estimateVO2(recentBest.distance_km, recentBest.duration_seconds))),
-    );
-    const olderVO2 = Math.round(
-      Math.min(85, Math.max(25, estimateVO2(olderBest.distance_km, olderBest.duration_seconds))),
-    );
+  if (previous.km >= VO2_MIN_CUMULATIVE_KM && previous.count > 0) {
+    const recentVO2 = clampVo2Display(estimateVO2(recent.km, recent.sec));
+    const olderVO2 = clampVo2Display(estimateVO2(previous.km, previous.sec));
     const diff = recentVO2 - olderVO2;
     if (Math.abs(diff) >= 1) {
       trend = diff > 0 ? "up" : "down";
@@ -366,10 +439,11 @@ export function estimateVO2maxFromRuns(runs: RunRow[]): VO2maxEstimate | null {
     levelLabel: levelLabels[level],
     trend,
     trendValue,
-    basedOnRun: {
-      distanceKm: best.distance_km,
-      durationSeconds: best.duration_seconds,
-      startedAt: best.started_at,
+    vo2Basis: "rolling_3w_cumulative",
+    basedOnWindow: {
+      totalDistanceKm: recent.km,
+      totalDurationSeconds: recent.sec,
+      runCount: recent.count,
     },
   };
 }

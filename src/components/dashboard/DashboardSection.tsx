@@ -1,9 +1,14 @@
 import { useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
+import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import { Calendar, Route, Clock, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
+import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
+import { compactWeeklyBarTopLabel, formatDashboardTooltipForKind } from "@/lib/dashboardHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
 type ProfileGoalData = {
   goalType: "weight" | "race" | "distance";
@@ -32,20 +37,41 @@ type WeeklyMetricCard = {
   change: string;
   icon: LucideIcon;
   color: string;
-  chartData: Array<{ week: string; value: number; showTick?: boolean }>;
+  metricKind: MetricKind;
+  chartData: Array<{ week: string; value: number; showTick?: boolean; barLabel?: string }>;
   comment: string;
   granularity?: "week" | "month" | "quarter";
-  period?: "1m" | "3m" | "1y" | "all";
+  period?: MetricChartPeriod;
 };
+
+type DashboardPeriod = Extract<MetricChartPeriod, "3m" | "6m" | "1y" | "all">;
+
+function periodRangeLabel(p: DashboardPeriod): string {
+  if (p === "3m") return "les 3 derniers mois";
+  if (p === "6m") return "les 6 derniers mois";
+  if (p === "1y") return "la dernière année";
+  return "tout l'historique";
+}
+
+function metricSubtitle(kind: MetricKind, period: DashboardPeriod): string {
+  const range = periodRangeLabel(period);
+  if (kind === "distance") return `Kilomètres cumulés par semaine sur ${range}.`;
+  if (kind === "duration") return `Temps total d'activité par semaine sur ${range}.`;
+  return `Dénivelé positif cumulé par semaine sur ${range}.`;
+}
 
 export const DashboardSection = ({
   recentRuns,
   userGoal,
   filteredMetrics,
+  period,
+  onPeriodChange,
 }: {
   recentRuns: RunRow[];
   userGoal: ProfileGoalData | null;
   filteredMetrics: WeeklyMetricCard[];
+  period: DashboardPeriod;
+  onPeriodChange: (p: DashboardPeriod) => void;
 }) => {
   const computedUpcomingSessions = useMemo<UpcomingSession[]>(() => {
     const profileWithPlan = userGoal as (ProfileGoalData & { selectedPlanId?: string; goalSavedAt?: string }) | null;
@@ -130,16 +156,74 @@ export const DashboardSection = ({
 
   return (
     <div className="space-y-6">
-      {filteredMetrics.map((metric, index) => (
-        <ScrollReveal key={metric.title} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
-          <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
-            <div className="mb-4">
-              <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
-              <p className="mt-1 text-xs text-muted-foreground">{metric.change}</p>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium text-muted-foreground">Période</p>
+        <div className="flex gap-1 rounded-lg border border-border p-0.5 bg-muted/50">
+          {(["3m", "6m", "1y", "all"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onPeriodChange(p)}
+              className={cn(
+                "rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+                period === p
+                  ? "bg-accent text-accent-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {p === "3m" ? "3 mois" : p === "6m" ? "6 mois" : p === "1y" ? "1 an" : "Tout"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filteredMetrics.map((metric, index) => {
+        const Icon = metric.icon;
+        return (
+          <ScrollReveal key={metric.title} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
+            <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+              <div className="mb-4 flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Icon className="h-4 w-4 text-muted-foreground" />
+                    <h2 className="text-sm font-semibold">{metric.title}</h2>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{metricSubtitle(metric.metricKind, period)}</p>
+                </div>
+                <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-semibold leading-4 text-lime">
+                  {metric.currentValue}
+                </span>
+              </div>
+              <div className="mb-4">
+                <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
+                <p className="mt-1 text-xs text-muted-foreground">{metric.change}</p>
+              </div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                    <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactWeekTick />} interval={0} />
+                    <YAxis hide />
+                    <Tooltip
+                      contentStyle={chartTooltipStyle}
+                      formatter={(value) => formatDashboardTooltipForKind(metric.metricKind, Number(value))}
+                    />
+                    <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
+                      <LabelList
+                        dataKey="barLabel"
+                        position="top"
+                        formatter={(value: string) => compactWeeklyBarTopLabel(metric.metricKind, value)}
+                        fill="hsl(var(--foreground))"
+                        fontSize={10}
+                        fontWeight={700}
+                      />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
-        </ScrollReveal>
-      ))}
+          </ScrollReveal>
+        );
+      })}
 
       <div className="grid gap-6 md:grid-cols-2">
         <ScrollReveal>

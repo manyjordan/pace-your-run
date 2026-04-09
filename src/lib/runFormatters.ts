@@ -1,7 +1,6 @@
 /**
  * Utility functions for formatting run data.
- * Legacy Strava API types have been removed.
- * TODO: rename this file to runFormatters.ts in a future cleanup.
+ * Renamed from strava.ts — no longer has any Strava API dependency.
  */
 
 export type { CommunityPost, GPSTracePoint } from "./types";

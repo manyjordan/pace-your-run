@@ -294,7 +294,7 @@ export function parseFitArrayBuffer(buffer: ArrayBuffer, fileName?: string): Imp
     const movingTimeSeconds = computeMovingTime(gpsTrace);
 
     return {
-      title: `Course importee ${titleDate}`,
+      title: `Course importée ${titleDate}`,
       distance_km: distanceKm,
       duration_seconds: durationSeconds,
       moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,

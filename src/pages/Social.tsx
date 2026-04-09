@@ -57,7 +57,7 @@ import {
   formatRelativeTime,
   getInitials,
   type CommunityPost,
-} from "@/lib/strava";
+} from "@/lib/runFormatters";
 
 const GPSMap = lazy(() => import("@/components/GPSMap"));
 const ForumSection = lazy(() =>
@@ -133,6 +133,8 @@ function inferPostType(title: string, description: string) {
   return "run" as const;
 }
 
+const PAGE_SIZE = 20;
+
 function ranWithBadgeText(description: string): string | null {
   const idx = description.indexOf("Couru avec");
   if (idx < 0) return null;
@@ -196,6 +198,9 @@ export default function Social() {
   const [selectedActivity, setSelectedActivity] = useState<RunRow | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<CommunityPost["gpsTrace"] | undefined>(undefined);
   const [isLoadingPosts, setIsLoadingPosts] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
   const [postsError, setPostsError] = useState<string | null>(null);
   const [likeBusyId, setLikeBusyId] = useState<string | null>(null);
   const [likeAnimatingId, setLikeAnimatingId] = useState<string | null>(null);
@@ -324,18 +329,58 @@ export default function Social() {
     }
   }, [user?.id]);
 
+  const loadFeed = useCallback(
+    async (pageNum = 0) => {
+      if (!user?.id) return;
+      if (pageNum === 0) {
+        setIsLoadingPosts(true);
+      } else {
+        setIsLoadingMore(true);
+      }
+
+      try {
+        const newPosts = await getPersonalizedFeed(user.id, PAGE_SIZE, pageNum * PAGE_SIZE);
+        const mappedPosts = newPosts.map(mapPersonalizedPostToFeedPost).map(ensurePostTrace);
+
+        if (pageNum === 0) {
+          setPosts(mappedPosts);
+          setActivities(newPosts.filter((post) => post.run).map((post) => post.run as RunRow));
+        } else {
+          setPosts((prev) => [...prev, ...mappedPosts]);
+          setActivities((prev) => [
+            ...prev,
+            ...newPosts.filter((post) => post.run).map((post) => post.run as RunRow),
+          ]);
+        }
+        setHasMore(newPosts.length === PAGE_SIZE);
+      } catch (error) {
+        console.error("Failed to load feed:", error);
+        if (pageNum === 0) {
+          setActivities([]);
+          setPosts([]);
+          setPostsError("Impossible de charger le fil d'actualité. Vérifiez votre connexion.");
+        }
+      } finally {
+        setIsLoadingPosts(false);
+        setIsLoadingMore(false);
+      }
+    },
+    [user?.id],
+  );
+
   const loadCommunityPosts = useCallback(async () => {
     if (!user?.id) {
       setIsLoadingPosts(false);
       return;
     }
 
+    setPage(0);
+    setHasMore(true);
     setIsLoadingPosts(true);
     setPostsError(null);
 
     try {
-      const [feedPosts, followingList, suggested] = await Promise.all([
-        getPersonalizedFeed(user.id),
+      const [followingList, suggested] = await Promise.all([
         getFollowing(user.id),
         getSuggestedUsersToFollow(user.id, 5),
       ]);
@@ -343,21 +388,16 @@ export default function Social() {
       setFollowingIds(new Set(followingList));
       setFollowingAnyone(followingList.length > 0);
       setSuggestions(suggested);
-
-      const mappedPosts = feedPosts.map(mapPersonalizedPostToFeedPost).map(ensurePostTrace);
-
-      setPosts(mappedPosts);
-      setActivities(
-        feedPosts.filter((post) => post.run).map((post) => post.run as RunRow),
-      );
     } catch {
       setActivities([]);
       setPosts([]);
       setPostsError("Impossible de charger le fil d'actualité. Vérifiez votre connexion.");
-    } finally {
       setIsLoadingPosts(false);
+      return;
     }
-  }, [user?.id]);
+
+    await loadFeed(0);
+  }, [user?.id, loadFeed]);
 
   useEffect(() => {
     void loadCommunityPosts();
@@ -865,6 +905,30 @@ export default function Social() {
                 </ScrollReveal>
               );
               })}
+
+              {hasMore && !isLoadingMore && posts.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextPage = page + 1;
+                    setPage(nextPage);
+                    void loadFeed(nextPage);
+                  }}
+                  className="w-full rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground hover:border-accent/50 hover:text-foreground transition-colors"
+                >
+                  Charger plus de publications
+                </button>
+              )}
+
+              {isLoadingMore && (
+                <div className="flex justify-center py-4">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                </div>
+              )}
+
+              {!hasMore && posts.length > 0 && (
+                <p className="text-center text-xs text-muted-foreground py-3">Vous avez tout vu</p>
+              )}
         </TabsContent>
 
         <TabsContent value="forum">

@@ -67,7 +67,7 @@ export function parseStravaCSV(csvText: string): StravaCSVImportResult {
 
     const typedRow = row as unknown as StravaCSVRow;
     const run: RunInput = {
-      title: typedRow["Activity Name"] || "Course importee",
+      title: typedRow["Activity Name"] || "Course importée",
       distance_km: distanceKm,
       duration_seconds: durationSeconds,
       moving_time_seconds: durationSeconds,
@@ -85,7 +85,7 @@ export function parseStravaCSV(csvText: string): StravaCSVImportResult {
   return { runs, skipped, total: lines.length - 1 };
 }
 
-function parseCSVLine(line: string): string[] {
+export function parseCSVLine(line: string): string[] {
   const result: string[] = [];
   let current = "";
   let inQuotes = false;

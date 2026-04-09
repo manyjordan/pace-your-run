@@ -3,7 +3,7 @@ import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } fr
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { RunRow } from "@/lib/database";
 import { Badge } from "@/components/ui/badge";
-import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/strava";
+import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
 
 const GPSMap = lazy(() => import("@/components/GPSMap"));
 

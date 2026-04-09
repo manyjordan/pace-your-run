@@ -1,43 +1,13 @@
 import { useMemo } from "react";
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, LabelList } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
+import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import { getStartOfWeek } from "@/lib/dashboardHelpers";
-import { formatDistance, formatDuration, formatPace } from "@/lib/strava";
-
-const tooltipStyle = {
-  background: "hsl(var(--card))",
-  border: "1px solid hsl(var(--border))",
-  borderRadius: "8px",
-  fontSize: 12,
-};
-
-function CompactYearTick({
-  x,
-  y,
-  payload,
-}: {
-  x?: number;
-  y?: number;
-  payload?: {
-    value: string;
-    payload?: { showTick?: boolean };
-  };
-}) {
-  if (typeof x !== "number" || typeof y !== "number" || !payload) return null;
-  if (payload.payload?.showTick === false) return null;
-
-  return (
-    <g transform={`translate(${x},${y})`}>
-      <text x={0} y={10} textAnchor="middle" fill="hsl(var(--foreground))" fontSize={9} fontWeight={600}>
-        {payload.value}
-      </text>
-    </g>
-  );
-}
+import { formatDistance, formatDuration, formatPace } from "@/lib/runFormatters";
 
 const WEEKS_BACK = 12;
 
@@ -86,11 +56,15 @@ function weekBuckets(runs: RunRow[]) {
     };
   });
 
-  const distanceSeries = labels.map((week, i) => ({
-    week,
-    value: Math.round(distanceKm[i] * 10) / 10,
-    showTick: i % 2 === 0,
-  }));
+  const distanceSeries = labels.map((week, i) => {
+    const km = Math.round(distanceKm[i] * 10) / 10;
+    return {
+      week,
+      value: km,
+      showTick: i % 2 === 0,
+      distanceBarLabel: km > 0 ? `${String(km).replace(".", ",")} km` : "",
+    };
+  });
 
   return { paceSeries, distanceSeries };
 }
@@ -165,10 +139,10 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactYearTick />} interval={0} />
+                <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactWeekTick />} interval={0} />
                 <YAxis hide />
                 <Tooltip
-                  contentStyle={tooltipStyle}
+                  contentStyle={chartTooltipStyle}
                   formatter={(_value, _name, props) => {
                     const p = props?.payload as { paceLabel?: string } | undefined;
                     return [p?.paceLabel || "—", "Allure moy."];
@@ -212,22 +186,24 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                <defs>
-                  <linearGradient id="distGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.24} />
-                    <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactYearTick />} interval={0} />
+              <BarChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactWeekTick />} interval={0} />
                 <YAxis hide />
                 <Tooltip
-                  contentStyle={tooltipStyle}
+                  contentStyle={chartTooltipStyle}
                   formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} km`, "Distance"]}
                 />
-                <Area type="monotone" dataKey="value" stroke="hsl(var(--accent))" strokeWidth={2.5} fill="url(#distGrad)" />
-              </AreaChart>
+                <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
+                  <LabelList
+                    dataKey="distanceBarLabel"
+                    position="top"
+                    formatter={(value: string) => (value ? value.replace(" km", "") : "")}
+                    fill="hsl(var(--foreground))"
+                    fontSize={10}
+                    fontWeight={700}
+                  />
+                </Bar>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
