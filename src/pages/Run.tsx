@@ -23,20 +23,12 @@ import {
 import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useToast } from "@/hooks/use-toast";
+import { useGpsTracking } from "@/hooks/useGpsTracking";
+import { useRunTimer } from "@/hooks/useRunTimer";
+import { useRunSave } from "@/hooks/useRunSave";
+import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
 import { cn } from "@/lib/utils";
-import {
-  createPost,
-  detectSimultaneousRuns,
-  getProfilesByIds,
-  saveRun,
-  updatePostAudience,
-  updatePostDescription,
-  updateRunRanWith,
-  type RouteRow,
-  type RunGpsPoint,
-  type RunRow,
-} from "@/lib/database";
+import { updatePostAudience, type RouteRow, type RunGpsPoint, type RunRow } from "@/lib/database";
 import {
   connectHeartRateMonitor,
   disconnectHeartRateMonitor,
@@ -51,7 +43,7 @@ import {
   getInitials,
   type CommunityPost,
 } from "@/lib/strava";
-import { computeMovingTime } from "@/lib/parsers/gpxParser";
+import { computeMovingTime, haversineDistanceKm } from "@/lib/parsers/gpxParser";
 import {
   convertDistanceFromKm,
   convertPaceFromMinutesPerKm,
@@ -67,19 +59,6 @@ import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib
 const GPSMap = lazy(() => import("@/components/GPSMap"));
 const RouteMap = lazy(() => import("@/components/RouteMap"));
 
-// Haversine formula: calculates distance between two lat/lng points in kilometers
-function haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLng = ((lng2 - lng1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-const OFFLINE_RUNS_KEY = "pace-offline-runs";
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
 function findClosestPointIndex(
@@ -101,42 +80,7 @@ function findClosestPointIndex(
   return closest;
 }
 
-function isLikelyNetworkError(error: unknown): boolean {
-  if (typeof navigator !== "undefined" && !navigator.onLine) return true;
-  if (error instanceof TypeError) {
-    const m = String(error.message);
-    if (/fetch|network|load failed/i.test(m)) return true;
-  }
-  const msg = String((error as { message?: string })?.message ?? error);
-  if (/failed to fetch|networkerror|network request failed/i.test(msg)) return true;
-  return false;
-}
-
 type GPSPoint = RunGpsPoint;
-
-/** Minutes per km over the trace from kilometre (endKm - 1) to endKm; null if GPS data is insufficient. */
-function paceMinutesPerKmForLastKm(trace: GPSPoint[], endKm: number): number | null {
-  if (trace.length < 2 || endKm < 1) return null;
-  let cum = 0;
-  let startTime: number | null = null;
-  let endTime: number | null = null;
-  for (let i = 1; i < trace.length; i++) {
-    const prev = trace[i - 1];
-    const curr = trace[i];
-    cum += haversineDistance(prev.lat, prev.lng, curr.lat, curr.lng);
-    if (startTime === null && cum >= endKm - 1) {
-      startTime = curr.time;
-    }
-    if (cum >= endKm) {
-      endTime = curr.time;
-      break;
-    }
-  }
-  if (startTime === null || endTime === null || endTime <= startTime) return null;
-  const seconds = (endTime - startTime) / 1000;
-  if (seconds <= 0) return null;
-  return seconds / 60;
-}
 
 function generateDefaultTitle(): string {
   const now = new Date();
@@ -161,25 +105,11 @@ function generateDefaultTitle(): string {
   return `Course ${timeOfDay} — ${day}`;
 }
 
-function parsePaceToSeconds(pace: string): number {
-  const normalizedPace = pace.replace("/km", "").trim();
-  const parts = normalizedPace.split(":");
-  if (parts.length !== 2) return 0;
-
-  const minutes = Number(parts[0]);
-  const seconds = Number(parts[1]);
-  if (!Number.isFinite(minutes) || !Number.isFinite(seconds)) return 0;
-
-  return minutes * 60 + seconds;
-}
-
 /* ── Run component ── */
 export default function Run() {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [postAudience, setPostAudience] = useState<"private" | "friends" | "public">("public");
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
-  const [elapsed, setElapsed] = useState(0);
   const [distance, setDistance] = useState(0);
   const [isTreadmill, setIsTreadmill] = useState(false);
   const [treadmillSpeedKmh, setTreadmillSpeedKmh] = useState(10);
@@ -188,9 +118,6 @@ export default function Run() {
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [activeRoute, setActiveRoute] = useState<RouteRow | null>(null);
   const [routeProgress, setRouteProgress] = useState(0);
-  const [gpsTrace, setGpsTrace] = useState<GPSPoint[]>([]);
-  const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
-  const [gpsError, setGpsError] = useState<string>("");
   const [title, setTitle] = useState("");
   const [runSummary, setRunSummary] = useState<{
     distance: number;
@@ -202,8 +129,6 @@ export default function Run() {
     gpsTrace: GPSPoint[];
     startedAt: string;
   } | null>(null);
-  const [saveError, setSaveError] = useState<string>("");
-  const [isSaving, setIsSaving] = useState(false);
   const [bluetoothDevice, setBluetoothDevice] = useState<string | null>(null);
   const [isConnectingBluetooth, setIsConnectingBluetooth] = useState(false);
   const [bluetoothError, setBluetoothError] = useState("");
@@ -217,31 +142,54 @@ export default function Run() {
   const [isUpdatingAudience, setIsUpdatingAudience] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const watchIdRef = useRef<number | null>(null);
-  const lastGpsPointRef = useRef<GPSPoint | null>(null);
   const runStartedAtRef = useRef<string | null>(null);
   const bluetoothConnectionRef = useRef<BluetoothConnection | null>(null);
   const heartRateSamplesRef = useRef<number[]>([]);
   const statusRef = useRef<"idle" | "running" | "paused">("idle");
   /** Preferences snapshot for speech for this run (set in start()). */
   const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
-  const lastAnnouncedKmRef = useRef(0);
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
   const routeArrivalAnnouncedRef = useRef(false);
-  const lastPaceAlertRef = useRef<number>(0);
   const currentIntervalRepRef = useRef<number>(0);
 
-  const formatTime = useCallback((s: number) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return h > 0
-      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-      : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+  const bumpDistance = useCallback((deltaKm: number) => {
+    setDistance((d) => d + deltaKm);
   }, []);
 
+  const {
+    gpsTrace,
+    setGpsTrace,
+    gpsAccuracy,
+    setGpsAccuracy,
+    gpsError,
+    setGpsError,
+    lastGpsPointRef,
+    startGpsTracking,
+    stopGpsTracking,
+    getAccuracyColor,
+  } = useGpsTracking({
+    onPermissionDenied: () => setStatus("idle"),
+    onDistanceDelta: bumpDistance,
+  });
+
+  const { elapsed, setElapsed, startInterval, stopInterval, formatTime } = useRunTimer();
+
+  const { persistCompletedRun, isSaving, saveError, setSaveError } = useRunSave();
+
   const pace = distance > 0 ? elapsed / 60 / distance : 0;
+
+  const { resetAnnouncementRefs, resetKilometreAnnouncementRef } = useSpeechAnnouncements({
+    speechPrefsRef,
+    distance,
+    elapsed,
+    gpsTrace,
+    status,
+    pace,
+    activeSession,
+    activeRoute,
+    routeProgress,
+    routeArrivalAnnouncedRef,
+  });
   const formatPace = useCallback(
     (p: number) => (p > 0 ? `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, "0")}` : "--:--"),
     [],
@@ -262,100 +210,6 @@ export default function Run() {
       : bluetoothDevice;
   const isRunActive = status === "running" || status === "paused";
   const hasLiveGpsTrace = gpsTrace.length > 0;
-
-  // GPS accuracy indicator color
-  const getAccuracyColor = (accuracy: number | null) => {
-    if (accuracy === null) return "bg-gray-400";
-    if (accuracy < 10) return "bg-lime-500";
-    if (accuracy < 30) return "bg-yellow-500";
-    return "bg-red-500";
-  };
-
-  // Start GPS tracking
-  const startGpsTracking = useCallback(() => {
-    if (!navigator.geolocation) {
-      setGpsError("GPS non disponible sur ce navigateur.");
-      return false;
-    }
-
-    watchIdRef.current = navigator.geolocation.watchPosition(
-      (position) => {
-        const { latitude, longitude, accuracy, altitude } = position.coords;
-        const now = Date.now();
-
-        // Filter out inaccurate points
-        if (accuracy > 50) {
-          setGpsAccuracy(accuracy);
-          return;
-        }
-
-        setGpsAccuracy(accuracy);
-        setGpsError("");
-
-        const newPoint: GPSPoint = {
-          lat: latitude,
-          lng: longitude,
-          time: now,
-          altitude: altitude ?? undefined,
-          accuracy,
-        };
-
-        // Only add point if user has moved at least 5 meters
-        if (lastGpsPointRef.current) {
-          const dist = haversineDistance(
-            lastGpsPointRef.current.lat,
-            lastGpsPointRef.current.lng,
-            latitude,
-            longitude
-          );
-
-          if (dist >= 0.005) { // 5 meters in km
-            setDistance((d) => d + dist);
-            setGpsTrace((t) => [...t, newPoint]);
-            lastGpsPointRef.current = newPoint;
-          }
-        } else {
-          // First point
-          setGpsTrace([newPoint]);
-          lastGpsPointRef.current = newPoint;
-        }
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        if (error.code === error.PERMISSION_DENIED) {
-          setGpsError("GPS non disponible. Activez la localisation pour enregistrer votre course.");
-          setStatus("idle");
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          setGpsError("Signal GPS perdu. Vérifiez que vous êtes à l'extérieur.");
-        } else if (error.code === error.TIMEOUT) {
-          setGpsError("Délai d'attente GPS dépassé.");
-        }
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-
-    return true;
-  }, []);
-
-  // Stop GPS tracking
-  const stopGpsTracking = useCallback(() => {
-    if (watchIdRef.current !== null) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-  }, []);
-
-  // Timer tick
-  const tick = useCallback(() => {
-    setElapsed((e) => e + 1);
-  }, []);
-
-  // Note: On iOS (Safari), geolocation requires HTTPS
-  // This app must be served over HTTPS or from localhost for geolocation to work on iOS
 
   const resetBluetoothState = useCallback((message = "") => {
     setBluetoothDevice(null);
@@ -459,26 +313,26 @@ export default function Run() {
   useEffect(() => {
     if (status === "running") {
       if (isTreadmill) {
-        intervalRef.current = setInterval(tick, 1000);
+        startInterval();
       } else {
         const startOk = startGpsTracking();
         if (startOk) {
-          intervalRef.current = setInterval(tick, 1000);
+          startInterval();
         }
       }
     } else if (status === "paused") {
       stopGpsTracking();
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      stopInterval();
     } else if (status === "idle") {
       stopGpsTracking();
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      stopInterval();
     }
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      stopInterval();
       if (status === "idle") stopGpsTracking();
     };
-  }, [isTreadmill, status, tick, startGpsTracking, stopGpsTracking]);
+  }, [isTreadmill, status, startGpsTracking, stopGpsTracking, startInterval, stopInterval]);
 
   useEffect(() => {
     if (!isTreadmill || status !== "running") return;
@@ -497,32 +351,10 @@ export default function Run() {
     const closestIndex = findClosestPointIndex(activeRoute.gps_trace, current);
     let coveredKm = 0;
     for (let i = 1; i <= closestIndex; i++) {
-      coveredKm += haversineDistance(
-        activeRoute.gps_trace[i - 1].lat,
-        activeRoute.gps_trace[i - 1].lng,
-        activeRoute.gps_trace[i].lat,
-        activeRoute.gps_trace[i].lng,
-      );
+      coveredKm += haversineDistanceKm(activeRoute.gps_trace[i - 1], activeRoute.gps_trace[i]);
     }
     setRouteProgress(Number(coveredKm.toFixed(2)));
   }, [activeRoute, gpsTrace, isTreadmill]);
-
-  useEffect(() => {
-    if (!activeRoute || status !== "running" || routeArrivalAnnouncedRef.current) return;
-    if (activeRoute.distance_km <= 0) return;
-
-    if (routeProgress >= activeRoute.distance_km * 0.95) {
-      routeArrivalAnnouncedRef.current = true;
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance("Vous approchez de l'arrivée");
-        utterance.lang = "fr-FR";
-        utterance.rate = 1.0;
-        utterance.volume = 1.0;
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-      }
-    }
-  }, [activeRoute, routeProgress, status]);
 
   useEffect(() => {
     return () => {
@@ -532,96 +364,6 @@ export default function Run() {
       }
     };
   }, []);
-
-  // Kilometre voice announcements (Web Speech API).
-  // iOS Safari only allows speech after a user gesture; tapping Start satisfies that.
-  // On iOS, speechSynthesis can be interrupted when the screen locks — limitation of the platform.
-  useEffect(() => {
-    if (status !== "running") return;
-
-    const prefs = speechPrefsRef.current;
-    if (!prefs.announceSplitSpeed && prefs.cumulativeTimeAnnouncement === "off") return;
-
-    const currentKm = Math.floor(distance);
-    if (currentKm <= lastAnnouncedKmRef.current) return;
-
-    lastAnnouncedKmRef.current = currentKm;
-
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
-    const messages: string[] = [];
-
-    if (prefs.announceSplitSpeed && currentKm > 0) {
-      const splitMinPerKm =
-        paceMinutesPerKmForLastKm(gpsTrace, currentKm) ?? (distance > 0 ? elapsed / 60 / distance : 0);
-      const paceForUnit = convertPaceFromMinutesPerKm(splitMinPerKm, prefs.distanceUnit);
-      const paceMinutes = Math.floor(paceForUnit);
-      const paceSeconds = Math.round((paceForUnit % 1) * 60);
-      const unit = prefs.distanceUnit === "mi" ? "mile" : "kilomètre";
-      const pacePart =
-        paceSeconds > 0
-          ? `Allure ${paceMinutes} minutes ${paceSeconds} secondes par ${unit}.`
-          : `Allure ${paceMinutes} minutes par ${unit}.`;
-      messages.push(`Kilomètre ${currentKm}. ${pacePart}`);
-    }
-
-    const cumInterval = parseInt(prefs.cumulativeTimeAnnouncement, 10);
-    if (!Number.isNaN(cumInterval) && cumInterval > 0 && currentKm % cumInterval === 0) {
-      const totalMinutes = Math.floor(elapsed / 60);
-      const totalSeconds = elapsed % 60;
-      const timePart =
-        totalSeconds > 0
-          ? `Temps total : ${totalMinutes} minutes ${totalSeconds} secondes.`
-          : `Temps total : ${totalMinutes} minutes.`;
-      messages.push(timePart);
-    }
-
-    if (messages.length === 0) return;
-
-    const utterance = new SpeechSynthesisUtterance(messages.join(" "));
-    utterance.lang = "fr-FR";
-    utterance.rate = 1.0;
-    utterance.volume = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [distance, elapsed, gpsTrace, status]);
-
-  useEffect(() => {
-    if (status !== "running" || !activeSession || pace <= 0) return;
-
-    const prefs = speechPrefsRef.current;
-    if (!prefs.paceAlerts) return;
-
-    const now = Date.now();
-    const timeSinceLastAlert = (now - lastPaceAlertRef.current) / 1000;
-    if (timeSinceLastAlert < 15) return;
-
-    const targetPaceSeconds = parsePaceToSeconds(activeSession.session.pace);
-    if (targetPaceSeconds <= 0) return;
-
-    const currentPaceSeconds = pace * 60;
-    const diff = currentPaceSeconds - targetPaceSeconds;
-    const threshold = prefs.paceAlertThresholdSeconds;
-    if (Math.abs(diff) <= threshold) return;
-
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
-    const targetMin = Math.floor(targetPaceSeconds / 60);
-    const targetSec = targetPaceSeconds % 60;
-    const currentMin = Math.floor(currentPaceSeconds / 60);
-    const currentSec = Math.round(currentPaceSeconds % 60);
-
-    const message = diff > 0
-      ? `Allure prévue ${targetMin} minutes ${targetSec > 0 ? `${targetSec} secondes` : ""}. Allure actuelle ${currentMin} minutes ${currentSec > 0 ? `${currentSec} secondes` : ""}. Accélérez légèrement.`
-      : `Allure prévue ${targetMin} minutes ${targetSec > 0 ? `${targetSec} secondes` : ""}. Allure actuelle ${currentMin} minutes ${currentSec > 0 ? `${currentSec} secondes` : ""}. Ralentissez légèrement.`;
-
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.lang = "fr-FR";
-    utterance.rate = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-    lastPaceAlertRef.current = now;
-  }, [activeSession, pace, status]);
 
   const start = () => {
     if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
@@ -646,8 +388,7 @@ export default function Run() {
     lastGpsPointRef.current = null;
     runStartedAtRef.current = new Date().toISOString();
     speechPrefsRef.current = loadRunPreferences(user?.id);
-    lastAnnouncedKmRef.current = 0;
-    lastPaceAlertRef.current = 0;
+    resetAnnouncementRefs();
     currentIntervalRepRef.current = 0;
     setRouteProgress(0);
     routeArrivalAnnouncedRef.current = false;
@@ -690,7 +431,7 @@ export default function Run() {
     if (isTreadmill && !showTreadmillCorrection) {
       disconnectHeartRateMonitor();
       stopGpsTracking();
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      stopInterval();
       if (status !== "idle" && finalElapsed > 0 && finalDistance > 0) {
         setRunSummary({
           distance: finalDistance,
@@ -791,7 +532,7 @@ export default function Run() {
     setHeartRate(null);
     setGpsError("");
     setBluetoothError("");
-    lastAnnouncedKmRef.current = 0;
+    resetKilometreAnnouncementRef();
     setRouteProgress(0);
     routeArrivalAnnouncedRef.current = false;
     setShowTreadmillCorrection(false);
@@ -801,105 +542,29 @@ export default function Run() {
     }
   };
 
-  const persistCompletedRun = useCallback(async () => {
-    if (!user || !runSummary) return;
-
-    const activityTitle = title.trim() || generateDefaultTitle();
-    const description = `Je viens de terminer ${runSummary.distance.toFixed(2)} km en ${formatTime(runSummary.duration)}.`;
-    const runData = {
-      distance_km: runSummary.distance,
-      duration_seconds: runSummary.duration,
-      moving_time_seconds: isTreadmill ? runSummary.duration : runSummary.movingTime && runSummary.movingTime > 0 ? runSummary.movingTime : null,
-      average_pace: runSummary.avgPace,
-      average_heartrate: runSummary.averageHeartRate ?? null,
-      elevation_gain: isTreadmill ? 0 : runSummary.elevation,
-      gps_trace: isTreadmill ? [] : runSummary.gpsTrace,
-      run_type: (isTreadmill ? "treadmill" : "run") as const,
-      started_at: runSummary.startedAt,
-      title: activityTitle,
-    };
-
-    try {
-      setIsSaving(true);
-      setSaveError("");
-
-      const savedRun = await saveRun(user.id, runData);
-
-      const createdPost = await createPost(user.id, savedRun.id, activityTitle, description, postAudienceRef.current);
-      setCompletedPostId(createdPost.id);
-      window.dispatchEvent(new Event("pace-community-updated"));
-      localStorage.removeItem(SELECTED_ROUTE_KEY);
-      setActiveRoute(null);
-      setRouteProgress(0);
-      clearActiveSession();
-      setActiveSession(null);
-
-      const ranWithIds = isTreadmill
-        ? []
-        : await detectSimultaneousRuns(
-            user.id,
-            runSummary.startedAt,
-            runSummary.duration,
-            runSummary.gpsTrace,
-          ).catch(() => []);
-
-      if (ranWithIds.length > 0) {
-        toast({
-          title: "Course partagée détectée",
-          description: `Il semblerait que vous ayez couru avec ${ranWithIds.length} ami(s) !`,
-        });
-
-        await updateRunRanWith(savedRun.id, user.id, ranWithIds).catch(() => {});
-
-        const ranWithProfiles = await getProfilesByIds(ranWithIds).catch(() => []);
-        const names = ranWithProfiles
-          .map((p) => p.first_name ?? p.full_name ?? p.username ?? "Un ami")
-          .join(", ");
-
-        const updatedDescription = `${description} · Couru avec ${names}`;
-
-        await updatePostDescription(createdPost.id, user.id, updatedDescription).catch(() => {});
-
-        setCompletedPost((p) => (p ? { ...p, description: updatedDescription } : null));
-      }
-    } catch (error) {
-      console.error("[Run] operation failed:", error);
-      import("@sentry/react")
-        .then(({ captureException }) => {
-          captureException(error);
-        })
-        .catch(() => {});
-
-      if (isLikelyNetworkError(error)) {
-        console.error("Failed to save run online:", error);
-        try {
-          const existing = JSON.parse(localStorage.getItem(OFFLINE_RUNS_KEY) ?? "[]");
-          const queue = Array.isArray(existing) ? existing : [];
-          const offlineRun = {
-            ...runData,
-            offlinePostDescription: description,
-            offlinePostAudience: postAudienceRef.current,
-            savedOfflineAt: new Date().toISOString(),
-            id: crypto.randomUUID(),
-          };
-          localStorage.setItem(OFFLINE_RUNS_KEY, JSON.stringify([offlineRun, ...queue]));
-          toast({
-            title: "Course sauvegardée localement",
-            description: "Elle sera synchronisée automatiquement dès que vous serez reconnecté.",
-          });
-          setSaveError("");
-        } catch (err) {
-          console.error("[Run] save failed:", err);
-          import("@sentry/react").then(({ captureException }) => captureException(err)).catch(() => {});
-          setSaveError("Impossible d'enregistrer cette course pour le moment.");
-        }
-      } else {
-        setSaveError("Impossible d'enregistrer cette course pour le moment.");
-      }
-    } finally {
-      setIsSaving(false);
-    }
-  }, [user, runSummary, title, formatTime, isTreadmill, toast]);
+  const handlePersistCompletedRun = useCallback(() => {
+    if (!runSummary) return;
+    void persistCompletedRun({
+      runSummary,
+      title,
+      isTreadmill,
+      postAudienceRef,
+      selectRouteKey: SELECTED_ROUTE_KEY,
+      formatTime,
+      setCompletedPostId,
+      setActiveRoute,
+      setRouteProgress,
+      setActiveSession,
+      setCompletedPost,
+    });
+  }, [
+    runSummary,
+    title,
+    isTreadmill,
+    persistCompletedRun,
+    formatTime,
+    setCompletedPost,
+  ]);
 
   const handleAudienceChange = useCallback(
     async (value: "private" | "friends" | "public") => {
@@ -923,7 +588,7 @@ export default function Run() {
         setIsUpdatingAudience(false);
       }
     },
-    [completedPostId, user],
+    [completedPostId, user, setSaveError],
   );
 
   return (
@@ -1473,7 +1138,7 @@ export default function Run() {
                         type="button"
                         className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
                         disabled={isSaving}
-                        onClick={() => void persistCompletedRun()}
+                        onClick={() => handlePersistCompletedRun()}
                       >
                         {isSaving ? "Enregistrement…" : "Enregistrer la course"}
                       </Button>
@@ -1496,14 +1161,14 @@ export default function Run() {
                     const splitStart = gpsTrace.findIndex((p) => {
                       const d = gpsTrace.slice(0, gpsTrace.indexOf(p) + 1).reduce((acc, curr, idx) => {
                         if (idx === 0) return 0;
-                        return acc + haversineDistance(gpsTrace[idx - 1].lat, gpsTrace[idx - 1].lng, curr.lat, curr.lng);
+                        return acc + haversineDistanceKm(gpsTrace[idx - 1], curr);
                       }, 0);
                       return d >= i * splitDistanceKm;
                     });
                     const splitEnd = gpsTrace.findIndex((p) => {
                       const d = gpsTrace.slice(0, gpsTrace.indexOf(p) + 1).reduce((acc, curr, idx) => {
                         if (idx === 0) return 0;
-                        return acc + haversineDistance(gpsTrace[idx - 1].lat, gpsTrace[idx - 1].lng, curr.lat, curr.lng);
+                        return acc + haversineDistanceKm(gpsTrace[idx - 1], curr);
                       }, 0);
                       return d >= (i + 1) * splitDistanceKm;
                     });
