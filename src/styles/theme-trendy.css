@@ -16,10 +16,10 @@
   --accent: 189 95% 46%;
   --accent-foreground: 220 30% 16%;
 
-  --border: 240 12% 90%;
+  --border: 220 15% 60%;
   --muted: 240 15% 96%;
   --muted-foreground: 220 10% 42%;
-  --input: 240 12% 92%;
+  --input: 240 12% 88%;
 
   --primary: 189 95% 46%;
   --primary-foreground: 0 0% 100%;
@@ -63,9 +63,9 @@
   --accent: 189 100% 42%;
   --accent-foreground: 0 0% 0%;
 
-  --border: 240 10% 12%;
+  --border: 240 10% 40%;
   --muted: 240 10% 8%;
-  --muted-foreground: 240 5% 55%;
+  --muted-foreground: 240 5% 62%;
   --input: 240 10% 8%;
 
   --primary: 189 100% 42%;
