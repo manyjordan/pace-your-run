@@ -1,6 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { Heart, Home, ClipboardList, Play, Settings, User, Users } from "lucide-react";
+import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -50,7 +50,7 @@ const mobileNavItems = [
   { to: "/social", icon: Users, label: "Social" },
   { to: "/run", icon: Play, label: "Course", isPrimary: true },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
-  { to: "/profile", icon: User, label: "Profil" },
+  { to: "/health", icon: Heart, label: "Santé" },
 ];
 
 export const AppShell = ({ children }: { children: React.ReactNode }) => {

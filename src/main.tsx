@@ -12,6 +12,7 @@ Sentry.init({
   dsn: import.meta.env.VITE_SENTRY_DSN,
   enabled: import.meta.env.PROD,
   environment: import.meta.env.MODE,
+  sendDefaultPii: false,
   integrations: [
     Sentry.browserTracingIntegration(),
     Sentry.replayIntegration({
@@ -20,10 +21,22 @@ Sentry.init({
     }),
   ],
   tracesSampleRate: 0.1,
-  replaysSessionSampleRate: 0.05,
-  replaysOnErrorSampleRate: 1.0,
+  replaysSessionSampleRate: 0,
+  replaysOnErrorSampleRate: 0.5,
   beforeSend(event) {
-    if (event.exception?.values?.[0]?.value?.includes("ResizeObserver")) return null;
+    // Remove IP address
+    if (event.user) {
+      delete event.user.ip_address;
+    }
+    // Remove full URL query params that might contain sensitive data
+    if (event.request?.url) {
+      try {
+        const url = new URL(event.request.url);
+        event.request.url = `${url.origin}${url.pathname}`;
+      } catch {
+        // ignore malformed URLs
+      }
+    }
     return event;
   },
 });

@@ -55,9 +55,10 @@ function periodRangeLabel(p: DashboardPeriod): string {
 
 function metricSubtitle(kind: MetricKind, period: DashboardPeriod): string {
   const range = periodRangeLabel(period);
-  if (kind === "distance") return `Kilomètres cumulés par semaine sur ${range}.`;
-  if (kind === "duration") return `Temps total d'activité par semaine sur ${range}.`;
-  return `Dénivelé positif cumulé par semaine sur ${range}.`;
+  const bucket = period === "3m" ? "semaine" : "mois";
+  if (kind === "distance") return `Kilomètres cumulés par ${bucket} sur ${range}.`;
+  if (kind === "duration") return `Temps total d'activité par ${bucket} sur ${range}.`;
+  return `Dénivelé positif cumulé par ${bucket} sur ${range}.`;
 }
 
 export const DashboardSection = ({

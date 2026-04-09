@@ -60,6 +60,7 @@ function AppRoutes() {
                   <Route path="/routes" element={<RoutesPage />} />
                   <Route path="/profile" element={<Navigate to="/settings" replace />} />
                   <Route path="/health" element={<Health />} />
+                  <Route path="/health/issue/:issueKey" element={<Health />} />
                   <Route path="/import" element={<Import />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
                   <Route path="/settings" element={<Settings />} />

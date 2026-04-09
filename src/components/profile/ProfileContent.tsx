@@ -14,6 +14,7 @@ import { getProfile, getRuns, uploadProfileAvatar, upsertProfile } from "@/lib/d
 import { getPlanById } from "@/lib/trainingPlans";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
+import { birthDateDayPickerProps } from "@/lib/dateCalendarSettings";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { toast } from "sonner";
 import type { ProfileRow, RunRow } from "@/lib/database";
@@ -579,6 +580,7 @@ function ProfileDatePicker({
       <PopoverContent align="start" className="w-auto rounded-lg border-border bg-card p-0 shadow-md">
         <CalendarComponent
           mode="single"
+          {...birthDateDayPickerProps(selectedDate)}
           selected={selectedDate}
           onSelect={(date) => {
             if (!date) return;

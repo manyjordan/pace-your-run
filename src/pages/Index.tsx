@@ -136,14 +136,26 @@ const Dashboard = () => {
 
   const runningRuns = useMemo(() => recentRuns.filter(isRunRow), [recentRuns]);
 
-  const metricCards = useMemo(
-    () => [
-      buildMetricData("Distance par semaine", runningRuns, "week", period, "distance"),
-      buildMetricData("Durée par semaine", runningRuns, "week", period, "duration"),
-      buildMetricData("Dénivelé par semaine", runningRuns, "week", period, "elevation"),
-    ],
-    [runningRuns, period],
-  );
+  const metricCards = useMemo(() => {
+    const granularity = period === "3m" ? "week" : "month";
+    const titles =
+      granularity === "week"
+        ? {
+            distance: "Distance par semaine",
+            duration: "Durée par semaine",
+            elevation: "Dénivelé par semaine",
+          }
+        : {
+            distance: "Distance par mois",
+            duration: "Durée par mois",
+            elevation: "Dénivelé par mois",
+          };
+    return [
+      buildMetricData(titles.distance, runningRuns, granularity, period, "distance"),
+      buildMetricData(titles.duration, runningRuns, granularity, period, "duration"),
+      buildMetricData(titles.elevation, runningRuns, granularity, period, "elevation"),
+    ];
+  }, [runningRuns, period]);
 
   const filteredMetrics = useMemo(() => metricCards, [metricCards]);
 

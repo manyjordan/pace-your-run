@@ -1,7 +1,8 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
-import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Search } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -683,10 +684,39 @@ const symptomZones: SymptomZone[] = [
   },
 ];
 
+/** Associe le segment d’URL aux clés de `issuesData` (déjà décodé, encodé, ou avec +). */
+function resolveIssueKeyFromUrl(issueKey: string | undefined): string | null {
+  if (!issueKey) return null;
+  const candidates = new Set<string>();
+  candidates.add(issueKey);
+  try {
+    candidates.add(decodeURIComponent(issueKey));
+  } catch {
+    /* ignore */
+  }
+  candidates.add(issueKey.replace(/\+/g, " "));
+  for (const key of candidates) {
+    if (key && issuesData[key]) return key;
+  }
+  return null;
+}
+
 const Health = () => {
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
+  const { issueKey } = useParams<{ issueKey: string }>();
+  const navigate = useNavigate();
+  const resolvedIssueKey = useMemo(() => resolveIssueKeyFromUrl(issueKey), [issueKey]);
+  const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
-  const issueDetails = selectedIssue ? issuesData[selectedIssue] : null;
+
+  useEffect(() => {
+    if (issueKey && !issueDetails) {
+      navigate("/health", { replace: true });
+    }
+  }, [issueKey, issueDetails, navigate]);
+
+  useEffect(() => {
+    if (issueKey) window.scrollTo(0, 0);
+  }, [issueKey]);
   const cleanMedicalText = (text: string) => text.replace(/^[^\p{L}\p{N}]+/u, "").replace(/\s+/g, " ").trim();
   const punctuateMedicalText = (text: string) => {
     const cleaned = cleanMedicalText(text);
@@ -728,6 +758,54 @@ const Health = () => {
 
   const visibleIssuesCount = filteredZones.reduce((count, zone) => count + zone.issues.length, 0);
 
+  const issueDetailBulletList = (items: string[]) => (
+    <ul className="mt-1 list-disc space-y-2 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-accent">
+      {items.map((item, i) => (
+        <li key={i}>{punctuateMedicalText(item)}</li>
+      ))}
+    </ul>
+  );
+
+  const issueDetailPanel =
+    issueDetails && resolvedIssueKey ? (
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-2 border-b pb-3">
+          <h3 className="text-base font-semibold">{issueDetails.name}</h3>
+          <Button variant="ghost" size="sm" className="shrink-0" onClick={() => navigate("/health")}>
+            <ArrowLeft className="mr-1 h-4 w-4" aria-hidden />
+            Retour
+          </Button>
+        </div>
+
+        <div className="space-y-3 text-sm">
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">Symptômes ressentis</p>
+            {issueDetailBulletList(issueDetails.symptomesRessentis)}
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">Causes probables</p>
+            {issueDetailBulletList(issueDetails.causesProbables)}
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">Soulager en priorité</p>
+            {issueDetailBulletList(issueDetails.meilleurMoyenSoulager)}
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">Risques si vous continuez</p>
+            {issueDetailBulletList(issueDetails.risques)}
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3">
+            <p className="mb-2 text-xs font-semibold text-foreground">Conseils pratiques</p>
+            {issueDetailBulletList(issueDetails.conseils)}
+          </div>
+        </div>
+      </div>
+    ) : null;
+
   return (
     <div className="space-y-6">
       <ScrollReveal>
@@ -735,7 +813,6 @@ const Health = () => {
         <p className="text-sm text-muted-foreground">Suivez votre récupération et gérez les blessures</p>
       </ScrollReveal>
 
-      {/* Medical disclaimer */}
       <ScrollReveal>
         <CollapsibleDisclaimer
           variant="warning"
@@ -744,156 +821,100 @@ const Health = () => {
         />
       </ScrollReveal>
 
-      <ScrollReveal>
-        <div className="rounded-xl border border-border bg-card p-5">
-          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-            <div>
-              <h2 className="mb-2 text-sm font-semibold">Explorer les symptômes</h2>
-              <p className="text-xs text-muted-foreground">
-                Parcourez les douleurs possibles par zone du corps ou recherchez directement un symptôme.
+      {issueKey && issueDetailPanel ? (
+        <ScrollReveal>
+          <div className="rounded-xl border border-border bg-card p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+            {issueDetailPanel}
+          </div>
+        </ScrollReveal>
+      ) : (
+        <ScrollReveal>
+          <div className="rounded-xl border border-border bg-card p-5">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="mb-2 text-sm font-semibold">Explorer les symptômes</h2>
+                <p className="text-xs text-muted-foreground">
+                  Parcourez les douleurs possibles par zone du corps ou recherchez directement un symptôme.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="secondary">{symptomZones.length} zones</Badge>
+                <Badge variant="secondary">{visibleIssuesCount} problèmes visibles</Badge>
+              </div>
+            </div>
+
+            <div className="mb-6 rounded-2xl border border-accent/20 bg-gradient-to-r from-card via-card to-accent/5 p-4 shadow-[0_18px_40px_hsl(var(--accent)/0.08)]">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Ex. douleur au genou, fasciite, ischio, cheville..."
+                  className="pl-9"
+                />
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Astuce : tapez une zone, un symptôme ou le nom d&apos;une blessure pour filtrer rapidement la liste.
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{symptomZones.length} zones</Badge>
-              <Badge variant="secondary">{visibleIssuesCount} problèmes visibles</Badge>
-            </div>
-          </div>
 
-          <div className="mb-6 rounded-2xl border border-accent/20 bg-gradient-to-r from-card via-card to-accent/5 p-4 shadow-[0_18px_40px_hsl(var(--accent)/0.08)]">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Ex. douleur au genou, fasciite, ischio, cheville..."
-                className="pl-9"
-              />
-            </div>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Astuce : tapez une zone, un symptôme ou le nom d&apos;une blessure pour filtrer rapidement la liste.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="flex flex-col">
-              <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
-                <CardContent className="p-4">
-                  {filteredZones.length > 0 ? (
-                    <Accordion type="multiple" className="space-y-2">
-                      {filteredZones.map((zone) => (
-                        <AccordionItem
-                          key={zone.id}
-                          value={zone.id}
-                          className="rounded-xl border border-border bg-muted/10 px-4"
-                        >
-                          <AccordionTrigger className="py-4 text-left hover:no-underline">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-semibold">{zone.title}</span>
-                                <Badge variant="outline">{zone.issues.length}</Badge>
-                              </div>
-                              <p className="text-xs text-muted-foreground">{zone.description}</p>
+            <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+              <CardContent className="p-4">
+                {filteredZones.length > 0 ? (
+                  <Accordion type="multiple" className="space-y-2">
+                    {filteredZones.map((zone) => (
+                      <AccordionItem
+                        key={zone.id}
+                        value={zone.id}
+                        className="rounded-xl border border-border bg-muted/10 px-4"
+                      >
+                        <AccordionTrigger className="py-4 text-left hover:no-underline">
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold">{zone.title}</span>
+                              <Badge variant="outline">{zone.issues.length}</Badge>
                             </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="space-y-2">
-                            {zone.issues.map((issue) => {
-                              const details = issuesData[issue];
-                              const isActive = selectedIssue === issue;
+                            <p className="text-xs text-muted-foreground">{zone.description}</p>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="space-y-2">
+                          {zone.issues.map((issue) => {
+                            const details = issuesData[issue];
+                            const to = `/health/issue/${encodeURIComponent(issue)}`;
 
-                              return (
-                                <button
-                                  key={issue}
-                                  type="button"
-                                  onClick={() => setSelectedIssue(issue)}
-                                  className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                                    isActive
-                                      ? "border-accent bg-accent/10"
-                                      : "border-border bg-card hover:bg-muted/30"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between gap-3">
-                                    <p className="text-sm font-medium">{issue}</p>
-                                    <span className="text-xs font-medium text-muted-foreground">Voir le détail</span>
-                                  </div>
-                                  <p className="mt-1 text-xs text-muted-foreground">
-                                    {toSentence(details?.symptomesRessentis ?? [], 1)}
-                                  </p>
-                                </button>
-                              );
-                            })}
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
-                    </Accordion>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-accent/30 bg-accent/5 py-8 text-center text-muted-foreground">
-                      <p className="text-sm font-medium">Aucun résultat pour cette recherche</p>
-                      <p className="mt-1 text-xs">Essayez un autre mot-clé, par exemple genou, pied, cheville ou ischio.</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="flex flex-col">
-              {selectedIssue && issueDetails ? (
-                <div className="space-y-3 max-h-[700px] overflow-y-auto">
-                  <div className="flex items-start justify-between gap-2 pb-3 border-b">
-                    <h3 className="font-semibold text-sm">{issueDetails.name}</h3>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedIssue(null)}>
-                      Fermer
-                    </Button>
+                            return (
+                              <Link
+                                key={issue}
+                                to={to}
+                                onClick={(e) => e.stopPropagation()}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="block w-full rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-muted/30"
+                              >
+                                <div className="flex items-center justify-between gap-3">
+                                  <p className="text-sm font-medium">{issue}</p>
+                                  <span className="text-xs font-medium text-accent">Voir le détail</span>
+                                </div>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {toSentence(details?.symptomesRessentis ?? [], 1)}
+                                </p>
+                              </Link>
+                            );
+                          })}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                ) : (
+                  <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-accent/30 bg-accent/5 py-8 text-center text-muted-foreground">
+                    <p className="text-sm font-medium">Aucun résultat pour cette recherche</p>
+                    <p className="mt-1 text-xs">Essayez un autre mot-clé, par exemple genou, pied, cheville ou ischio.</p>
                   </div>
-
-                  <div className="space-y-3 text-sm">
-                    <div className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="mb-2 text-xs font-semibold text-foreground">Symptômes ressentis</p>
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        {toSentence(issueDetails.symptomesRessentis)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="mb-2 text-xs font-semibold text-foreground">Causes probables</p>
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        {toSentence(issueDetails.causesProbables)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="mb-2 text-xs font-semibold text-foreground">Soulager en priorité</p>
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        {toSentence(issueDetails.meilleurMoyenSoulager)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="mb-2 text-xs font-semibold text-foreground">Risques si vous continuez</p>
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        {toSentence(issueDetails.risques)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-lg border border-border bg-muted/20 p-3">
-                      <p className="mb-2 text-xs font-semibold text-foreground">Conseils pratiques</p>
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        {toSentence(issueDetails.conseils)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-accent/30 bg-accent/5 py-8 text-center text-muted-foreground">
-                  <p className="text-sm font-medium">Choisissez un symptôme ou une blessure</p>
-                  <p className="mt-1 text-xs">
-                    Explorez les zones à gauche puis touchez un problème pour afficher sa fiche pratique ici.
-                  </p>
-                </div>
-              )}
-            </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </div>
-      </ScrollReveal>
+        </ScrollReveal>
+      )}
     </div>
   );
 };

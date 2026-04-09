@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
+import * as Sentry from "@sentry/react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 
@@ -37,10 +38,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Listen for auth changes (including email confirmation)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      if (event === "SIGNED_OUT") {
+        Sentry.setUser(null);
+      }
+      if (event === "SIGNED_IN" && session?.user) {
+        Sentry.setUser({ id: session.user.id });
+      }
     });
 
     return () => subscription?.unsubscribe();

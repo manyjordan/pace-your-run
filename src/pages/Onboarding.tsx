@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { birthDateDayPickerProps, futureEventDayPickerProps } from "@/lib/dateCalendarSettings";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DaySelector } from "@/components/goal/DaySelector";
 import { DistanceSelector } from "@/components/goal/DistanceSelector";
@@ -376,15 +377,20 @@ function OnboardingDatePicker({
   value,
   onChange,
   required = false,
+  preset = "birth",
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
+  /** birth: années 1920→aujourd'hui ; future: année courante → +5 ans (courses, échéances) */
+  preset?: "birth" | "future";
 }) {
   const [open, setOpen] = useState(false);
   const selectedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
+  const rangeProps =
+    preset === "future" ? futureEventDayPickerProps(selectedDate) : birthDateDayPickerProps(selectedDate);
 
   return (
     <div className="space-y-3">
@@ -407,6 +413,7 @@ function OnboardingDatePicker({
         >
           <CalendarComponent
             mode="single"
+            {...rangeProps}
             selected={selectedDate}
             onSelect={(date) => {
               if (!date) return;
@@ -714,6 +721,7 @@ function Step4Goal({
             label="Date de la course"
             value={data.raceTargetDate || ""}
             onChange={(date) => setData({ ...data, raceTargetDate: date })}
+            preset="future"
           />
 
           <div className="space-y-3">

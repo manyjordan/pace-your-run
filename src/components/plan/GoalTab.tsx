@@ -28,6 +28,7 @@ import {
   racePresetDistance,
   validateRaceTargetTime,
 } from "@/lib/goalHelpers";
+import { futureEventDayPickerProps } from "@/lib/dateCalendarSettings";
 
 type GoalType = "weight" | "race" | "distance";
 type RaceType = "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
@@ -107,6 +108,7 @@ function GoalDatePicker({
         >
           <Calendar
             mode="single"
+            {...futureEventDayPickerProps(selectedDate)}
             selected={selectedDate}
             onSelect={(date) => {
               if (!date) return;
