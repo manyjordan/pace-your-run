@@ -22,7 +22,7 @@
   --input: 240 12% 88%;
 
   --primary: 189 95% 46%;
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 220 30% 16%;
 
   --secondary: 240 15% 96%;
   --secondary-foreground: 220 25% 12%;
@@ -65,7 +65,7 @@
 
   --border: 240 10% 40%;
   --muted: 240 10% 8%;
-  --muted-foreground: 240 5% 62%;
+  --muted-foreground: 240 6% 70%;
   --input: 240 10% 8%;
 
   --primary: 189 100% 42%;
@@ -87,16 +87,40 @@
   --lime-foreground: 0 0% 0%;
   --navy: 0 0% 98%;
   --navy-light: 240 10% 70%;
-  --navy-muted: 240 5% 55%;
+  --navy-muted: 240 8% 68%;
   --surface: 240 10% 6%;
   --sidebar-background: 240 10% 5%;
   --sidebar-foreground: 0 0% 92%;
   --sidebar-primary: 189 100% 42%;
   --sidebar-primary-foreground: 0 0% 0%;
   --sidebar-accent: 240 10% 12%;
-  --sidebar-accent-foreground: 0 0% 92%;
-  --sidebar-border: 240 10% 15%;
+  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-border: 240 10% 41%;
   --sidebar-ring: 189 100% 42%;
+}
+
+/* Mode sombre : --accent-foreground est noir (boutons cyan pleins) ; sur en-tête vitré ou
+   fond accent très transparent, forcer un texte clair pour rester lisible sur noir. */
+.dark .pace-header {
+  --accent-foreground: 0 0% 98%;
+}
+
+.dark [class~="bg-accent/5"],
+.dark [class~="bg-accent/10"],
+.dark [class~="bg-accent/15"],
+.dark [class~="bg-accent/20"] {
+  --accent-foreground: 0 0% 96%;
+}
+
+/* Boutons / pastilles cyan pleins : garder le texte foncé même imbriqués dans un bloc ci-dessus */
+.dark .bg-accent {
+  --accent-foreground: 0 0% 0%;
+}
+
+/* Hero type accueil : dégradé .bg-accent.rounded-2xl très sombre → texte clair (le noir était illisible) */
+.dark .bg-accent.rounded-2xl {
+  --accent-foreground: 0 0% 98%;
+  color: hsl(0 0% 98%);
 }
 
 /* Header app — glassmorphism (classe pace-header dans AppShell) */
@@ -131,7 +155,7 @@ img.header-logo {
 /* Mode clair : ne pas appliquer le dégradé hero sombre aux boutons rounded-lg / rounded-md */
 html:not(.dark) .bg-accent {
   background: linear-gradient(135deg, hsl(189 88% 50%), hsl(199 82% 58%)) !important;
-  color: hsl(0 0% 100%) !important;
+  color: hsl(220 30% 16%) !important;
   box-shadow: 0 0 18px hsl(189 95% 46% / 0.3);
 }
 
@@ -139,14 +163,14 @@ html:not(.dark) .bg-accent:hover {
   box-shadow: 0 0 28px hsl(189 95% 46% / 0.42);
 }
 
-/* Outline / ghost : au survol ou focus, fond accent = texte blanc (classe Tailwind hover:bg-accent) */
+/* Outline / ghost : survol/focus sur fond accent clair = texte marine (WCAG) */
 html:not(.dark) .hover\:bg-accent:hover,
 html:not(.dark) .focus\:bg-accent:focus {
-  color: hsl(0 0% 100%) !important;
+  color: hsl(220 30% 16%) !important;
 }
 
 html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
-  color: hsl(0 0% 100%) !important;
+  color: hsl(220 30% 16%) !important;
 }
 
 /* ── Cards — glassmorphism léger ── */
@@ -202,7 +226,7 @@ html:not(.dark) .bg-accent.rounded-2xl {
     hsl(200 80% 58%),
     hsl(189 82% 50%)
   ) !important;
-  color: hsl(0 0% 100%) !important;
+  color: hsl(220 30% 16%) !important;
   box-shadow:
     0 0 32px hsl(189 95% 46% / 0.25),
     0 16px 48px hsl(199 82% 58% / 0.12) !important;
@@ -232,7 +256,7 @@ nav.fixed.bottom-0 {
 
 html:not(.dark) .bg-accent.rounded-full {
   background: linear-gradient(135deg, hsl(189 88% 50%), hsl(199 82% 58%)) !important;
-  color: hsl(0 0% 100%) !important;
+  color: hsl(220 30% 16%) !important;
   box-shadow:
     0 0 18px hsl(189 95% 46% / 0.45),
     0 0 36px hsl(189 95% 46% / 0.22) !important;
@@ -254,7 +278,11 @@ textarea:focus {
     hsl(210 100% 52% / 0.1)
   ) !important;
   border-bottom: 2px solid hsl(189 100% 42%) !important;
-  color: hsl(189 100% 42%) !important;
+  color: hsl(189 100% 28%) !important;
+}
+
+.dark [data-state="active"][role="tab"] {
+  color: hsl(189 100% 52%) !important;
 }
 
 /* ── Progress bars & accents ── */
@@ -263,7 +291,7 @@ textarea:focus {
 }
 
 .text-accent {
-  color: hsl(189 100% 36%) !important;
+  color: hsl(189 90% 28%) !important;
   text-shadow: none;
 }
 
@@ -275,7 +303,7 @@ textarea:focus {
 /* ── Badges accent ── */
 [class*="border-accent"][class*="text-accent"] {
   border-color: hsl(189 100% 42% / 0.4) !important;
-  color: hsl(189 100% 36%) !important;
+  color: hsl(189 90% 28%) !important;
   background: hsl(189 100% 42% / 0.08) !important;
 }
 
