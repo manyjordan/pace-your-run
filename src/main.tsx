@@ -4,6 +4,7 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import "./styles/logo-colors.css";
+import "./styles/theme-trendy.css"; // Thème bleu/cyan (actif)
 
 registerSW({ immediate: true });
 

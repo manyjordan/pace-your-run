@@ -1,0 +1,317 @@
+/* ============================================
+   PACE — Thème bleu / cyan (charte actuelle)
+   Importé depuis src/main.tsx. Sans cet import,
+   les couleurs de base reviennent à src/index.css.
+   ============================================ */
+
+:root {
+  /* Mode clair — fond blanc */
+  --background: 0 0% 100%;
+  --foreground: 220 25% 12%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 220 25% 12%;
+
+  /* accent-foreground reste foncé pour bg-accent/10, cartes légères, etc. */
+  --accent: 189 95% 46%;
+  --accent-foreground: 220 30% 16%;
+
+  --border: 240 12% 90%;
+  --muted: 240 15% 96%;
+  --muted-foreground: 220 10% 42%;
+  --input: 240 12% 92%;
+
+  --primary: 189 95% 46%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 240 15% 96%;
+  --secondary-foreground: 220 25% 12%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 25% 12%;
+
+  --ring: 189 100% 42%;
+  --radius: 1rem;
+
+  --lime: 189 100% 42%;
+  --lime-foreground: 0 0% 0%;
+  --navy: 220 30% 18%;
+  --navy-light: 220 20% 35%;
+  --navy-muted: 220 12% 45%;
+  --surface: 240 25% 98%;
+  --sidebar-background: 0 0% 100%;
+  --sidebar-foreground: 220 25% 12%;
+  --sidebar-primary: 189 100% 42%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 240 15% 95%;
+  --sidebar-accent-foreground: 220 25% 12%;
+  --sidebar-border: 240 12% 90%;
+  --sidebar-ring: 189 100% 42%;
+}
+
+.dark {
+  /* Mode sombre — Cyan/Neon inchangé */
+  --background: 0 0% 0%;
+  --foreground: 0 0% 98%;
+
+  --card: 240 10% 4%;
+  --card-foreground: 0 0% 98%;
+
+  --accent: 189 100% 42%;
+  --accent-foreground: 0 0% 0%;
+
+  --border: 240 10% 12%;
+  --muted: 240 10% 8%;
+  --muted-foreground: 240 5% 55%;
+  --input: 240 10% 8%;
+
+  --primary: 189 100% 42%;
+  --primary-foreground: 0 0% 0%;
+
+  --secondary: 240 10% 10%;
+  --secondary-foreground: 0 0% 98%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 98%;
+
+  --popover: 240 10% 5%;
+  --popover-foreground: 0 0% 98%;
+
+  --ring: 189 100% 42%;
+  --radius: 1rem;
+
+  --lime: 189 100% 42%;
+  --lime-foreground: 0 0% 0%;
+  --navy: 0 0% 98%;
+  --navy-light: 240 10% 70%;
+  --navy-muted: 240 5% 55%;
+  --surface: 240 10% 6%;
+  --sidebar-background: 240 10% 5%;
+  --sidebar-foreground: 0 0% 92%;
+  --sidebar-primary: 189 100% 42%;
+  --sidebar-primary-foreground: 0 0% 0%;
+  --sidebar-accent: 240 10% 12%;
+  --sidebar-accent-foreground: 0 0% 92%;
+  --sidebar-border: 240 10% 15%;
+  --sidebar-ring: 189 100% 42%;
+}
+
+/* Header app — glassmorphism (classe pace-header dans AppShell) */
+.pace-header {
+  background: linear-gradient(
+    135deg,
+    hsl(189 100% 42% / 0.15),
+    hsl(210 100% 52% / 0.08)
+  );
+  border-bottom: 1px solid hsl(189 100% 42% / 0.25);
+  box-shadow: 0 4px 32px hsl(189 100% 42% / 0.1);
+  backdrop-filter: blur(20px);
+}
+
+/* Logo header : teinte cyan (logo-colors.css applique jaune par défaut) */
+img.header-logo {
+  filter: hue-rotate(101deg) saturate(1.12) brightness(1.03);
+}
+
+/* ── Bouton accent — gradient cyan → bleu ── */
+.bg-accent {
+  background: linear-gradient(135deg, hsl(189 100% 42%), hsl(210 100% 52%)) !important;
+  box-shadow: 0 0 20px hsl(189 100% 42% / 0.35);
+}
+
+.bg-accent:hover {
+  box-shadow: 0 0 32px hsl(189 100% 42% / 0.55);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+/* Mode clair : ne pas appliquer le dégradé hero sombre aux boutons rounded-lg / rounded-md */
+html:not(.dark) .bg-accent {
+  background: linear-gradient(135deg, hsl(189 88% 50%), hsl(199 82% 58%)) !important;
+  color: hsl(0 0% 100%) !important;
+  box-shadow: 0 0 18px hsl(189 95% 46% / 0.3);
+}
+
+html:not(.dark) .bg-accent:hover {
+  box-shadow: 0 0 28px hsl(189 95% 46% / 0.42);
+}
+
+/* Outline / ghost : au survol ou focus, fond accent = texte blanc (classe Tailwind hover:bg-accent) */
+html:not(.dark) .hover\:bg-accent:hover,
+html:not(.dark) .focus\:bg-accent:focus {
+  color: hsl(0 0% 100%) !important;
+}
+
+html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
+  color: hsl(0 0% 100%) !important;
+}
+
+/* ── Cards — glassmorphism léger ── */
+.rounded-xl,
+.rounded-2xl {
+  border-radius: 1.25rem !important;
+}
+
+[class*="bg-card"] {
+  background: linear-gradient(
+    145deg,
+    hsl(0 0% 100%),
+    hsl(240 20% 98%)
+  ) !important;
+  backdrop-filter: blur(8px);
+  border-color: hsl(189 100% 42% / 0.2) !important;
+}
+
+.dark [class*="bg-card"] {
+  background: linear-gradient(
+    145deg,
+    hsl(240 10% 5%),
+    hsl(240 10% 4%)
+  ) !important;
+  border-color: hsl(189 100% 42% / 0.12) !important;
+}
+
+/* ── Glow effect sur les cartes accent ── */
+[class*="border-accent"] {
+  box-shadow:
+    0 0 0 1px hsl(189 100% 42% / 0.2),
+    0 8px 32px hsl(189 100% 42% / 0.08) !important;
+  border-color: hsl(189 100% 42% / 0.35) !important;
+}
+
+/* ── Hero banner — uniquement rounded-2xl (évite d’assombrir rounded-lg) ── */
+.bg-accent.rounded-2xl {
+  background: linear-gradient(
+    135deg,
+    hsl(189 100% 38%),
+    hsl(220 100% 50%),
+    hsl(189 100% 35%)
+  ) !important;
+  box-shadow:
+    0 0 40px hsl(189 100% 42% / 0.3),
+    0 20px 60px hsl(210 100% 52% / 0.15) !important;
+}
+
+html:not(.dark) .bg-accent.rounded-2xl {
+  background: linear-gradient(
+    135deg,
+    hsl(189 85% 52%),
+    hsl(200 80% 58%),
+    hsl(189 82% 50%)
+  ) !important;
+  color: hsl(0 0% 100%) !important;
+  box-shadow:
+    0 0 32px hsl(189 95% 46% / 0.25),
+    0 16px 48px hsl(199 82% 58% / 0.12) !important;
+}
+
+/* ── Bottom nav mobile — frosted glass ── */
+nav.fixed.bottom-0 {
+  background: hsl(0 0% 100% / 0.92) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  border-top: 1px solid hsl(189 100% 42% / 0.22) !important;
+  box-shadow: 0 -8px 32px hsl(189 100% 42% / 0.06) !important;
+}
+
+.dark nav.fixed.bottom-0 {
+  background: hsl(0 0% 0% / 0.85) !important;
+  border-top: 1px solid hsl(189 100% 42% / 0.2) !important;
+  box-shadow: 0 -8px 32px hsl(189 100% 42% / 0.08) !important;
+}
+
+/* ── Bouton primaire Course (nav centrale) — glow ── */
+.bg-accent.rounded-full {
+  background: linear-gradient(135deg, hsl(189 100% 42%), hsl(210 100% 52%)) !important;
+  box-shadow:
+    0 0 20px hsl(189 100% 42% / 0.5),
+    0 0 40px hsl(189 100% 42% / 0.25) !important;
+}
+
+html:not(.dark) .bg-accent.rounded-full {
+  background: linear-gradient(135deg, hsl(189 88% 50%), hsl(199 82% 58%)) !important;
+  color: hsl(0 0% 100%) !important;
+  box-shadow:
+    0 0 18px hsl(189 95% 46% / 0.45),
+    0 0 36px hsl(189 95% 46% / 0.22) !important;
+}
+
+/* ── Inputs — style neon ── */
+input:focus,
+textarea:focus {
+  border-color: hsl(189 100% 42% / 0.6) !important;
+  box-shadow: 0 0 0 2px hsl(189 100% 42% / 0.15) !important;
+  outline: none !important;
+}
+
+/* ── Tabs active indicator ── */
+[data-state="active"][role="tab"] {
+  background: linear-gradient(
+    135deg,
+    hsl(189 100% 42% / 0.15),
+    hsl(210 100% 52% / 0.1)
+  ) !important;
+  border-bottom: 2px solid hsl(189 100% 42%) !important;
+  color: hsl(189 100% 42%) !important;
+}
+
+/* ── Progress bars & accents ── */
+.bg-accent\/10 {
+  background: hsl(189 100% 42% / 0.08) !important;
+}
+
+.text-accent {
+  color: hsl(189 100% 36%) !important;
+  text-shadow: none;
+}
+
+.dark .text-accent {
+  color: hsl(189 100% 52%) !important;
+  text-shadow: 0 0 12px hsl(189 100% 52% / 0.3);
+}
+
+/* ── Badges accent ── */
+[class*="border-accent"][class*="text-accent"] {
+  border-color: hsl(189 100% 42% / 0.4) !important;
+  color: hsl(189 100% 36%) !important;
+  background: hsl(189 100% 42% / 0.08) !important;
+}
+
+.dark [class*="border-accent"][class*="text-accent"] {
+  color: hsl(189 100% 52%) !important;
+}
+
+/* ── Scrollbar neon ── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(240 15% 96%);
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: hsl(240 10% 4%);
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(189 100% 42% / 0.4);
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(189 100% 42% / 0.7);
+}
+
+/* ── Sélection de texte ── */
+::selection {
+  background: hsl(189 100% 42% / 0.22);
+  color: hsl(220 25% 12%);
+}
+
+.dark ::selection {
+  background: hsl(189 100% 42% / 0.25);
+  color: hsl(0 0% 98%);
+}
