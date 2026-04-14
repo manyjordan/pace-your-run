@@ -8,12 +8,8 @@ workflows:
         - app-store-credentials
       vars:
         BUNDLE_ID: "com.pace.runapp"
-        XCODE_PROJECT: "App.xcodeproj"
-        XCODE_WORKSPACE: "App.xcworkspace"
         XCODE_SCHEME: "App"
-      node: latest
-      xcode: latest
-      cocoapods: default
+        XCODE_WORKSPACE: "App.xcworkspace"
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -24,11 +20,6 @@ workflows:
           npm run build
       - name: Capacitor sync
         script: npx cap sync ios
-      - name: Install CocoaPods
-        script: |
-          cd ios/App
-          pod repo update
-          pod install --repo-update
       - name: Set up code signing
         script: |
           keychain initialize
@@ -40,11 +31,11 @@ workflows:
             --create
           keychain add-certificates
           xcode-project use-profiles
-      - name: Build iOS
+      - name: Build iOS IPA
         script: |
           cd ios/App
           xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
+            --workspace "$XCODE_WORKSPACE" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
