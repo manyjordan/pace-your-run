@@ -4,7 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -15,8 +14,6 @@ import {
   Clock,
   Zap,
   Trophy,
-  Image as ImageIcon,
-  Send,
   Search,
   UserPlus,
   Users,
@@ -188,7 +185,6 @@ export default function Social() {
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FeedPost[]>([]);
   const [activities, setActivities] = useState<RunRow[]>([]);
-  const [newPost, setNewPost] = useState("");
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [friendQuery, setFriendQuery] = useState("");
   const [suggestions, setSuggestions] = useState<{ profile: ProfileRow; runCount: number }[]>([]);
@@ -478,7 +474,6 @@ export default function Social() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Communauté</h1>
-            <p className="text-sm text-muted-foreground">Suivez les activités et préparez l'arrivée d'un forum running</p>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <Sheet open={notifOpen} onOpenChange={(o) => void handleNotifOpenChange(o)}>
@@ -627,32 +622,6 @@ export default function Social() {
               </Card>
             </ScrollReveal>
           )}
-
-          <ScrollReveal>
-            <Card>
-              <CardContent className="space-y-3 p-4">
-                <div className="flex gap-3">
-                  <Avatar className="h-9 w-9">
-                    <AvatarFallback className="bg-accent text-xs font-bold text-accent-foreground">MOI</AvatarFallback>
-                  </Avatar>
-                  <Textarea
-                    placeholder="Partagez votre dernière course..."
-                    value={newPost}
-                    onChange={(e) => setNewPost(e.target.value)}
-                    className="min-h-[60px] resize-none"
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <Button variant="ghost" size="sm" className="text-muted-foreground">
-                    <ImageIcon className="mr-1 h-4 w-4" /> Photo
-                  </Button>
-                  <Button size="sm" disabled={!newPost.trim()}>
-                    <Send className="mr-1 h-4 w-4" /> Publier
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </ScrollReveal>
 
           {isLoadingPosts
             ? Array.from({ length: 3 }, (_, i) => (
