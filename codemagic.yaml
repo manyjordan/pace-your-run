@@ -34,13 +34,14 @@ workflows:
             --create
           keychain add-certificates
           xcode-project use-profiles
+          echo "Profiles installed:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/
       - name: Build iOS IPA
         script: |
           cd ios/App
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "CODE_SIGN_STYLE=Manual"
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
