@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.pace.running',
+  appId: 'com.pace.runapp',
   appName: 'Pace',
   webDir: 'dist',
   server: {
