@@ -29,6 +29,12 @@ workflows:
         script: |
           keychain initialize
           keychain add-certificates
+          # Copy provisioning profiles to the right location
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          find ~/Library/MobileDevice -name "*.mobileprovision" -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \;
+          find /Users/builder -name "*.mobileprovision" 2>/dev/null -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \;
+          echo "Profiles found:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
           xcode-project use-profiles
       - name: Build iOS IPA
         script: |
