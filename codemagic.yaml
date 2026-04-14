@@ -12,9 +12,6 @@ workflows:
         XCODE_PROJECT: "App.xcodeproj"
       xcode: 16.2
       node: latest
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: com.pace.runapp
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -29,29 +26,33 @@ workflows:
         script: |
           keychain initialize
           keychain add-certificates
-          # Copy provisioning profiles
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          find /Users/builder -name "*.mobileprovision" 2>/dev/null -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \;
-          echo "Profiles found:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/
-          # Make project writable
-          chmod -R 755 /Users/builder/clone/ios/App/App.xcodeproj/
-          # Apply profiles
-          xcode-project use-profiles --project /Users/builder/clone/ios/App/App.xcodeproj || true
-          # Get profile UUID and apply manually
-          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i "$PROFILE_PATH"))
+          find /Users/builder/Library/MobileDevice/Certificates -name "*.mobileprovision" 2>/dev/null \
+            -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \; || true
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
+          echo "Using profile: $PROFILE_PATH"
+          PROFILE_UUID=$(security cms -D -i "$PROFILE_PATH" 2>/dev/null | \
+            /usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin)
           echo "Profile UUID: $PROFILE_UUID"
-          /usr/libexec/PlistBuddy -c "Set :buildSettings:CODE_SIGN_STYLE Manual" /Users/builder/clone/ios/App/App.xcodeproj/project.pbxproj || true
+          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
       - name: Build iOS IPA
         script: |
           cd ios/App
-          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
-          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i "$PROFILE_PATH"))
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-xcargs "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE=$PROFILE_UUID CODE_SIGN_IDENTITY='Apple Distribution'"
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            CODE_SIGN_STYLE=Manual \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            DEVELOPMENT_TEAM="$(echo $PROFILE_UUID)" \
+            archive
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist /Users/builder/export_options.plist
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
