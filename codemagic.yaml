@@ -33,13 +33,14 @@ workflows:
             --private-key @file:/tmp/auth_key.p8 \
             --create
           keychain add-certificates
-          xcode-project use-profiles --project ios/App/App.xcodeproj
+          xcode-project use-profiles
       - name: Build iOS IPA
         script: |
           cd ios/App
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "CODE_SIGN_STYLE=Manual"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
