@@ -12,6 +12,9 @@ workflows:
         XCODE_PROJECT: "App.xcodeproj"
       xcode: 16.2
       node: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pace.runapp
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -24,18 +27,9 @@ workflows:
         script: npx cap sync ios
       - name: Set up code signing
         script: |
-          echo $APP_STORE_CONNECT_PRIVATE_KEY | base64 --decode > /tmp/auth_key.p8
           keychain initialize
-          app-store-connect fetch-signing-files $BUNDLE_ID \
-            --type IOS_APP_STORE \
-            --issuer-id $APP_STORE_CONNECT_ISSUER_ID \
-            --key-id $APP_STORE_CONNECT_KEY_IDENTIFIER \
-            --private-key @file:/tmp/auth_key.p8 \
-            --create
           keychain add-certificates
           xcode-project use-profiles
-          echo "Profiles installed:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/
       - name: Build iOS IPA
         script: |
           cd ios/App
