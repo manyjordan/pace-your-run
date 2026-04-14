@@ -29,19 +29,29 @@ workflows:
         script: |
           keychain initialize
           keychain add-certificates
-          # Copy provisioning profiles to the right location
+          # Copy provisioning profiles
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          find ~/Library/MobileDevice -name "*.mobileprovision" -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \;
           find /Users/builder -name "*.mobileprovision" 2>/dev/null -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \;
           echo "Profiles found:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
-          xcode-project use-profiles
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/
+          # Make project writable
+          chmod -R 755 /Users/builder/clone/ios/App/App.xcodeproj/
+          # Apply profiles
+          xcode-project use-profiles --project /Users/builder/clone/ios/App/App.xcodeproj || true
+          # Get profile UUID and apply manually
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i "$PROFILE_PATH"))
+          echo "Profile UUID: $PROFILE_UUID"
+          /usr/libexec/PlistBuddy -c "Set :buildSettings:CODE_SIGN_STYLE Manual" /Users/builder/clone/ios/App/App.xcodeproj/project.pbxproj || true
       - name: Build iOS IPA
         script: |
           cd ios/App
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin <<< $(security cms -D -i "$PROFILE_PATH"))
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs "CODE_SIGN_STYLE=Manual PROVISIONING_PROFILE=$PROFILE_UUID CODE_SIGN_IDENTITY='Apple Distribution'"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
