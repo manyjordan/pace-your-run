@@ -9,7 +9,7 @@ workflows:
       vars:
         BUNDLE_ID: "com.pace.runapp"
         XCODE_SCHEME: "App"
-        XCODE_WORKSPACE: "App.xcworkspace"
+        XCODE_PROJECT: "App.xcodeproj"
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -35,7 +35,7 @@ workflows:
         script: |
           cd ios/App
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
+            --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
