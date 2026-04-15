@@ -1,4 +1,4 @@
-workflows:
+﻿workflows:
   ios-testflight:
     name: iOS TestFlight
     max_build_duration: 60
@@ -10,6 +10,7 @@ workflows:
         BUNDLE_ID: "com.pace.runapp"
         XCODE_SCHEME: "App"
         XCODE_PROJECT: "App.xcodeproj"
+        DEVELOPMENT_TEAM: "3GHBFTSZ9H"
       xcode: 16.2
       node: latest
     scripts:
@@ -26,15 +27,37 @@ workflows:
         script: |
           keychain initialize
           keychain add-certificates
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          find /Users/builder/Library/MobileDevice/Certificates -name "*.mobileprovision" 2>/dev/null \
-            -exec cp {} ~/Library/MobileDevice/Provisioning\ Profiles/ \; || true
           PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
           echo "Using profile: $PROFILE_PATH"
           PROFILE_UUID=$(security cms -D -i "$PROFILE_PATH" 2>/dev/null | \
             /usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin)
           echo "Profile UUID: $PROFILE_UUID"
           echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
+      - name: Create export options
+        script: |
+          cat > /tmp/export_options.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>3GHBFTSZ9H</string>
+            <key>uploadBitcode</key>
+            <false/>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.pace.runapp</key>
+              <string>Pace App Store</string>
+            </dict>
+          </dict>
+          </plist>
+          EOF
       - name: Build iOS IPA
         script: |
           cd ios/App
@@ -46,13 +69,13 @@ workflows:
             CODE_SIGN_STYLE=Manual \
             PROVISIONING_PROFILE="$PROFILE_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="$(echo $PROFILE_UUID)" \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
             archive
           xcodebuild \
             -exportArchive \
             -archivePath build/App.xcarchive \
             -exportPath build/ios/ipa \
-            -exportOptionsPlist /Users/builder/export_options.plist
+            -exportOptionsPlist /tmp/export_options.plist
     artifacts:
       - ios/App/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
