@@ -191,8 +191,8 @@ const SettingsPage = () => {
         <SettingsSection title="Appareils connectés" icon={Watch}>
           <NavigationRow
             icon={Apple}
-            label="Apple Santé & Apple Watch"
-            description="Synchronisez vos données santé et vos courses iPhone"
+            label="Importer depuis Apple Santé"
+            description="Import par fichier (export.xml) ou import ponctuel depuis l'app Santé sur iPhone"
             onClick={() => navigate("/healthkit")}
           />
 

@@ -113,7 +113,7 @@ export const sourceConfig: Record<
     ],
   },
   apple: {
-    label: "Apple Santé",
+    label: "Importer depuis Apple Santé",
     description: "iPhone → Santé → Votre profil → Exporter les données",
     icon: Apple,
     acceptedExtensions: ".xml",

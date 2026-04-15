@@ -22,7 +22,7 @@ const PrivacyPolicy = () => {
                 <li>• <strong>Données de course</strong> : distance, durée, allure, dénivelé, trace GPS</li>
                 <li>• <strong>Fréquence cardiaque</strong> (si capteur Bluetooth ou Apple Watch connecté)</li>
                 <li>• <strong>Données d'activité Strava</strong> (si compte connecté)</li>
-                <li>• <strong>Données Apple Santé</strong> (si autorisation accordée sur iPhone)</li>
+                <li>• <strong>Données Apple Santé</strong> : import du fichier export.xml ou, sur iPhone, import ponctuel depuis l'app Santé après votre autorisation</li>
                 <li>• <strong>Temps de déplacement effectif</strong> : durée de course hors pauses, calculée depuis la trace GPS</li>
                 <li>• <strong>Courses simultanées</strong> : si des amis ont couru au même endroit au même moment, leurs identifiants sont associés à votre course</li>
                 <li>• <strong>Données sociales</strong> : publications, likes, follows, commentaires de forum</li>
@@ -53,9 +53,9 @@ const PrivacyPolicy = () => {
 
             {/* Section 4 */}
             <section className="space-y-3">
-              <h2 className="text-2xl font-semibold">4. Données Apple Santé (HealthKit)</h2>
+              <h2 className="text-2xl font-semibold">4. Données Apple Santé</h2>
               <p className="text-muted-foreground">
-                Si vous autorisez l'accès à Apple Santé, nous lisons vos données de course et de fréquence cardiaque. Ces données ne sont jamais partagées avec des tiers. Nous respectons les directives Apple concernant l'utilisation des données HealthKit.
+                Les données issues d'Apple Santé sont ajoutées à Pace uniquement lorsque vous lancez un import : par fichier (export.xml fourni dans l'archive d'export Apple, voir l'écran Import), ou, sur l'application iPhone, en important ponctuellement les enregistrements présents dans l'app Santé après votre autorisation. Aucune synchronisation automatique continue en arrière-plan n'est effectuée à votre place. Ces données ne sont pas partagées avec des tiers.
               </p>
             </section>
 

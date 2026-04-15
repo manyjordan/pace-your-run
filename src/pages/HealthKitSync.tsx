@@ -52,7 +52,7 @@ const HealthKitSync = () => {
         setIsAuthorized(true);
         toast({
           title: "Autorisations accordées",
-          description: "Apple Santé est maintenant connecté à Pace",
+          description: "Vous pouvez importer vos courses depuis l'app Santé sur cet iPhone.",
         });
       } else {
         toast({
@@ -84,7 +84,7 @@ const HealthKitSync = () => {
       if (runs.length === 0) {
         toast({
           title: "Aucune nouvelle course",
-          description: "Toutes vos courses Apple Santé ont déjà été importées",
+          description: "Aucune course à importer depuis Santé pour le moment",
         });
         setSyncing(false);
         return;
@@ -114,14 +114,14 @@ const HealthKitSync = () => {
       setRunsCount(prev => prev + importedCount);
 
       toast({
-        title: "Synchronisation réussie",
+        title: "Import réussi",
         description: `${importedCount} nouvelle${importedCount > 1 ? "s" : ""} course${importedCount > 1 ? "s" : ""} importée${importedCount > 1 ? "s" : ""} depuis Apple Santé`,
       });
     } catch (error) {
       console.error("Error syncing HealthKit data:", error);
       toast({
-        title: "Erreur de synchronisation",
-        description: "Impossible de synchroniser vos courses Apple Santé",
+        title: "Erreur d'import",
+        description: "Impossible d'importer vos courses depuis Apple Santé sur cet appareil",
         variant: "destructive",
       });
     } finally {
@@ -133,7 +133,7 @@ const HealthKitSync = () => {
   return (
     <div className="space-y-6">
       <ScrollReveal>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Apple Santé & Apple Watch</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Importer depuis Apple Santé</h1>
       </ScrollReveal>
 
       {!isAvailable ? (
@@ -149,16 +149,16 @@ const HealthKitSync = () => {
         <ScrollReveal>
           <div className="rounded-xl border border-border bg-card p-5 space-y-4">
             <div>
-              <h2 className="text-lg font-semibold">Connecter Apple Santé</h2>
+              <h2 className="text-lg font-semibold">Lecture de l'app Santé (import ponctuel)</h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Pace accédera à ces informations de votre iPhone
+                Autorisez la lecture pour importer manuellement les séances présentes dans Santé sur cet iPhone. Pour un import par fichier (export.xml depuis l'export Apple), utilisez Paramètres → Importer l'historique.
               </p>
             </div>
 
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• Vos courses et sorties à pied</li>
-              <li>• Fréquence cardiaque en temps réel</li>
-              <li>• Calories brûlées pendant l'entraînement</li>
+                       <ul className="space-y-2 text-sm text-muted-foreground">
+              <li>• Vos courses et sorties à pied enregistrées dans Santé</li>
+              <li>• Fréquence cardiaque associée à ces séances (si disponible)</li>
+              <li>• Calories brûlées pendant l'entraînement (si disponible)</li>
             </ul>
 
             <Button
@@ -174,16 +174,16 @@ const HealthKitSync = () => {
           <ScrollReveal>
             <div className="rounded-xl border border-border bg-card p-5 space-y-4">
               <div>
-                <h2 className="text-lg font-semibold">Synchroniser vos courses</h2>
+                <h2 className="text-lg font-semibold">Importer vos courses</h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Importez vos courses enregistrées dans Apple Santé
+                  Lancez un import manuel depuis les données Santé sur cet iPhone. Pas de synchronisation automatique en arrière-plan.
                 </p>
               </div>
 
               {isSyncing && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span>Synchronisation en cours...</span>
+                    <span>Import en cours...</span>
                     <span className="text-accent font-semibold">{syncProgress}%</span>
                   </div>
                   <Progress value={syncProgress} className="h-2" />
@@ -198,10 +198,10 @@ const HealthKitSync = () => {
                 {isSyncing ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Synchronisation...
+                    Import...
                   </>
                 ) : (
-                  "Synchroniser mes courses Apple Santé"
+                  "Importer mes courses Apple Santé"
                 )}
               </Button>
             </div>
@@ -211,7 +211,7 @@ const HealthKitSync = () => {
             <div className="rounded-xl border border-border bg-card p-5 space-y-3">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Dernière synchronisation</p>
+                  <p className="text-xs text-muted-foreground">Dernier import</p>
                   <p className="text-sm font-semibold mt-1">
                     {lastSyncDate
                       ? lastSyncDate.toLocaleDateString("fr-FR", {
@@ -225,7 +225,7 @@ const HealthKitSync = () => {
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground">Courses synchronisées</p>
+                  <p className="text-xs text-muted-foreground">Courses importées (cumul)</p>
                   <p className="text-sm font-semibold mt-1">{runsCount}</p>
                 </div>
               </div>
@@ -237,8 +237,8 @@ const HealthKitSync = () => {
       <ScrollReveal>
         <CollapsibleDisclaimer
           variant="info"
-          summary="Les courses Apple Santé importées apparaissent dans votre historique Pace."
-          fullText="Les données de vos courses Apple Santé seront importées et affichées dans votre historique Pace. Vos données restent privées et sécurisées."
+          summary="Les courses importées depuis Apple Santé apparaissent dans votre historique Pace."
+          fullText="L'import se fait sur votre action (fichier export.xml via l'écran Import, ou import ponctuel depuis l'app Santé sur iPhone après autorisation). Pace n'effectue pas de synchronisation automatique continue avec Apple Santé. Vos données restent privées et sécurisées."
         />
       </ScrollReveal>
     </div>
