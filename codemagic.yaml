@@ -27,12 +27,7 @@
         script: |
           keychain initialize
           keychain add-certificates
-          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision 2>/dev/null | head -1)
-          echo "Using profile: $PROFILE_PATH"
-          PROFILE_UUID=$(security cms -D -i "$PROFILE_PATH" 2>/dev/null | \
-            /usr/libexec/PlistBuddy -c "Print UUID" /dev/stdin)
-          echo "Profile UUID: $PROFILE_UUID"
-          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
+          echo "Using profile UUID: e7dfad80-3b90-4ada-bcc8-602aa7fede1b"
       - name: Create export options
         script: |
           cat > /tmp/export_options.plist << EOF
@@ -66,10 +61,11 @@
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -archivePath build/App.xcarchive \
+            -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE="$PROFILE_UUID" \
+            PROVISIONING_PROFILE="e7dfad80-3b90-4ada-bcc8-602aa7fede1b" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
+            DEVELOPMENT_TEAM="3GHBFTSZ9H" \
             archive
           xcodebuild \
             -exportArchive \
