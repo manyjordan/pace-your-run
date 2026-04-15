@@ -186,7 +186,7 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
   }, [syncOfflineRuns]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pt-safe">
       {/* Top header */}
       <header className="pace-header sticky top-0 z-50 border-b text-accent-foreground backdrop-blur-xl">
         <div className="container flex h-14 items-center justify-between">

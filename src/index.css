@@ -6,6 +6,7 @@
 
 @layer base {
   :root {
+    --safe-area-inset-top: env(safe-area-inset-top);
     --background: 45 100% 92%;
     --foreground: 213 44% 11%;
     --card: 45 100% 98%;

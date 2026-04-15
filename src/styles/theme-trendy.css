@@ -5,6 +5,7 @@
    ============================================ */
 
 :root {
+  --safe-area-inset-top: env(safe-area-inset-top);
   /* Mode clair — fond blanc */
   --background: 0 0% 100%;
   --foreground: 220 25% 12%;
@@ -342,4 +343,9 @@ textarea:focus {
 .dark ::selection {
   background: hsl(189 100% 42% / 0.25);
   color: hsl(0 0% 98%);
+}
+
+/* Safe area — iOS status bar / notch (requires viewport-fit=cover) */
+.pt-safe {
+  padding-top: var(--safe-area-inset-top);
 }
