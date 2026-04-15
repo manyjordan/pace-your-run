@@ -31,7 +31,6 @@
         script: |
           keychain initialize
           keychain add-certificates
-          xcode-project use-profiles
       - name: Create export options
         script: |
           cat > /tmp/export_options.plist << EOF
