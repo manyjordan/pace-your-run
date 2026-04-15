@@ -13,17 +13,23 @@ export function CompactWeekTick({
 }: {
   x?: number;
   y?: number;
-  payload?: {
-    value: string;
-    payload?: { showTick?: boolean };
-  };
+  payload?: { value: string; payload?: { showTick?: boolean } };
 }) {
   if (typeof x !== "number" || typeof y !== "number" || !payload) return null;
   if (payload.payload?.showTick === false) return null;
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text x={0} y={10} textAnchor="middle" fill="hsl(var(--foreground))" fontSize={9} fontWeight={600}>
+      <text
+        x={0}
+        y={0}
+        dy={12}
+        textAnchor="end"
+        fill="hsl(var(--foreground))"
+        fontSize={11}
+        fontWeight={500}
+        transform="rotate(-35)"
+      >
         {payload.value}
       </text>
     </g>

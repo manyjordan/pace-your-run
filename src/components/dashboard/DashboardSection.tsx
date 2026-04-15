@@ -202,7 +202,7 @@ export const DashboardSection = ({
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                    <XAxis dataKey="week" axisLine={false} tickLine={false} height={56} tick={<CompactWeekTick />} interval={0} />
+                    <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick />} interval={0} />
                     <YAxis hide />
                     <Tooltip
                       contentStyle={chartTooltipStyle}
