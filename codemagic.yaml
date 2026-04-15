@@ -12,7 +12,8 @@
         XCODE_PROJECT: "App.xcodeproj"
         DEVELOPMENT_TEAM: "3GHBFTSZ9H"
         PROFILE_UUID: "e7dfad80-3b90-4ada-bcc8-602aa7fede1b"
-      xcode: 16.2
+      # Capacitor 8 SPM requires Swift 6.2 / Xcode 26 so CAPPluginCall.reject is visible (see ionic-team/capacitor#8333)
+      xcode: 26.0
       node: latest
       ios_signing:
         distribution_type: app_store
