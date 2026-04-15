@@ -11,8 +11,12 @@
         XCODE_SCHEME: "App"
         XCODE_PROJECT: "App.xcodeproj"
         DEVELOPMENT_TEAM: "3GHBFTSZ9H"
+        PROFILE_UUID: "e7dfad80-3b90-4ada-bcc8-602aa7fede1b"
       xcode: 16.2
       node: latest
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.pace.runapp
     scripts:
       - name: Install npm dependencies
         script: npm install
@@ -27,7 +31,7 @@
         script: |
           keychain initialize
           keychain add-certificates
-          echo "Using profile UUID: e7dfad80-3b90-4ada-bcc8-602aa7fede1b"
+          xcode-project use-profiles
       - name: Create export options
         script: |
           cat > /tmp/export_options.plist << EOF
@@ -39,16 +43,12 @@
             <string>app-store</string>
             <key>teamID</key>
             <string>3GHBFTSZ9H</string>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
             <key>signingStyle</key>
             <string>manual</string>
             <key>provisioningProfiles</key>
             <dict>
               <key>com.pace.runapp</key>
-              <string>Pace App Store</string>
+              <string>e7dfad80-3b90-4ada-bcc8-602aa7fede1b</string>
             </dict>
           </dict>
           </plist>
@@ -63,9 +63,9 @@
             -archivePath build/App.xcarchive \
             -destination "generic/platform=iOS" \
             CODE_SIGN_STYLE=Manual \
-            PROVISIONING_PROFILE="e7dfad80-3b90-4ada-bcc8-602aa7fede1b" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" \
             CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM="3GHBFTSZ9H" \
+            DEVELOPMENT_TEAM="$DEVELOPMENT_TEAM" \
             archive
           xcodebuild \
             -exportArchive \
