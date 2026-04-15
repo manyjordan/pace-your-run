@@ -10,7 +10,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-/** OAuth redirect for Supabase: custom scheme on native iOS, web origin elsewhere. */
+/** OAuth redirect for Supabase: app deep link on native iOS (hash tokens via appUrlOpen), web origin elsewhere. */
 export function getOAuthRedirectUrl(): string {
   if (Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios") {
     return "com.pace.runapp://";

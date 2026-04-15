@@ -9,6 +9,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { SplashScreen } from "@/components/SplashScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DeepLinkAuthHandler } from "@/components/DeepLinkAuthHandler";
 import { useState, useEffect, lazy, Suspense, useCallback } from "react";
 
 const Index = lazy(() => import("@/pages/Index"));
@@ -103,6 +104,7 @@ const App = () => {
                 <SplashScreen onComplete={handleSplashComplete} />
               ) : (
                 <BrowserRouter>
+                  <DeepLinkAuthHandler />
                   <AppRoutes />
                 </BrowserRouter>
               )}
