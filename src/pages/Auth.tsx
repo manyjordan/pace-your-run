@@ -21,6 +21,7 @@ const Auth = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [signupSuccess, setSignupSuccess] = useState(false);
+  const [signupSuccessEmail, setSignupSuccessEmail] = useState("");
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,16 +63,23 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      const isNative = window.location.protocol === "capacitor:";
+      const redirectTo = isNative
+        ? "com.pace.runapp://auth/confirm"
+        : `${window.location.origin}/auth/confirm`;
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/confirm`,
+          emailRedirectTo: redirectTo,
         },
       });
 
       if (error) throw error;
 
+      const submittedEmail = email;
+      setSignupSuccessEmail(submittedEmail);
       setSignupSuccess(true);
       setEmail("");
       setPassword("");
@@ -214,7 +222,10 @@ const Auth = () => {
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
                   <AlertDescription className="text-green-700">
                     <div className="font-semibold mb-1">Compte créé avec succès !</div>
-                    <div>Un email de confirmation a été envoyé à <strong>{email}</strong>. Veuillez vérifier votre boîte de réception et suivre les instructions pour activer votre compte.</div>
+                    <div>
+                      Un email de confirmation a été envoyé à <strong>{signupSuccessEmail}</strong>. Veuillez vérifier
+                      votre boîte de réception et suivre les instructions pour activer votre compte.
+                    </div>
                   </AlertDescription>
                 </Alert>
               ) : (
