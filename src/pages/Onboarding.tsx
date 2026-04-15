@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
@@ -91,6 +91,7 @@ function buildOnboardingPlanData(data: OnboardingData) {
 const Onboarding = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const contentScrollRef = useRef<HTMLDivElement>(null);
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [data, setData] = useState<OnboardingData>({
@@ -108,15 +109,24 @@ const Onboarding = () => {
     }
   }, [session, navigate]);
 
+  const scrollStepIntoView = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    document.documentElement.scrollTo({ top: 0, behavior: "smooth" });
+    document.body.scrollTo({ top: 0, behavior: "smooth" });
+    contentScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const handleNext = () => {
     if (step < 5) {
       setStep(step + 1);
+      scrollStepIntoView();
     }
   };
 
   const handleBack = () => {
     if (step > 1) {
       setStep(step - 1);
+      scrollStepIntoView();
     }
   };
 
@@ -134,6 +144,7 @@ const Onboarding = () => {
 
   const handleSkipToSummary = () => {
     setStep(5);
+    scrollStepIntoView();
   };
 
   const completeOnboarding = async (redirectToImport = false) => {
@@ -186,9 +197,9 @@ const Onboarding = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex min-h-screen flex-col bg-background">
       {/* Progress Bar */}
-      <div className="sticky top-0 z-50 flex items-center justify-between border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm">
+      <div className="sticky top-0 z-50 flex shrink-0 items-center justify-between border-b border-border bg-card/95 px-4 py-3 backdrop-blur-sm">
         <button
           onClick={handleBack}
           className={`rounded-lg p-2 text-accent ${step === 1 ? "invisible" : ""}`}
@@ -209,7 +220,7 @@ const Onboarding = () => {
       </div>
 
       {/* Progress indicator dots */}
-      <div className="flex justify-center gap-2 px-4 py-4">
+      <div className="flex shrink-0 justify-center gap-2 px-4 py-4">
         {[1, 2, 3, 4, 5].map((dotStep) => (
           <motion.div
             key={dotStep}
@@ -222,8 +233,11 @@ const Onboarding = () => {
         ))}
       </div>
 
-      {/* Content */}
-      <div className="relative flex-1 overflow-hidden px-4 pb-20">
+      {/* Content — bounded scroll area so Capacitor/iOS can scrollTo ref; window fallbacks for document scroll */}
+      <div
+        ref={contentScrollRef}
+        className="relative max-h-[calc(100dvh-8.5rem)] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-20"
+      >
         <AnimatePresence mode="wait" custom={step > 1 ? 1 : -1}>
           {step === 1 && (
             <motion.div
