@@ -90,7 +90,7 @@ const categoryMeta: Record<string, CategoryMeta> = {
   },
   equipment: {
     icon: Footprints,
-    accent: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+    accent: "bg-accent/10 text-accent",
     topics: ["Chaussures route", "Capteurs et montres", "Équipement selon la météo"],
   },
   "preparation-course": {

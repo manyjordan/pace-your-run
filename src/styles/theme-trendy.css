@@ -1,5 +1,5 @@
 /* ============================================
-   PACE — Thème bleu / cyan (charte actuelle)
+   PACE — Thème vert logo (#B4DC5A, HSL 76 65% 60%)
    Importé depuis src/main.tsx. Sans cet import,
    les couleurs de base reviennent à src/index.css.
    ============================================ */
@@ -22,7 +22,7 @@
   --muted-foreground: 220 10% 42%;
   --input: 240 12% 88%;
 
-  --primary: 189 95% 46%;
+  --primary: 76 62% 58%;
   --primary-foreground: 220 30% 16%;
 
   --secondary: 240 15% 96%;
@@ -34,10 +34,10 @@
   --popover: 0 0% 100%;
   --popover-foreground: 220 25% 12%;
 
-  --ring: 189 100% 42%;
+  --ring: 76 65% 58%;
   --radius: 1rem;
 
-  --lime: 189 100% 42%;
+  --lime: 76 65% 60%;
   --lime-foreground: 0 0% 0%;
   --navy: 220 30% 18%;
   --navy-light: 220 20% 35%;
@@ -45,12 +45,12 @@
   --surface: 240 25% 98%;
   --sidebar-background: 0 0% 100%;
   --sidebar-foreground: 220 25% 12%;
-  --sidebar-primary: 189 100% 42%;
+  --sidebar-primary: 76 65% 58%;
   --sidebar-primary-foreground: 0 0% 0%;
   --sidebar-accent: 240 15% 95%;
   --sidebar-accent-foreground: 220 25% 12%;
   --sidebar-border: 240 12% 90%;
-  --sidebar-ring: 189 100% 42%;
+  --sidebar-ring: 76 65% 58%;
 }
 
 .dark {
@@ -69,7 +69,7 @@
   --muted-foreground: 240 6% 70%;
   --input: 240 10% 8%;
 
-  --primary: 189 100% 42%;
+  --primary: 76 62% 58%;
   --primary-foreground: 0 0% 0%;
 
   --secondary: 240 10% 10%;
@@ -81,10 +81,10 @@
   --popover: 240 10% 5%;
   --popover-foreground: 0 0% 98%;
 
-  --ring: 189 100% 42%;
+  --ring: 76 65% 58%;
   --radius: 1rem;
 
-  --lime: 189 100% 42%;
+  --lime: 76 65% 60%;
   --lime-foreground: 0 0% 0%;
   --navy: 0 0% 98%;
   --navy-light: 240 10% 70%;
@@ -92,15 +92,15 @@
   --surface: 240 10% 6%;
   --sidebar-background: 240 10% 5%;
   --sidebar-foreground: 0 0% 92%;
-  --sidebar-primary: 189 100% 42%;
+  --sidebar-primary: 76 65% 58%;
   --sidebar-primary-foreground: 0 0% 0%;
   --sidebar-accent: 240 10% 12%;
   --sidebar-accent-foreground: 0 0% 96%;
   --sidebar-border: 240 10% 41%;
-  --sidebar-ring: 189 100% 42%;
+  --sidebar-ring: 76 65% 58%;
 }
 
-/* Mode sombre : --accent-foreground est noir (boutons cyan pleins) ; sur en-tête vitré ou
+/* Mode sombre : --accent-foreground est noir (boutons accent pleins) ; sur en-tête vitré ou
    fond accent très transparent, forcer un texte clair pour rester lisible sur noir. */
 .dark .pace-header {
   --accent-foreground: 0 0% 98%;
@@ -113,7 +113,7 @@
   --accent-foreground: 0 0% 96%;
 }
 
-/* Boutons / pastilles cyan pleins : garder le texte foncé même imbriqués dans un bloc ci-dessus */
+/* Boutons / pastilles accent pleins : garder le texte foncé même imbriqués dans un bloc ci-dessus */
 .dark .bg-accent {
   --accent-foreground: 76 10% 10%;
 }
@@ -128,40 +128,40 @@
 .pace-header {
   background: linear-gradient(
     135deg,
-    hsl(189 100% 42% / 0.15),
-    hsl(210 100% 52% / 0.08)
+    hsl(76 65% 58% / 0.15),
+    hsl(76 42% 44% / 0.08)
   );
-  border-bottom: 1px solid hsl(189 100% 42% / 0.25);
-  box-shadow: 0 4px 32px hsl(189 100% 42% / 0.1);
+  border-bottom: 1px solid hsl(76 65% 58% / 0.25);
+  box-shadow: 0 4px 32px hsl(76 65% 58% / 0.1);
   backdrop-filter: blur(20px);
 }
 
-/* Logo header : teinte cyan (logo-colors.css applique jaune par défaut) */
+/* Logo header : léger renfort saturation (logo-colors.css) */
 img.header-logo {
-  filter: hue-rotate(101deg) saturate(1.12) brightness(1.03);
+  filter: saturate(1.06) brightness(1.02);
 }
 
-/* ── Bouton accent — gradient cyan → bleu ── */
+/* ── Bouton accent — dégradé vert Pace ── */
 .bg-accent {
-  background: linear-gradient(135deg, hsl(189 100% 42%), hsl(210 100% 52%)) !important;
-  box-shadow: 0 0 20px hsl(189 100% 42% / 0.35);
+  background: linear-gradient(135deg, hsl(76 65% 58%), hsl(76 42% 44%)) !important;
+  box-shadow: 0 0 20px hsl(76 65% 58% / 0.35);
 }
 
 .bg-accent:hover {
-  box-shadow: 0 0 32px hsl(189 100% 42% / 0.55);
+  box-shadow: 0 0 32px hsl(76 65% 58% / 0.55);
   transform: translateY(-1px);
   transition: all 0.2s ease;
 }
 
 /* Mode clair : ne pas appliquer le dégradé hero sombre aux boutons rounded-lg / rounded-md */
 html:not(.dark) .bg-accent {
-  background: linear-gradient(135deg, hsl(189 88% 50%), hsl(199 82% 58%)) !important;
+  background: linear-gradient(135deg, hsl(76 64% 58%), hsl(76 55% 52%)) !important;
   color: hsl(220 30% 16%) !important;
-  box-shadow: 0 0 18px hsl(189 95% 46% / 0.3);
+  box-shadow: 0 0 18px hsl(76 62% 58% / 0.3);
 }
 
 html:not(.dark) .bg-accent:hover {
-  box-shadow: 0 0 28px hsl(189 95% 46% / 0.42);
+  box-shadow: 0 0 28px hsl(76 62% 58% / 0.42);
 }
 
 /* Outline / ghost : survol/focus sur fond accent clair = texte marine (WCAG) */
@@ -187,7 +187,7 @@ html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
     hsl(240 20% 98%)
   ) !important;
   backdrop-filter: blur(8px);
-  border-color: hsl(189 100% 42% / 0.2) !important;
+  border-color: hsl(76 65% 58% / 0.2) !important;
 }
 
 .dark [class*="bg-card"] {
@@ -196,78 +196,78 @@ html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
     hsl(240 10% 5%),
     hsl(240 10% 4%)
   ) !important;
-  border-color: hsl(189 100% 42% / 0.12) !important;
+  border-color: hsl(76 65% 58% / 0.12) !important;
 }
 
 /* ── Glow effect sur les cartes accent ── */
 [class*="border-accent"] {
   box-shadow:
-    0 0 0 1px hsl(189 100% 42% / 0.2),
-    0 8px 32px hsl(189 100% 42% / 0.08) !important;
-  border-color: hsl(189 100% 42% / 0.35) !important;
+    0 0 0 1px hsl(76 65% 58% / 0.2),
+    0 8px 32px hsl(76 65% 58% / 0.08) !important;
+  border-color: hsl(76 65% 58% / 0.35) !important;
 }
 
 /* ── Hero banner — uniquement rounded-2xl (évite d’assombrir rounded-lg) ── */
 .bg-accent.rounded-2xl {
   background: linear-gradient(
     135deg,
-    hsl(189 100% 38%),
-    hsl(220 100% 50%),
-    hsl(189 100% 35%)
+    hsl(76 52% 44%),
+    hsl(76 45% 46%),
+    hsl(76 48% 40%)
   ) !important;
   box-shadow:
-    0 0 40px hsl(189 100% 42% / 0.3),
-    0 20px 60px hsl(210 100% 52% / 0.15) !important;
+    0 0 40px hsl(76 65% 58% / 0.3),
+    0 20px 60px hsl(76 42% 44% / 0.15) !important;
 }
 
 html:not(.dark) .bg-accent.rounded-2xl {
   background: linear-gradient(
     135deg,
-    hsl(189 85% 52%),
+    hsl(76 66% 60%),
     hsl(200 80% 58%),
-    hsl(189 82% 50%)
+    hsl(76 60% 54%)
   ) !important;
   color: hsl(220 30% 16%) !important;
   box-shadow:
-    0 0 32px hsl(189 95% 46% / 0.25),
-    0 16px 48px hsl(199 82% 58% / 0.12) !important;
+    0 0 32px hsl(76 62% 58% / 0.25),
+    0 16px 48px hsl(76 55% 52% / 0.12) !important;
 }
 
 /* ── Bottom nav mobile — frosted glass ── */
 nav.fixed.bottom-0 {
   background: hsl(0 0% 100% / 0.92) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;
-  border-top: 1px solid hsl(189 100% 42% / 0.22) !important;
-  box-shadow: 0 -8px 32px hsl(189 100% 42% / 0.06) !important;
+  border-top: 1px solid hsl(76 65% 58% / 0.22) !important;
+  box-shadow: 0 -8px 32px hsl(76 65% 58% / 0.06) !important;
 }
 
 .dark nav.fixed.bottom-0 {
   background: hsl(0 0% 0% / 0.85) !important;
-  border-top: 1px solid hsl(189 100% 42% / 0.2) !important;
-  box-shadow: 0 -8px 32px hsl(189 100% 42% / 0.08) !important;
+  border-top: 1px solid hsl(76 65% 58% / 0.2) !important;
+  box-shadow: 0 -8px 32px hsl(76 65% 58% / 0.08) !important;
 }
 
 /* ── Bouton primaire Course (nav centrale) — glow ── */
 .bg-accent.rounded-full {
-  background: linear-gradient(135deg, hsl(189 100% 42%), hsl(210 100% 52%)) !important;
+  background: linear-gradient(135deg, hsl(76 65% 58%), hsl(76 42% 44%)) !important;
   box-shadow:
-    0 0 20px hsl(189 100% 42% / 0.5),
-    0 0 40px hsl(189 100% 42% / 0.25) !important;
+    0 0 20px hsl(76 65% 58% / 0.5),
+    0 0 40px hsl(76 65% 58% / 0.25) !important;
 }
 
 html:not(.dark) .bg-accent.rounded-full {
-  background: linear-gradient(135deg, hsl(189 88% 50%), hsl(199 82% 58%)) !important;
+  background: linear-gradient(135deg, hsl(76 64% 58%), hsl(76 55% 52%)) !important;
   color: hsl(220 30% 16%) !important;
   box-shadow:
-    0 0 18px hsl(189 95% 46% / 0.45),
-    0 0 36px hsl(189 95% 46% / 0.22) !important;
+    0 0 18px hsl(76 62% 58% / 0.45),
+    0 0 36px hsl(76 62% 58% / 0.22) !important;
 }
 
 /* ── Inputs — style neon ── */
 input:focus,
 textarea:focus {
-  border-color: hsl(189 100% 42% / 0.6) !important;
-  box-shadow: 0 0 0 2px hsl(189 100% 42% / 0.15) !important;
+  border-color: hsl(76 65% 58% / 0.6) !important;
+  box-shadow: 0 0 0 2px hsl(76 65% 58% / 0.15) !important;
   outline: none !important;
 }
 
@@ -275,41 +275,41 @@ textarea:focus {
 [data-state="active"][role="tab"] {
   background: linear-gradient(
     135deg,
-    hsl(189 100% 42% / 0.15),
-    hsl(210 100% 52% / 0.1)
+    hsl(76 65% 58% / 0.15),
+    hsl(76 42% 44% / 0.1)
   ) !important;
-  border-bottom: 2px solid hsl(189 100% 42%) !important;
-  color: hsl(189 100% 28%) !important;
+  border-bottom: 2px solid hsl(76 65% 58%) !important;
+  color: hsl(76 42% 28%) !important;
 }
 
 .dark [data-state="active"][role="tab"] {
-  color: hsl(189 100% 52%) !important;
+  color: hsl(76 72% 66%) !important;
 }
 
 /* ── Progress bars & accents ── */
 .bg-accent\/10 {
-  background: hsl(189 100% 42% / 0.08) !important;
+  background: hsl(76 65% 58% / 0.08) !important;
 }
 
 .text-accent {
-  color: hsl(189 90% 28%) !important;
+  color: hsl(76 40% 28%) !important;
   text-shadow: none;
 }
 
 .dark .text-accent {
-  color: hsl(189 100% 52%) !important;
-  text-shadow: 0 0 12px hsl(189 100% 52% / 0.3);
+  color: hsl(76 72% 66%) !important;
+  text-shadow: 0 0 12px hsl(76 72% 66% / 0.3);
 }
 
 /* ── Badges accent ── */
 [class*="border-accent"][class*="text-accent"] {
-  border-color: hsl(189 100% 42% / 0.4) !important;
-  color: hsl(189 90% 28%) !important;
-  background: hsl(189 100% 42% / 0.08) !important;
+  border-color: hsl(76 65% 58% / 0.4) !important;
+  color: hsl(76 40% 28%) !important;
+  background: hsl(76 65% 58% / 0.08) !important;
 }
 
 .dark [class*="border-accent"][class*="text-accent"] {
-  color: hsl(189 100% 52%) !important;
+  color: hsl(76 72% 66%) !important;
 }
 
 /* ── Scrollbar neon ── */
@@ -326,22 +326,22 @@ textarea:focus {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(189 100% 42% / 0.4);
+  background: hsl(76 65% 58% / 0.4);
   border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(189 100% 42% / 0.7);
+  background: hsl(76 65% 58% / 0.7);
 }
 
 /* ── Sélection de texte ── */
 ::selection {
-  background: hsl(189 100% 42% / 0.22);
+  background: hsl(76 65% 58% / 0.22);
   color: hsl(220 25% 12%);
 }
 
 .dark ::selection {
-  background: hsl(189 100% 42% / 0.25);
+  background: hsl(76 65% 58% / 0.25);
   color: hsl(0 0% 98%);
 }
 

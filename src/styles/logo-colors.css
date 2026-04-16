@@ -1,5 +1,5 @@
 /* Color filter utility to convert green logos to yellow.
- * Thème bleu/cyan : img.header-logo est re-teinté en cyan dans theme-trendy.css. */
+ * Avec theme-trendy.css, img.header-logo reçoit un filtre vert Pace (surcharge ci-dessous si thème absent). */
 
 /* Hue-rotate filter to convert green (#84cc16) to yellow (#d4a927) */
 .logo-yellow-filter {
