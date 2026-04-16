@@ -5,6 +5,7 @@ import {
   createForumThread,
   deleteForumReply,
   deleteForumThread,
+  getMutualNetworkUserIds,
   getForumCategories,
   getForumLikedThreadIds,
   getForumThreadDetail,
@@ -56,6 +57,8 @@ import {
   Footprints,
   Heart,
   Lightbulb,
+  Lock,
+  MapPin,
   MessageCircle,
   MessageSquare,
   MoreHorizontal,
@@ -100,6 +103,11 @@ const categoryMeta: Record<string, CategoryMeta> = {
     accent: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
     topics: ["Nouvelles fonctionnalités", "Améliorations existantes", "Bugs rencontrés"],
   },
+  organiser: {
+    icon: MapPin,
+    accent: "bg-orange-500/10 text-orange-500 dark:text-orange-400",
+    topics: ["Run débutants", "Run intermédiaires", "Trail", "Soirée running"],
+  },
   autres: {
     icon: MessageCircle,
     accent: "bg-gray-500/10 text-gray-600 dark:text-gray-400",
@@ -131,7 +139,9 @@ export function ForumSection() {
   const [newThreadCategoryId, setNewThreadCategoryId] = useState("");
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [newThreadContent, setNewThreadContent] = useState("");
+  const [newThreadVisibility, setNewThreadVisibility] = useState<"public" | "network">("public");
   const [replyContent, setReplyContent] = useState("");
+  const [mutualNetworkIds, setMutualNetworkIds] = useState<string[]>([]);
   const [likedThreadIds, setLikedThreadIds] = useState<string[]>([]);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editThreadContent, setEditThreadContent] = useState("");
@@ -150,9 +160,10 @@ export function ForumSection() {
   const discussionsRef = useRef<HTMLDivElement>(null);
 
   const THREADS_PAGE_SIZE = 15;
+  const mutualNetworkSet = useMemo(() => new Set(mutualNetworkIds), [mutualNetworkIds]);
 
   const loadThreads = useCallback(
-    async (categoryId: string, pageNum = 0) => {
+    async (categoryId: string, pageNum = 0, allowedNetworkIds: string[] = mutualNetworkIds) => {
       if (pageNum === 0) {
         setThreads([]);
       }
@@ -164,10 +175,17 @@ export function ForumSection() {
       setForumError(null);
 
       try {
-        const newThreads = await getForumThreads(
+        const fetchedThreads = await getForumThreads(
           categoryId === "all" ? undefined : categoryId,
           THREADS_PAGE_SIZE,
           pageNum * THREADS_PAGE_SIZE,
+        );
+        const allowedNetworkSet = new Set(allowedNetworkIds);
+        const newThreads = fetchedThreads.filter(
+          (thread) =>
+            thread.visibility !== "network" ||
+            thread.user_id === user?.id ||
+            allowedNetworkSet.has(thread.user_id),
         );
 
         if (pageNum === 0) {
@@ -175,7 +193,7 @@ export function ForumSection() {
         } else {
           setThreads((prev) => [...prev, ...newThreads]);
         }
-        setHasMoreThreads(newThreads.length === THREADS_PAGE_SIZE);
+        setHasMoreThreads(fetchedThreads.length === THREADS_PAGE_SIZE);
 
         if (user?.id && newThreads.length > 0) {
           try {
@@ -203,7 +221,7 @@ export function ForumSection() {
         setIsLoadingMoreThreads(false);
       }
     },
-    [user?.id],
+    [mutualNetworkIds, user?.id],
   );
 
   const loadOverview = useCallback(async () => {
@@ -215,6 +233,12 @@ export function ForumSection() {
     try {
       const categoriesData = await getForumCategories();
       setCategories(categoriesData);
+      if (user?.id) {
+        const networkIds = await getMutualNetworkUserIds(user.id);
+        setMutualNetworkIds(networkIds);
+      } else {
+        setMutualNetworkIds([]);
+      }
 
       if (!newThreadCategoryId && categoriesData.length > 0) {
         setNewThreadCategoryId(categoriesData[0].id);
@@ -225,8 +249,9 @@ export function ForumSection() {
       return;
     }
 
-    await loadThreads(selectedCategoryId, 0);
-  }, [loadThreads, newThreadCategoryId, selectedCategoryId]);
+    const networkIdsForFilter = user?.id ? await getMutualNetworkUserIds(user.id) : [];
+    await loadThreads(selectedCategoryId, 0, networkIdsForFilter);
+  }, [loadThreads, newThreadCategoryId, selectedCategoryId, user?.id]);
 
   const loadThreadDetail = useCallback(async (threadId: string) => {
     setIsLoadingThread(true);
@@ -257,6 +282,19 @@ export function ForumSection() {
     void loadThreadDetail(selectedThreadId);
   }, [loadThreadDetail, selectedThreadId]);
 
+  useEffect(() => {
+    if (!selectedThreadDetail) return;
+    const canView =
+      selectedThreadDetail.visibility !== "network" ||
+      selectedThreadDetail.user_id === user?.id ||
+      mutualNetworkSet.has(selectedThreadDetail.user_id);
+    if (!canView) {
+      toast.error("Ce sujet est réservé au réseau de l'auteur.");
+      setSelectedThreadId(null);
+      setSelectedThreadDetail(null);
+    }
+  }, [mutualNetworkSet, selectedThreadDetail, user?.id]);
+
   const activeCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) ?? null,
     [categories, selectedCategoryId],
@@ -280,12 +318,14 @@ export function ForumSection() {
         newThreadCategoryId,
         newThreadTitle.trim(),
         newThreadContent.trim(),
+        newThreadVisibility,
       );
 
       toast.success("Sujet créé.");
       setIsCreateOpen(false);
       setNewThreadTitle("");
       setNewThreadContent("");
+      setNewThreadVisibility("public");
       setSelectedCategoryId(thread.category_id);
       await loadOverview();
       setSelectedThreadId(thread.id);
@@ -544,6 +584,36 @@ export function ForumSection() {
                       placeholder="Décrivez votre question ou votre retour d'expérience."
                       className="min-h-[140px] resize-none"
                     />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Visibilité</Label>
+                    <div className="inline-flex rounded-lg border border-border p-1">
+                      <button
+                        type="button"
+                        className={cn(
+                          "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                          newThreadVisibility === "public"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        onClick={() => setNewThreadVisibility("public")}
+                      >
+                        Tout le monde
+                      </button>
+                      <button
+                        type="button"
+                        className={cn(
+                          "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                          newThreadVisibility === "network"
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:text-foreground",
+                        )}
+                        onClick={() => setNewThreadVisibility("network")}
+                      >
+                        Mon réseau uniquement
+                      </button>
+                    </div>
                   </div>
 
                   <Button onClick={() => void handleCreateThread()} disabled={isSubmittingThread} className="w-full">
@@ -811,7 +881,15 @@ export function ForumSection() {
                                 {initials}
                               </div>
                               <div className="min-w-0 flex-1 space-y-0.5">
-                                <p className="text-sm font-semibold leading-tight">{author}</p>
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-semibold leading-tight">{author}</p>
+                                  {thread.visibility === "network" ? (
+                                    <Badge variant="secondary" className="gap-1">
+                                      <Lock className="h-3 w-3" />
+                                      Réseau
+                                    </Badge>
+                                  ) : null}
+                                </div>
                                 <p className="text-xs text-muted-foreground">
                                   {formatRelativeTime(thread.updated_at ?? thread.created_at ?? new Date().toISOString())}{" "}
                                   · {thread.repliesCount} réponse{thread.repliesCount !== 1 ? "s" : ""}
@@ -957,6 +1035,12 @@ export function ForumSection() {
                             selectedThreadDetail.profile?.username,
                           )}
                         </p>
+                        {selectedThreadDetail.visibility === "network" ? (
+                          <Badge variant="secondary" className="w-fit gap-1">
+                            <Lock className="h-3 w-3" />
+                            Réseau
+                          </Badge>
+                        ) : null}
                         <p className="text-xs text-muted-foreground">
                           {formatRelativeTime(selectedThreadDetail.created_at ?? new Date().toISOString())}
                         </p>

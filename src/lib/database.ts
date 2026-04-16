@@ -134,6 +134,7 @@ export type ForumThreadRow = {
   title: string;
   updated_at: string | null;
   user_id: string;
+  visibility?: "public" | "network";
 };
 
 export type ForumReplyRow = {
@@ -549,6 +550,24 @@ export async function getFollowing(userId: string): Promise<string[]> {
 
   if (error) throw error;
   return (data ?? []).map((row) => row.following_id as string);
+}
+
+export async function getFollowers(userId: string): Promise<string[]> {
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("follows")
+    .select("follower_id")
+    .eq("following_id", userId);
+
+  if (error) throw error;
+  return (data ?? []).map((row) => row.follower_id as string);
+}
+
+export async function getMutualNetworkUserIds(userId: string): Promise<string[]> {
+  const [following, followers] = await Promise.all([getFollowing(userId), getFollowers(userId)]);
+  const followersSet = new Set(followers);
+  return following.filter((id) => followersSet.has(id));
 }
 
 /**
@@ -1018,7 +1037,13 @@ export async function getForumThreadDetail(threadId: string) {
   } as ForumThreadDetailRecord;
 }
 
-export async function createForumThread(userId: string, categoryId: string, title: string, content: string) {
+export async function createForumThread(
+  userId: string,
+  categoryId: string,
+  title: string,
+  content: string,
+  visibility: "public" | "network" = "public",
+) {
   await requireCurrentUserId(userId);
 
   const { data, error } = await supabase
@@ -1028,6 +1053,7 @@ export async function createForumThread(userId: string, categoryId: string, titl
       content,
       title,
       user_id: userId,
+      visibility,
     })
     .select("*")
     .single();
