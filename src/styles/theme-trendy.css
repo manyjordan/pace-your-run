@@ -14,8 +14,8 @@
   --card-foreground: 220 25% 12%;
 
   /* accent-foreground reste foncé pour bg-accent/10, cartes légères, etc. */
-  --accent: 189 95% 46%;
-  --accent-foreground: 220 30% 16%;
+  --accent: 76 65% 60%;
+  --accent-foreground: 76 10% 10%;
 
   --border: 220 15% 60%;
   --muted: 240 15% 96%;
@@ -61,8 +61,8 @@
   --card: 240 10% 4%;
   --card-foreground: 0 0% 98%;
 
-  --accent: 189 100% 42%;
-  --accent-foreground: 0 0% 0%;
+  --accent: 76 65% 60%;
+  --accent-foreground: 76 10% 10%;
 
   --border: 240 10% 40%;
   --muted: 240 10% 8%;
@@ -115,7 +115,7 @@
 
 /* Boutons / pastilles cyan pleins : garder le texte foncé même imbriqués dans un bloc ci-dessus */
 .dark .bg-accent {
-  --accent-foreground: 0 0% 0%;
+  --accent-foreground: 76 10% 10%;
 }
 
 /* Hero type accueil : dégradé .bg-accent.rounded-2xl très sombre → texte clair (le noir était illisible) */
