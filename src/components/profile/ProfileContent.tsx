@@ -15,6 +15,7 @@ import { getPlanById } from "@/lib/trainingPlans";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 import { birthDateDayPickerProps } from "@/lib/dateCalendarSettings";
+import { logger } from "@/lib/logger";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { toast } from "sonner";
 import type { ProfileRow, RunRow } from "@/lib/database";
@@ -109,7 +110,7 @@ export function ProfileContent({
         dateOfBirth: profileData?.date_of_birth || "",
       });
     } catch (error) {
-      console.error("Error loading profile:", error);
+      logger.error("Error loading profile", error);
     } finally {
       setIsLoading(false);
     }
@@ -156,7 +157,7 @@ export function ProfileContent({
       setIsEditMode(false);
       toast.success("Profil mis à jour");
     } catch (error) {
-      console.error("Error saving profile:", error);
+      logger.error("Error saving profile", error);
       const message =
         typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
           ? error.message
@@ -215,7 +216,7 @@ export function ProfileContent({
       setAvatarPreviewUrl(null);
       toast.success("Photo de profil mise à jour");
     } catch (error) {
-      console.error("Error uploading avatar:", error);
+      logger.error("Error uploading avatar", error);
       const message =
         typeof error === "object" && error !== null && "message" in error && typeof error.message === "string"
           ? error.message

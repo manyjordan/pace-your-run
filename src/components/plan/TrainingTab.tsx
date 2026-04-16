@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getWeekSessions, toggleSessionCompleted } from "@/lib/database";
 import { normalizeGoalData } from "@/lib/goalHelpers";
+import { logger } from "@/lib/logger";
 import { getPlanById } from "@/lib/trainingPlans";
 import SessionDetail from "./SessionDetail";
 import type { TrainingPlan, Session } from "@/lib/trainingPlans";
@@ -198,7 +199,7 @@ export default function TrainingTab() {
           const sessions = await getWeekSessions(user.id, selectedPlan.id, currentWeek);
           setWeekSessions(sessions);
         } catch (error) {
-          console.error("Error loading week sessions:", error);
+          logger.error("Error loading week sessions", error);
           setWeekSessions([]);
         }
       }
@@ -287,7 +288,7 @@ export default function TrainingTab() {
       const sessions = await getWeekSessions(user.id, selectedPlan.id, currentWeek);
       setWeekSessions(sessions);
     } catch (error) {
-      console.error("Error toggling session:", error);
+      logger.error("Error toggling session", error);
     } finally {
       setCompletingSession(null);
     }

@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -285,7 +286,7 @@ export default function Social() {
         await navigator.share(shareData);
       } catch (error) {
         if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Share failed:", error);
+          logger.error("Share failed", error);
         }
       }
     } else {
@@ -344,7 +345,7 @@ export default function Social() {
         }
         setHasMore(newPosts.length === PAGE_SIZE);
       } catch (error) {
-        console.error("Failed to load feed:", error);
+        logger.error("Failed to load feed", error);
         if (pageNum === 0) {
           setActivities([]);
           setPosts([]);

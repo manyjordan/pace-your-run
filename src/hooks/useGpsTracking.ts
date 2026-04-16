@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from "react";
 import type { RunGpsPoint } from "@/lib/database";
+import { logger } from "@/lib/logger";
 import { haversineDistanceKm } from "@/lib/parsers/gpxParser";
 
 type UseGpsTrackingOptions = {
@@ -58,7 +59,7 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
         }
       },
       (error) => {
-        console.error("Geolocation error:", error);
+        logger.error("Geolocation error", error);
         if (error.code === error.PERMISSION_DENIED) {
           setGpsError("GPS non disponible. Activez la localisation pour enregistrer votre course.");
           onPermissionDenied?.();

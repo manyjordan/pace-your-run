@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { logger } from "@/lib/logger";
 import type { ImportedRun } from "@/lib/parsers/gpxParser";
 
 type HealthKitWorkout = {
@@ -125,7 +126,7 @@ export async function requestHealthKitPermissions(): Promise<boolean> {
 
     return result && result.success === true;
   } catch (error) {
-    console.error("Error requesting HealthKit permissions:", error);
+    logger.error("Error requesting HealthKit permissions", error);
     return false;
   }
 }
@@ -183,7 +184,7 @@ export async function fetchRecentRuns(limit: number = 200): Promise<ImportedRun[
 
     return runs;
   } catch (error) {
-    console.error("Error fetching HealthKit workouts:", error);
+    logger.error("Error fetching HealthKit workouts", error);
     return [];
   }
 }
@@ -210,13 +211,13 @@ export async function startLiveHeartRate(callback: (bpm: number) => void): Promi
         }
       },
       onError: (error: Error) => {
-        console.error("Error observing heart rate:", error);
+        logger.error("Error observing heart rate", error);
         isObserving = false;
         heartRateCallback = null;
       },
     });
   } catch (error) {
-    console.error("Error starting HealthKit heart rate observation:", error);
+    logger.error("Error starting HealthKit heart rate observation", error);
     isObserving = false;
     heartRateCallback = null;
   }
@@ -236,7 +237,7 @@ export async function stopLiveHeartRate(): Promise<void> {
     isObserving = false;
     heartRateCallback = null;
   } catch (error) {
-    console.error("Error stopping HealthKit heart rate observation:", error);
+    logger.error("Error stopping HealthKit heart rate observation", error);
     isObserving = false;
     heartRateCallback = null;
   }
@@ -265,7 +266,7 @@ export async function isHealthKitAuthorized(): Promise<boolean> {
 
     return result && result.authorized === true;
   } catch (error) {
-    console.error("Error checking HealthKit authorization:", error);
+    logger.error("Error checking HealthKit authorization", error);
     return false;
   }
 }

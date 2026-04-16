@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/lib/logger";
 import { getProfile } from "@/lib/database";
 
 export function useOnboarding() {
@@ -40,7 +41,7 @@ export function useOnboarding() {
           setNeedsOnboarding(false);
         }
       } catch (error) {
-        console.error("Error checking onboarding status:", error);
+        logger.error("Error checking onboarding status", error);
         // Do not force onboarding again for existing users if the profile check temporarily fails.
         setNeedsOnboarding(false);
       } finally {

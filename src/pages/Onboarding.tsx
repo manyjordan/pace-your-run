@@ -17,6 +17,7 @@ import {
   validateRaceTargetTime,
 } from "@/lib/goalHelpers";
 import { selectPlan } from "@/lib/planSelector";
+import { logger } from "@/lib/logger";
 import { mapSessionsToDays } from "@/lib/plans";
 
 type OnboardingData = {
@@ -178,7 +179,7 @@ const Onboarding = () => {
       setIsLoading(false);
       navigate(redirectToImport ? "/import" : "/", { replace: true });
     } catch (error) {
-      console.error("Onboarding error:", error);
+      logger.error("Onboarding error", error);
       setIsLoading(false);
     }
   };

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import * as Sentry from "@sentry/react";
 import { User, Session } from "@supabase/supabase-js";
+import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 
 interface AuthContextType {
@@ -27,7 +28,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setSession(session);
         setUser(session?.user ?? null);
       } catch (error) {
-        console.error("Error checking session:", error);
+        logger.error("Error checking session", error);
       } finally {
         setLoading(false);
       }
@@ -59,7 +60,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(null);
       setSession(null);
     } catch (error) {
-      console.error("Error signing out:", error);
+      logger.error("Error signing out", error);
       throw error;
     }
   }, []);

@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { logger } from "@/lib/logger";
 import { getRunWithGps, type RunRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
@@ -235,7 +236,7 @@ export function ActivityDetail({
         if (!isCancelled) setFullRun(run);
       })
       .catch((err) => {
-        console.error("getRunWithGps failed:", err, "run.id:", act.id, "userId:", resolvedUserId);
+        logger.error("getRunWithGps failed", err, { runId: act.id, userId: resolvedUserId });
         if (!isCancelled) setFullRun(null);
       })
       .finally(() => {

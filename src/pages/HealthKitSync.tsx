@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { isHealthKitAvailable, requestHealthKitPermissions, fetchRecentRuns, isHealthKitAuthorized } from "@/lib/healthkit";
 import { saveRun } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
+import { logger } from "@/lib/logger";
 import { ScrollReveal } from "@/components/ScrollReveal";
 
 const HealthKitSync = () => {
@@ -62,7 +63,7 @@ const HealthKitSync = () => {
         });
       }
     } catch (error) {
-      console.error("Error requesting permissions:", error);
+      logger.error("Error requesting permissions", error);
       toast({
         title: "Erreur",
         description: "Impossible de demander les autorisations",
@@ -101,7 +102,7 @@ const HealthKitSync = () => {
           setSyncProgress(Math.round((i + 1) / totalRuns * 100));
         } catch (error) {
           // Skip duplicates and errors
-          console.error(`Error saving run ${i}:`, error);
+          logger.error("Error saving run from HealthKit", error, { index: i });
         }
       }
 
@@ -118,7 +119,7 @@ const HealthKitSync = () => {
         description: `${importedCount} nouvelle${importedCount > 1 ? "s" : ""} course${importedCount > 1 ? "s" : ""} importée${importedCount > 1 ? "s" : ""} depuis Apple Santé`,
       });
     } catch (error) {
-      console.error("Error syncing HealthKit data:", error);
+      logger.error("Error syncing HealthKit data", error);
       toast({
         title: "Erreur d'import",
         description: "Impossible d'importer vos courses depuis Apple Santé sur cet appareil",

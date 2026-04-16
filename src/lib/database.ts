@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 
 type Json =
@@ -336,7 +337,7 @@ export async function detectSimultaneousRuns(
   });
 
   if (error) {
-    console.error("detectSimultaneousRuns error:", error);
+    logger.error("detectSimultaneousRuns error", error);
     return [];
   }
 
@@ -540,7 +541,7 @@ export async function followUser(followerId: string, followingId: string) {
       post_id: null,
       post_title: null,
     });
-    if (notifError) console.error("follow notification:", notifError);
+    if (notifError) logger.error("follow notification", notifError);
   }
 }
 
@@ -889,7 +890,7 @@ export async function toggleLike(postId: string, userId: string) {
         post_id: postId,
         post_title: postRow.title,
       });
-      if (notifError) console.error("like notification:", notifError);
+      if (notifError) logger.error("like notification", notifError);
     }
   }
 

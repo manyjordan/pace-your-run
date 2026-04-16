@@ -19,6 +19,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useNavigate } from "react-router-dom";
+import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import {
   AlertDialog,
@@ -100,7 +101,7 @@ const SettingsPage = () => {
       await signOut();
       navigate("/auth");
     } catch (error) {
-      console.error("Error signing out:", error);
+      logger.error("Error signing out", error);
       toast({
         title: "Erreur",
         description: "Impossible de vous déconnecter pour le moment.",
