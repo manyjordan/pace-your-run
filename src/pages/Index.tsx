@@ -211,14 +211,15 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {selectedRunForDetail && (
+      {selectedRunForDetail && session?.user?.id ? (
         <ActivityDetail
           activity={selectedRunForDetail}
+          userId={session.user.id}
           onClose={handleCloseActivityDetail}
           allActivities={runningRuns}
           fallbackTrace={selectedDetailTrace}
         />
-      )}
+      ) : null}
 
       <ScrollReveal>
         {isLoading ? (

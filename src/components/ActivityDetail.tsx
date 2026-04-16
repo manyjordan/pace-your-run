@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getRunWithGps, type RunRow } from "@/lib/database";
@@ -49,6 +49,8 @@ function normalizeActivityDetailInput(input: RunRow): NormalizedActivity {
 
 type ActivityDetailProps = {
   activity: RunRow;
+  /** If set, used for lazy GPS fetch (authenticated user id). */
+  userId?: string;
   onClose: () => void;
   allActivities?: RunRow[];
   fallbackTrace?: GPSTracePoint[];
@@ -196,11 +198,16 @@ function buildTraceFromActivityPolyline(activity: NormalizedActivity): GPSTraceP
 
 export function ActivityDetail({
   activity,
+  userId: userIdProp,
   onClose,
   allActivities = [],
   fallbackTrace,
 }: ActivityDetailProps) {
   const { session } = useAuth();
+  const resolvedUserId = userIdProp ?? session?.user?.id;
+  const activityRef = useRef(activity);
+  activityRef.current = activity;
+
   const [fullRun, setFullRun] = useState<RunRow | null>(null);
   const [isLoadingGpsTrace, setIsLoadingGpsTrace] = useState(false);
   const [gpsLoadAttempted, setGpsLoadAttempted] = useState(false);
@@ -211,9 +218,10 @@ export function ActivityDetail({
   }, [activity.id]);
 
   useEffect(() => {
-    if (!activity?.id || !session?.user?.id || gpsLoadAttempted) return;
-    if (Array.isArray(activity.gps_trace) && activity.gps_trace.length > 0) {
-      setFullRun(activity);
+    const act = activityRef.current;
+    if (!act?.id || !resolvedUserId || gpsLoadAttempted) return;
+    if (Array.isArray(act.gps_trace) && act.gps_trace.length > 0) {
+      setFullRun(act);
       setGpsLoadAttempted(true);
       return;
     }
@@ -222,11 +230,12 @@ export function ActivityDetail({
     setIsLoadingGpsTrace(true);
     setGpsLoadAttempted(true);
 
-    void getRunWithGps(session.user.id, activity.id)
+    void getRunWithGps(resolvedUserId, act.id)
       .then((run) => {
         if (!isCancelled) setFullRun(run);
       })
-      .catch(() => {
+      .catch((err) => {
+        console.error("getRunWithGps failed:", err, "run.id:", act.id, "userId:", resolvedUserId);
         if (!isCancelled) setFullRun(null);
       })
       .finally(() => {
@@ -236,7 +245,7 @@ export function ActivityDetail({
     return () => {
       isCancelled = true;
     };
-  }, [activity, gpsLoadAttempted, session?.user?.id]);
+  }, [activity.id, gpsLoadAttempted, resolvedUserId]);
 
   const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
   const normalizedAllActivities = useMemo(

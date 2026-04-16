@@ -373,7 +373,7 @@ export async function getRunWithGps(userId: string, runId: string) {
 
   const { data, error } = await supabase
     .from("runs")
-    .select("*")
+    .select("*, gps_trace")
     .eq("user_id", userId)
     .eq("id", runId)
     .single();
