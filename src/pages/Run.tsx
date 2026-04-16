@@ -1,51 +1,27 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { ActivityDetail } from "@/components/ActivityDetail";
-import { ActivityPostCard } from "@/components/ActivityPostCard";
+import { RunCourseSettingsDialog } from "@/components/run/RunCourseSettingsDialog";
+import { RunLiveMapBlock } from "@/components/run/RunLiveMapBlock";
+import { RunMainTimerCard } from "@/components/run/RunMainTimerCard";
+import { RunPerformanceRecapCard } from "@/components/run/RunPerformanceRecapCard";
+import { RunProgrammedSessionCard } from "@/components/run/RunProgrammedSessionCard";
+import { RunSplitsCard } from "@/components/run/RunSplitsCard";
+import { RunTreadmillSpeedPanel } from "@/components/run/RunTreadmillSpeedPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import {
-  Play, Pause, Square, MapPin, Map, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2, Gauge, Trash2,
-  Settings,
-} from "lucide-react";
-import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { MapPin, Map, AlertCircle, Gauge, Settings } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useGpsTracking } from "@/hooks/useGpsTracking";
-import { useRunTimer } from "@/hooks/useRunTimer";
+import { useBluetoothHR, type RunBluetoothStatus } from "@/hooks/useBluetoothHR";
 import { useRunSave } from "@/hooks/useRunSave";
+import { useRunSession, type RunSummary } from "@/hooks/useRunSession";
 import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
 import { INTERVAL_TEMPLATES, useSessionProgram } from "@/hooks/useSessionProgram";
+import { useTreadmill } from "@/hooks/useTreadmill";
 import { cn } from "@/lib/utils";
-import { updatePostAudience, type RouteRow, type RunGpsPoint, type RunRow } from "@/lib/database";
-import {
-  connectHeartRateMonitor,
-  disconnectHeartRateMonitor,
-  isBluetoothAvailable,
-  type BluetoothConnection,
-} from "@/lib/bluetooth";
-import {
-  formatDuration as formatSocialDuration,
-  formatPaceFromSeconds,
-  formatPace as formatSocialPace,
-  formatRelativeTime,
-  getInitials,
-  type CommunityPost,
-} from "@/lib/runFormatters";
-import { computeMovingTime, haversineDistanceKm } from "@/lib/parsers/gpxParser";
+import { updatePostAudience, type RouteRow, type RunRow } from "@/lib/database";
+import type { CommunityPost } from "@/lib/runFormatters";
 import {
   convertDistanceFromKm,
   convertPaceFromMinutesPerKm,
@@ -58,85 +34,16 @@ import {
 } from "@/lib/runPreferences";
 import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib/activeSession";
 
-const GPSMap = lazy(() => import("@/components/GPSMap"));
-const RouteMap = lazy(() => import("@/components/RouteMap"));
-
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
-function findClosestPointIndex(
-  trace: Array<{ lat: number; lng: number }>,
-  current: { lat: number; lng: number }
-): number {
-  let minDist = Infinity;
-  let closest = 0;
-  for (let i = 0; i < trace.length; i++) {
-    const d = Math.sqrt(
-      Math.pow(trace[i].lat - current.lat, 2) +
-      Math.pow(trace[i].lng - current.lng, 2)
-    );
-    if (d < minDist) {
-      minDist = d;
-      closest = i;
-    }
-  }
-  return closest;
-}
-
-type GPSPoint = RunGpsPoint;
-
-function generateDefaultTitle(): string {
-  const now = new Date();
-  const hour = now.getHours();
-
-  const timeOfDay =
-    hour >= 5 && hour < 9
-      ? "matinale"
-      : hour >= 9 && hour < 12
-        ? "du matin"
-        : hour >= 12 && hour < 14
-          ? "de midi"
-          : hour >= 14 && hour < 18
-            ? "de l'après-midi"
-            : hour >= 18 && hour < 21
-              ? "du soir"
-              : "nocturne";
-
-  const days = ["Dimanche", "Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi"];
-  const day = days[now.getDay()];
-
-  return `Course ${timeOfDay} — ${day}`;
-}
-
-/* ── Run component ── */
 export default function Run() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [postAudience, setPostAudience] = useState<"private" | "friends" | "public">("public");
-  const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
-  const [distance, setDistance] = useState(0);
-  const [isTreadmill, setIsTreadmill] = useState(false);
-  const [treadmillSpeedKmh, setTreadmillSpeedKmh] = useState(10);
-  const [showTreadmillCorrection, setShowTreadmillCorrection] = useState(false);
-  const [correctedDistanceKm, setCorrectedDistanceKm] = useState("");
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
   const [activeRoute, setActiveRoute] = useState<RouteRow | null>(null);
-  const [routeProgress, setRouteProgress] = useState(0);
   const [title, setTitle] = useState("");
-  const [runSummary, setRunSummary] = useState<{
-    distance: number;
-    duration: number;
-    movingTime?: number;
-    avgPace: number;
-    elevation: number;
-    averageHeartRate?: number;
-    gpsTrace: GPSPoint[];
-    startedAt: string;
-  } | null>(null);
-  const [bluetoothDevice, setBluetoothDevice] = useState<string | null>(null);
-  const [isConnectingBluetooth, setIsConnectingBluetooth] = useState(false);
-  const [bluetoothError, setBluetoothError] = useState("");
-  const [heartRate, setHeartRate] = useState<number | null>(null);
-  const [bluetoothAvailable] = useState(() => isBluetoothAvailable());
+  const [runSummary, setRunSummary] = useState<RunSummary | null>(null);
   const [runPreferences, setRunPreferences] = useState<RunPreferences>(() => getDefaultRunPreferences());
   const [completedActivity, setCompletedActivity] = useState<RunRow | null>(null);
   const [completedPost, setCompletedPost] = useState<CommunityPost | null>(null);
@@ -145,37 +52,66 @@ export default function Run() {
   const [isUpdatingAudience, setIsUpdatingAudience] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
-  const runStartedAtRef = useRef<string | null>(null);
-  const bluetoothConnectionRef = useRef<BluetoothConnection | null>(null);
-  const heartRateSamplesRef = useRef<number[]>([]);
-  const statusRef = useRef<"idle" | "running" | "paused">("idle");
-  /** Preferences snapshot for speech for this run (set in start()). */
   const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
   const routeArrivalAnnouncedRef = useRef(false);
   const currentIntervalRepRef = useRef<number>(0);
+  const resetProgramProgressRef = useRef<() => void>(() => {});
+  const resetAnnouncementRefsRef = useRef<() => void>(() => {});
+  const resetKilometreAnnouncementRefRef = useRef<() => void>(() => {});
+  const statusRef = useRef<RunBluetoothStatus>("idle");
 
-  const bumpDistance = useCallback((deltaKm: number) => {
-    setDistance((d) => d + deltaKm);
-  }, []);
+  const bluetooth = useBluetoothHR({ statusRef });
+  const treadmill = useTreadmill();
+  const { persistCompletedRun, isSaving, saveError, setSaveError } = useRunSave();
 
-  const {
-    gpsTrace,
-    setGpsTrace,
-    gpsAccuracy,
-    setGpsAccuracy,
-    gpsError,
-    setGpsError,
-    lastGpsPointRef,
-    startGpsTracking,
-    stopGpsTracking,
-    getAccuracyColor,
-  } = useGpsTracking({
-    onPermissionDenied: () => setStatus("idle"),
-    onDistanceDelta: bumpDistance,
+  const session = useRunSession({
+    statusRef,
+    user,
+    userPreferencesUserId: user?.id,
+    activeSession,
+    activeRoute,
+    treadmill,
+    bluetooth,
+    title,
+    setTitle,
+    runSummary,
+    showTreadmillCorrection: treadmill.showTreadmillCorrection,
+    completedActivity,
+    completedPost,
+    setRunSummary,
+    setCompletedActivity,
+    setCompletedPost,
+    setCompletedPostId,
+    setShowCompletedActivityDetail,
+    setSaveError,
+    routeArrivalAnnouncedRef,
+    speechPrefsRef,
+    currentIntervalRepRef,
+    resetProgramProgressRef,
+    resetAnnouncementRefsRef,
+    resetKilometreAnnouncementRefRef,
   });
 
-  const { elapsed, setElapsed, startInterval, stopInterval, formatTime } = useRunTimer();
+  const {
+    status,
+    distance,
+    setDistance,
+    elapsed,
+    pace,
+    gpsTrace,
+    gpsAccuracy,
+    gpsError,
+    getAccuracyColor,
+    formatTime,
+    routeProgress,
+    setRouteProgress,
+    start,
+    pause,
+    resume,
+    stop,
+  } = session;
+
   const {
     runMode,
     setRunMode,
@@ -200,9 +136,7 @@ export default function Run() {
     segmentTransitionAnnouncedRef,
   } = useSessionProgram({ elapsed, status });
 
-  const { persistCompletedRun, isSaving, saveError, setSaveError } = useRunSave();
-
-  const pace = distance > 0 ? elapsed / 60 / distance : 0;
+  resetProgramProgressRef.current = resetProgramProgress;
 
   const { resetAnnouncementRefs, resetKilometreAnnouncementRef } = useSpeechAnnouncements({
     speechPrefsRef,
@@ -222,6 +156,10 @@ export default function Run() {
     thirtySecondAnnouncedRef,
     segmentTransitionAnnouncedRef,
   });
+
+  resetAnnouncementRefsRef.current = resetAnnouncementRefs;
+  resetKilometreAnnouncementRefRef.current = resetKilometreAnnouncementRef;
+
   const formatPace = useCallback(
     (p: number) => (p > 0 ? `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, "0")}` : "--:--"),
     [],
@@ -230,375 +168,25 @@ export default function Run() {
   const splitDistanceKm = getSplitDistanceKm(runPreferences.distanceUnit);
   const displayDistance = convertDistanceFromKm(distance, runPreferences.distanceUnit);
   const displayPace = convertPaceFromMinutesPerKm(pace, runPreferences.distanceUnit);
-  const averageHeartRate =
-    heartRateSamplesRef.current.length > 0
-      ? Math.round(
-        heartRateSamplesRef.current.reduce((sum, bpm) => sum + bpm, 0) / heartRateSamplesRef.current.length
-      )
-      : undefined;
-  const truncatedDeviceName =
-    bluetoothDevice && bluetoothDevice.length > 15
-      ? `${bluetoothDevice.slice(0, 15)}…`
-      : bluetoothDevice;
   const isRunActive = status === "running" || status === "paused";
   const hasLiveGpsTrace = gpsTrace.length > 0;
-
-  const resetBluetoothState = useCallback((message = "") => {
-    setBluetoothDevice(null);
-    setHeartRate(null);
-    setIsConnectingBluetooth(false);
-    setBluetoothError(message);
-    bluetoothConnectionRef.current = null;
-  }, []);
-
-  const handleBluetoothDisconnect = useCallback(() => {
-    const disconnectMessage =
-      statusRef.current === "running" || statusRef.current === "paused"
-        ? "Capteur déconnecté. Vérifiez qu'il est toujours allumé et à portée."
-        : "";
-    resetBluetoothState(disconnectMessage);
-  }, [resetBluetoothState]);
-
-  const handleConnectBluetooth = useCallback(async () => {
-    if (!bluetoothAvailable) {
-      setBluetoothError("Bluetooth non disponible sur cet appareil");
-      return;
-    }
-
-    setBluetoothError("");
-    setIsConnectingBluetooth(true);
-
-    try {
-      const connection = await connectHeartRateMonitor();
-      bluetoothConnectionRef.current = connection;
-      setBluetoothDevice(connection.deviceName);
-      setHeartRate(null);
-
-      connection.onHeartRate((bpm) => {
-        setHeartRate(bpm);
-        if (statusRef.current === "running") {
-          heartRateSamplesRef.current = [...heartRateSamplesRef.current, bpm];
-        }
-      });
-
-      connection.onDisconnect(() => {
-        handleBluetoothDisconnect();
-      });
-    } catch (error) {
-      console.error("[Run] operation failed:", error);
-      import("@sentry/react")
-        .then(({ captureException }) => {
-          captureException(error);
-        })
-        .catch(() => {});
-      setBluetoothError("Appareil non trouvé. Vérifiez que votre capteur est allumé.");
-      setBluetoothDevice(null);
-      setHeartRate(null);
-      bluetoothConnectionRef.current = null;
-    } finally {
-      setIsConnectingBluetooth(false);
-    }
-  }, [bluetoothAvailable, handleBluetoothDisconnect]);
-
-  const handleDisconnectBluetooth = useCallback(() => {
-    disconnectHeartRateMonitor();
-    resetBluetoothState("");
-  }, [resetBluetoothState]);
-
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  useEffect(() => {
-    setRunPreferences(loadRunPreferences(user?.id));
-    setPreferencesLoaded(true);
-  }, [user?.id]);
-
-  useEffect(() => {
-    if (!preferencesLoaded) return;
-    saveRunPreferences(runPreferences, user?.id);
-  }, [preferencesLoaded, runPreferences, user?.id]);
-
-  useEffect(() => {
-    postAudienceRef.current = postAudience;
-  }, [postAudience]);
-
-  useEffect(() => {
-    const session = loadActiveSession();
-    if (!session) return;
-    setActiveSession(session);
-    setTitle(session.session.type);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(SELECTED_ROUTE_KEY);
-      if (stored) {
-        const route = JSON.parse(stored) as RouteRow;
-        setActiveRoute(route);
-      }
-    } catch {
-      // ignore invalid localStorage payload
-    }
-  }, []);
-
-  useEffect(() => {
-    if (status === "running") {
-      if (isTreadmill) {
-        startInterval();
-      } else {
-        const startOk = startGpsTracking();
-        if (startOk) {
-          startInterval();
-        }
-      }
-    } else if (status === "paused") {
-      stopGpsTracking();
-      stopInterval();
-    } else if (status === "idle") {
-      stopGpsTracking();
-      stopInterval();
-    }
-
-    return () => {
-      stopInterval();
-      if (status === "idle") stopGpsTracking();
-    };
-  }, [isTreadmill, status, startGpsTracking, stopGpsTracking, startInterval, stopInterval]);
-
-  useEffect(() => {
-    if (!isTreadmill || status !== "running") return;
-
-    const interval = setInterval(() => {
-      setDistance((prev) => Number((prev + treadmillSpeedKmh / 3600).toFixed(4)));
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [isTreadmill, status, treadmillSpeedKmh]);
-
-  useEffect(() => {
-    if (!activeRoute || isTreadmill || gpsTrace.length === 0) return;
-
-    const current = gpsTrace[gpsTrace.length - 1];
-    const closestIndex = findClosestPointIndex(activeRoute.gps_trace, current);
-    let coveredKm = 0;
-    for (let i = 1; i <= closestIndex; i++) {
-      coveredKm += haversineDistanceKm(activeRoute.gps_trace[i - 1], activeRoute.gps_trace[i]);
-    }
-    setRouteProgress(Number(coveredKm.toFixed(2)));
-  }, [activeRoute, gpsTrace, isTreadmill]);
-
-  useEffect(() => {
-    return () => {
-      disconnectHeartRateMonitor();
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        window.speechSynthesis.cancel();
-      }
-    };
-  }, []);
-
-  const start = () => {
-    if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
-      setIsTreadmill(false);
-      setTreadmillSpeedKmh(10);
-      setShowTreadmillCorrection(false);
-      setCorrectedDistanceKm("");
-    }
-    setTitle(activeSession?.session.type ?? "");
-    setRunSummary(null);
-    setCompletedActivity(null);
-    setCompletedPost(null);
-    setCompletedPostId(null);
-    setShowCompletedActivityDetail(false);
-    setSaveError("");
-    setGpsTrace([]);
-    setDistance(0);
-    setElapsed(0);
-    setGpsAccuracy(null);
-    setBluetoothError("");
-    heartRateSamplesRef.current = [];
-    lastGpsPointRef.current = null;
-    runStartedAtRef.current = new Date().toISOString();
-    speechPrefsRef.current = loadRunPreferences(user?.id);
-    resetAnnouncementRefs();
-    resetProgramProgress();
-    currentIntervalRepRef.current = 0;
-    setRouteProgress(0);
-    routeArrivalAnnouncedRef.current = false;
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-    setStatus("running");
-  };
-
-  const pause = () => setStatus("paused");
-  const resume = () => setStatus("running");
-
-  const calculateElevationGain = (trace: GPSPoint[]): number => {
-    if (trace.length < 2) return 0;
-    let gain = 0;
-    for (let i = 1; i < trace.length; i++) {
-      const diff = (trace[i].altitude ?? 0) - (trace[i - 1].altitude ?? 0);
-      if (diff > 0) gain += diff;
-    }
-    return gain;
-  };
-
-  const stop = async () => {
-    const finalDistance = isTreadmill && correctedDistanceKm && parseFloat(correctedDistanceKm) > 0
-      ? parseFloat(correctedDistanceKm)
-      : distance;
-    const finalElapsed = elapsed;
-    const finalGpsTrace = isTreadmill ? [] : gpsTrace;
-    const movingTimeSeconds = isTreadmill ? finalElapsed : computeMovingTime(finalGpsTrace);
-    const finalStartedAt = runStartedAtRef.current ?? new Date().toISOString();
-    const finalElevation = isTreadmill ? 0 : calculateElevationGain(finalGpsTrace);
-    const finalAvgPace = finalDistance > 0 ? finalElapsed / 60 / finalDistance : 0;
-    const finalAverageHeartRate =
-      heartRateSamplesRef.current.length > 0
-        ? Math.round(
-          heartRateSamplesRef.current.reduce((sum, bpm) => sum + bpm, 0) / heartRateSamplesRef.current.length
-        )
-        : undefined;
-
-    if (isTreadmill && !showTreadmillCorrection) {
-      disconnectHeartRateMonitor();
-      stopGpsTracking();
-      stopInterval();
-      if (status !== "idle" && finalElapsed > 0 && finalDistance > 0) {
-        setRunSummary({
-          distance: finalDistance,
-          duration: finalElapsed,
-          movingTime: finalElapsed,
-          avgPace: finalAvgPace,
-          elevation: 0,
-          averageHeartRate: finalAverageHeartRate,
-          gpsTrace: [],
-          startedAt: finalStartedAt,
-        });
-      }
-      setStatus("idle");
-      setShowTreadmillCorrection(true);
-      setCorrectedDistanceKm("");
-      return;
-    }
-
-    if (status !== "idle" && finalElapsed > 0 && finalDistance > 0) {
-      setRunSummary({
-        distance: finalDistance,
-        duration: finalElapsed,
-        movingTime: isTreadmill ? finalElapsed : movingTimeSeconds > 0 ? movingTimeSeconds : undefined,
-        avgPace: finalAvgPace,
-        elevation: finalElevation,
-        averageHeartRate: finalAverageHeartRate,
-        gpsTrace: finalGpsTrace,
-        startedAt: finalStartedAt,
-      });
-
-      // Set default title when run ends, only if user hasn't typed one
-      const resolvedTitle = title.trim() || generateDefaultTitle();
-      if (!title.trim()) {
-        setTitle(resolvedTitle);
-      }
-
-      const activityName = resolvedTitle;
-      const activityDescription = `Je viens de terminer ${finalDistance.toFixed(2)} km en ${formatTime(finalElapsed)}.`;
-      const postNumericId = Date.now();
-      const syntheticRun: RunRow = {
-        id: String(postNumericId),
-        user_id: user?.id ?? null,
-        distance_km: finalDistance,
-        duration_seconds: finalElapsed,
-        moving_time_seconds: movingTimeSeconds > 0 ? movingTimeSeconds : null,
-        elevation_gain: finalElevation,
-        average_pace: finalAvgPace,
-        average_heartrate: finalAverageHeartRate ?? null,
-        gps_trace: finalGpsTrace,
-        run_type: isTreadmill ? "treadmill" : "run",
-        started_at: finalStartedAt,
-        title: activityName,
-        created_at: new Date().toISOString(),
-      };
-      const identity = user?.email ?? "Vous";
-      const syntheticPost: CommunityPost = {
-        id: postNumericId,
-        user: identity,
-        initials: getInitials(identity),
-        time: formatRelativeTime(finalStartedAt),
-        type: "run",
-        title: activityName,
-        description: activityDescription,
-        stats: {
-          distance: `${finalDistance.toFixed(2)} km`,
-          pace: formatSocialPace(finalDistance * 1000, finalElapsed),
-          duration: formatSocialDuration(finalElapsed),
-          elevation: `+${Math.round(finalElevation)} m`,
-        },
-        likes: 0,
-        comments: 0,
-        liked: false,
-        gpsTrace: finalGpsTrace,
-      };
-
-      setCompletedActivity(syntheticRun);
-      setCompletedPost(syntheticPost);
-      setShowCompletedActivityDetail(true);
-
-      if (user) {
-        setCompletedPostId(null);
-        setSaveError("");
-      } else {
-        setSaveError("Impossible d'enregistrer cette course sans session active.");
-      }
-    }
-
-    disconnectHeartRateMonitor();
-    stopGpsTracking();
-    setStatus("idle");
-    setElapsed(0);
-    setDistance(0);
-    setGpsTrace([]);
-    lastGpsPointRef.current = null;
-    runStartedAtRef.current = null;
-    heartRateSamplesRef.current = [];
-    setBluetoothDevice(null);
-    setHeartRate(null);
-    setGpsError("");
-    setBluetoothError("");
-    resetKilometreAnnouncementRef();
-    setRouteProgress(0);
-    routeArrivalAnnouncedRef.current = false;
-    setShowTreadmillCorrection(false);
-    setCorrectedDistanceKm("");
-    resetProgramProgress();
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
-    }
-  };
 
   const handlePersistCompletedRun = useCallback(() => {
     if (!runSummary) return;
     void persistCompletedRun({
       runSummary,
       title,
-      isTreadmill,
+      isTreadmill: treadmill.isTreadmill,
       postAudienceRef,
       selectRouteKey: SELECTED_ROUTE_KEY,
       formatTime,
       setCompletedPostId,
       setActiveRoute,
-      setRouteProgress,
+      setRouteProgress: () => {},
       setActiveSession,
       setCompletedPost,
     });
-  }, [
-    runSummary,
-    title,
-    isTreadmill,
-    persistCompletedRun,
-    formatTime,
-    setCompletedPost,
-  ]);
+  }, [runSummary, title, treadmill.isTreadmill, persistCompletedRun, formatTime, setCompletedPost, setRouteProgress]);
 
   const handleAudienceChange = useCallback(
     async (value: "private" | "friends" | "public") => {
@@ -624,6 +212,47 @@ export default function Run() {
     },
     [completedPostId, user, setSaveError],
   );
+
+  useEffect(() => {
+    setRunPreferences(loadRunPreferences(user?.id));
+    setPreferencesLoaded(true);
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) return;
+    saveRunPreferences(runPreferences, user?.id);
+  }, [preferencesLoaded, runPreferences, user?.id]);
+
+  useEffect(() => {
+    postAudienceRef.current = postAudience;
+  }, [postAudience]);
+
+  useEffect(() => {
+    const s = loadActiveSession();
+    if (!s) return;
+    setActiveSession(s);
+    setTitle(s.session.type);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SELECTED_ROUTE_KEY);
+      if (stored) {
+        const route = JSON.parse(stored) as RouteRow;
+        setActiveRoute(route);
+      }
+    } catch {
+      // ignore invalid localStorage payload
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== "undefined" && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -663,88 +292,7 @@ export default function Run() {
 
       <div className="space-y-6">
         {status === "idle" && (
-          <ScrollReveal>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="w-full justify-between border-accent/30 bg-card/95 px-4 py-6">
-                  <span className="flex items-center gap-2 text-sm font-semibold">
-                    <SlidersHorizontal className="h-4 w-4" />
-                    Réglages de la course
-                  </span>
-                  <span className="text-xs text-muted-foreground">Ouvrir</span>
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Réglages de la course</DialogTitle>
-                  <DialogDescription>
-                    Choisissez vos unités et les annonces vocales avant de démarrer.
-                  </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Unité de distance</Label>
-                    <Select
-                      value={runPreferences.distanceUnit}
-                      onValueChange={(value) =>
-                        setRunPreferences((current) => ({ ...current, distanceUnit: value as "km" | "mi" }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choisir une unité" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="km">Kilomètres</SelectItem>
-                        <SelectItem value="mi">Miles</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">Annonce vocale de vitesse</p>
-                      <p className="text-xs text-muted-foreground">
-                        Si activée, vous entendrez{" "}
-                        {runPreferences.distanceUnit === "mi"
-                          ? "\"mile X, vitesse X mph\" à chaque mile."
-                          : "\"km X, vitesse X km/h\" à chaque kilomètre."}
-                      </p>
-                    </div>
-                    <Switch
-                      checked={runPreferences.announceSplitSpeed}
-                      onCheckedChange={(checked) =>
-                        setRunPreferences((current) => ({ ...current, announceSplitSpeed: checked }))
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Annonce du temps cumulé</Label>
-                    <Select
-                      value={runPreferences.cumulativeTimeAnnouncement}
-                      onValueChange={(value) =>
-                        setRunPreferences((current) => ({
-                          ...current,
-                          cumulativeTimeAnnouncement: value as RunPreferences["cumulativeTimeAnnouncement"],
-                        }))
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choisir une fréquence" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="off">Aucune annonce</SelectItem>
-                        <SelectItem value="1">Chaque {runPreferences.distanceUnit === "mi" ? "mile" : "km"}</SelectItem>
-                        <SelectItem value="5">Tous les 5 {runPreferences.distanceUnit === "mi" ? "miles" : "km"}</SelectItem>
-                        <SelectItem value="10">Tous les 10 {runPreferences.distanceUnit === "mi" ? "miles" : "km"}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </ScrollReveal>
+          <RunCourseSettingsDialog runPreferences={runPreferences} setRunPreferences={setRunPreferences} />
         )}
 
         {status === "idle" && (
@@ -782,140 +330,41 @@ export default function Run() {
         )}
 
         {status === "idle" && isProgrammedMode && (
-          <Card className="border-accent/30 bg-card/95">
-            <CardContent className="space-y-4 p-4">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setProgramSource("custom")}
-                  className={cn(
-                    "rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all",
-                    programSource === "custom"
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border text-muted-foreground hover:border-accent/50",
-                  )}
-                >
-                  Session personnalisée
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setProgramSource("template")}
-                  className={cn(
-                    "rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all",
-                    programSource === "template"
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border text-muted-foreground hover:border-accent/50",
-                  )}
-                >
-                  Session type fractionné
-                </button>
-              </div>
-
-              {programSource === "template" ? (
-                <div className="space-y-2">
-                  <Label>Template</Label>
-                  <Select value={selectedTemplateId} onValueChange={loadTemplate}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choisir une session type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {INTERVAL_TEMPLATES.map((template) => (
-                        <SelectItem key={template.id} value={template.id}>
-                          {template.name} — {template.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              ) : null}
-
-              <div className="space-y-3">
-                {segments.map((segment, index) => (
-                  <div key={segment.id} className="space-y-2 rounded-lg border border-border p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs font-semibold text-muted-foreground">Segment {index + 1}</p>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7"
-                        onClick={() => removeSegment(segment.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-xs">Durée (min)</Label>
-                        <Input
-                          type="number"
-                          min="0.1"
-                          step="0.1"
-                          value={segment.duration_minutes}
-                          onChange={(event) =>
-                            updateSegment(segment.id, {
-                              duration_minutes: Math.max(0.1, Number(event.target.value) || 0.1),
-                            })
-                          }
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-xs">Allure cible</Label>
-                        <Input
-                          value={segment.target_pace}
-                          onChange={(event) => updateSegment(segment.id, { target_pace: event.target.value })}
-                          placeholder="4:30"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Label (optionnel)</Label>
-                      <Input
-                        value={segment.label ?? ""}
-                        onChange={(event) => updateSegment(segment.id, { label: event.target.value })}
-                        placeholder="Échauffement"
-                      />
-                    </div>
-                  </div>
-                ))}
-                <Button type="button" variant="outline" className="w-full" onClick={addSegment}>
-                  + Ajouter un segment
-                </Button>
-                {segments.length > 0 ? (
-                  <p className="text-xs text-muted-foreground">
-                    {segments.map((segment) => `${segment.duration_minutes} min à ${segment.target_pace}`).join(" → ")}
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Ajoutez au moins un segment pour démarrer la session programmée.
-                  </p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <RunProgrammedSessionCard
+            programSource={programSource}
+            setProgramSource={setProgramSource}
+            selectedTemplateId={selectedTemplateId}
+            loadTemplate={loadTemplate}
+            segments={segments}
+            addSegment={addSegment}
+            removeSegment={removeSegment}
+            updateSegment={updateSegment}
+          />
         )}
 
         {status === "idle" && (
           <div className="flex w-full gap-2">
             <button
-              onClick={() => setIsTreadmill(false)}
+              type="button"
+              onClick={() => treadmill.setIsTreadmill(false)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-semibold transition-all",
-                !isTreadmill
+                !treadmill.isTreadmill
                   ? "border-accent bg-accent/10 text-accent"
-                  : "border-border text-muted-foreground hover:border-accent/50"
+                  : "border-border text-muted-foreground hover:border-accent/50",
               )}
             >
               <MapPin className="h-4 w-4" />
               Course extérieure
             </button>
             <button
-              onClick={() => setIsTreadmill(true)}
+              type="button"
+              onClick={() => treadmill.setIsTreadmill(true)}
               className={cn(
                 "flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-semibold transition-all",
-                isTreadmill
+                treadmill.isTreadmill
                   ? "border-accent bg-accent/10 text-accent"
-                  : "border-border text-muted-foreground hover:border-accent/50"
+                  : "border-border text-muted-foreground hover:border-accent/50",
               )}
             >
               <Gauge className="h-4 w-4" />
@@ -934,6 +383,7 @@ export default function Run() {
                 <p className="text-sm font-semibold">{activeSession.session.type}</p>
               </div>
               <button
+                type="button"
                 onClick={() => {
                   clearActiveSession();
                   setActiveSession(null);
@@ -971,6 +421,7 @@ export default function Run() {
               </p>
             </div>
             <button
+              type="button"
               onClick={() => {
                 setActiveRoute(null);
                 localStorage.removeItem(SELECTED_ROUTE_KEY);
@@ -993,12 +444,7 @@ export default function Run() {
               <Settings className="h-4 w-4 shrink-0" />
               Réglages
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 gap-2"
-              onClick={() => navigate("/routes")}
-            >
+            <Button type="button" variant="outline" className="flex-1 gap-2" onClick={() => navigate("/routes")}>
               <Map className="h-4 w-4 shrink-0" />
               Mes parcours
             </Button>
@@ -1049,397 +495,82 @@ export default function Run() {
           </Card>
         ) : null}
 
-        {!isTreadmill && isRunActive && (
-          <ScrollReveal>
-            {hasLiveGpsTrace ? (
-              <Card className="border-accent/30">
-                <CardContent className="space-y-3 p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-semibold">Carte en direct</p>
-                      <p className="text-xs text-muted-foreground">Votre tracé GPS se met à jour en temps réel</p>
-                    </div>
-                    <Badge variant="outline" className="border-accent/40 text-accent">
-                      {status === "running" ? "En direct" : "En pause"}
-                    </Badge>
-                  </div>
-                  <Suspense fallback={<div className="h-[220px] rounded-lg bg-muted animate-pulse" />}>
-                    {activeRoute ? (
-                      <RouteMap
-                        referenceTrace={activeRoute.gps_trace}
-                        liveTrace={gpsTrace}
-                        isLive
-                        height={220}
-                        progressKm={routeProgress}
-                        totalKm={activeRoute.distance_km}
-                      />
-                    ) : (
-                      <GPSMap trace={gpsTrace} isLive height={220} />
-                    )}
-                  </Suspense>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-accent/30">
-                <CardContent className="flex h-[220px] flex-col items-center justify-center gap-4 p-4">
-                  <div className="relative flex h-14 w-14 items-center justify-center">
-                    <span className="absolute h-14 w-14 animate-ping rounded-full bg-accent/20" />
-                    <span className="relative h-5 w-5 rounded-full bg-accent" />
-                  </div>
-                  <div className="space-y-1 text-center">
-                    <p className="text-sm font-semibold">Acquisition du signal GPS...</p>
-                    <p className="text-xs text-muted-foreground">
-                      Attendez les premiers points GPS pour afficher la carte en direct.
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </ScrollReveal>
+        {!treadmill.isTreadmill && isRunActive && (
+          <RunLiveMapBlock
+            activeRoute={activeRoute}
+            gpsTrace={gpsTrace}
+            routeProgress={routeProgress}
+            status={status}
+            hasLiveGpsTrace={hasLiveGpsTrace}
+          />
         )}
 
-        {isTreadmill && status === "running" && (
-          <Card className="border-accent/30">
-            <CardContent className="p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">Vitesse tapis</p>
-                <p className="text-xs text-muted-foreground">
-                  {(60 / treadmillSpeedKmh).toFixed(1).replace(".", ":")} /km
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setTreadmillSpeedKmh((s) => Math.max(3, Number((s - 0.5).toFixed(1))))}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border text-lg font-bold hover:border-accent hover:text-accent transition-colors"
-                >
-                  -
-                </button>
-                <div className="flex-1 text-center">
-                  <span className="text-4xl font-black tabular-nums">{treadmillSpeedKmh.toFixed(1)}</span>
-                  <span className="ml-1 text-sm text-muted-foreground">km/h</span>
-                </div>
-                <button
-                  onClick={() => setTreadmillSpeedKmh((s) => Math.min(30, Number((s + 0.5).toFixed(1))))}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-border text-lg font-bold hover:border-accent hover:text-accent transition-colors"
-                >
-                  +
-                </button>
-              </div>
-              <p className="text-xs text-center text-muted-foreground">
-                Distance calculée automatiquement depuis la vitesse
-              </p>
-            </CardContent>
-          </Card>
-        )}
+        {treadmill.isTreadmill && status === "running" && <RunTreadmillSpeedPanel treadmill={treadmill} />}
 
-        <ScrollReveal>
-          <Card className="border-accent/30">
-            <CardContent className="p-6 flex flex-col items-center space-y-6">
-              <div className="text-6xl font-black tracking-tighter tabular-nums text-foreground" style={{ lineHeight: 1.1 }}>
-                {formatTime(elapsed)}
-              </div>
-              <div className="grid grid-cols-3 gap-4 w-full">
-                <div className="text-center space-y-1">
-                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="h-3 w-3" />
-                    Distance
-                    {isRunActive && !isTreadmill && (
-                      <TooltipProvider delayDuration={150}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              type="button"
-                              className="inline-flex items-center"
-                              aria-label={
-                                gpsAccuracy !== null
-                                  ? `Précision GPS : ${Math.round(gpsAccuracy)} m`
-                                  : "Précision GPS indisponible"
-                              }
-                            >
-                              <span className={`h-2 w-2 rounded-full ${getAccuracyColor(gpsAccuracy)}`} />
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Précision GPS : {gpsAccuracy !== null ? `${Math.round(gpsAccuracy)}m` : "--"}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    {isRunActive && isTreadmill && (
-                      <Badge variant="outline" className="border-muted-foreground/30 text-[10px] text-muted-foreground">
-                        Mode tapis
-                      </Badge>
-                    )}
-                  </div>
-                  {isRunActive && runPreferences.announceSplitSpeed && (
-                    <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                      <Volume2 className="h-3 w-3 shrink-0" aria-hidden />
-                      <span>Annonces vocales actives</span>
-                    </div>
-                  )}
-                  <div className="text-xl font-bold tabular-nums">{displayDistance.toFixed(2)}</div>
-                  <div className="text-[10px] text-muted-foreground">{distanceUnitShortLabel}</div>
-                </div>
-                <div className="text-center space-y-1">
-                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><Zap className="h-3 w-3" /> Allure</div>
-                  <div className="text-xl font-bold tabular-nums">{formatPace(displayPace)}</div>
-                  <div className="text-[10px] text-muted-foreground">/{distanceUnitShortLabel}</div>
-                </div>
-                <div className="text-center space-y-1">
-                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground"><Heart className="h-3 w-3" /> Fréquence</div>
-                  {bluetoothDevice ? (
-                    <>
-                      <div className="text-xl font-bold tabular-nums">{heartRate ?? "--"}</div>
-                      <div className="text-[10px] text-muted-foreground">bpm</div>
-                    </>
-                  ) : (
-                    <div className="flex flex-col items-center gap-1">
-                      <div className="text-xs font-medium text-muted-foreground text-center">
-                        Pas d&apos;information disponible
-                      </div>
-                      <Link
-                        to="/plan?tab=equipment&section=gear"
-                        className="text-[10px] text-accent underline underline-offset-2"
-                      >
-                        Équipement requis pour mesurer la fréquence cardiquage
-                      </Link>
-                      <p className="mt-1 text-center text-xs text-muted-foreground">
-                        Compatible ceintures cardiaques Bluetooth et montres Suunto, Garmin, Polar
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                {status === "idle" && (
-                  <Button
-                    size="lg"
-                    onClick={start}
-                    disabled={isProgrammedMode && !isProgramActive}
-                    className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"
-                  >
-                    <Play className="h-7 w-7 ml-0.5" />
-                  </Button>
-                )}
-                {status === "running" && (
-                  <>
-                    <Button size="lg" variant="outline" onClick={() => void stop()} className="h-14 w-14 rounded-full border-destructive text-destructive hover:bg-destructive/10"><Square className="h-5 w-5" /></Button>
-                    <Button size="lg" onClick={pause} className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"><Pause className="h-7 w-7" /></Button>
-                  </>
-                )}
-                {status === "paused" && (
-                  <>
-                    <Button size="lg" variant="outline" onClick={() => void stop()} className="h-14 w-14 rounded-full border-destructive text-destructive hover:bg-destructive/10"><Square className="h-5 w-5" /></Button>
-                    <Button size="lg" onClick={resume} className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"><Play className="h-7 w-7 ml-0.5" /></Button>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
+        <RunMainTimerCard
+          formatTime={formatTime}
+          elapsed={elapsed}
+          displayDistance={displayDistance}
+          distanceUnitShortLabel={distanceUnitShortLabel}
+          displayPace={displayPace}
+          formatPace={formatPace}
+          treadmill={treadmill}
+          bluetooth={{
+            bluetoothDevice: bluetooth.bluetoothDevice,
+            heartRate: bluetooth.heartRate,
+          }}
+          gpsAccuracy={gpsAccuracy}
+          getAccuracyColor={getAccuracyColor}
+          isRunActive={isRunActive}
+          runPreferences={runPreferences}
+          status={status}
+          start={start}
+          pause={pause}
+          resume={resume}
+          stop={stop}
+          isProgrammedMode={isProgrammedMode}
+          isProgramActive={isProgramActive}
+        />
 
         {runSummary && status === "idle" && (
-          <ScrollReveal>
-            <Card className="border-accent/50 bg-accent/10">
-              <CardContent className="p-5 space-y-3">
-                {isTreadmill && showTreadmillCorrection && (
-                  <div className="space-y-4 rounded-lg border border-border/60 bg-background/60 p-3">
-                    <div className="text-center space-y-1">
-                      <p className="text-sm font-semibold">Distance calculée</p>
-                      <p className="text-3xl font-black tabular-nums">{distance.toFixed(2)} km</p>
-                      <p className="text-xs text-muted-foreground">
-                        Basée sur {treadmillSpeedKmh} km/h pendant {Math.floor(elapsed / 60)}min
-                      </p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">
-                        Corriger la distance si nécessaire
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0.1"
-                          max="100"
-                          value={correctedDistanceKm}
-                          onChange={(e) => setCorrectedDistanceKm(e.target.value)}
-                          placeholder={distance.toFixed(2)}
-                          className="w-full rounded-lg border border-border bg-background px-4 py-3 pr-12 text-lg font-bold tabular-nums focus:border-accent focus:outline-none"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">km</span>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Le tapis affiche parfois une distance différente - corrigez si besoin
-                      </p>
-                    </div>
-
-                    <Button
-                      className="w-full bg-accent text-accent-foreground"
-                      onClick={() => {
-                        if (correctedDistanceKm && parseFloat(correctedDistanceKm) > 0) {
-                          setDistance(parseFloat(correctedDistanceKm));
-                        }
-                        setShowTreadmillCorrection(false);
-                        void stop();
-                      }}
-                    >
-                      Confirmer et continuer
-                    </Button>
-                  </div>
-                )}
-
-                {(!isTreadmill || !showTreadmillCorrection) && (
-                  <>
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold">Récapitulatif de performance</h3>
-                      <Button variant="outline" size="sm" onClick={() => setShowCompletedActivityDetail(true)}>
-                        Ouvrir l'analyse
-                      </Button>
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {runSummary.averageHeartRate
-                        ? `FC moyenne : ${runSummary.averageHeartRate} bpm`
-                        : "Connectez une ceinture cardiaque pour mesurer votre FC"}
-                    </p>
-                    {isSaving && <p className="text-xs text-muted-foreground">Enregistrement en cours...</p>}
-                    <div className="space-y-3 rounded-lg border border-border/60 bg-background/60 p-3">
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold tabular-nums">
-                        {formatSocialDuration(runSummary.duration)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Temps total</div>
-                    </div>
-                    {runSummary.movingTime && Math.abs(runSummary.duration - runSummary.movingTime) > 30 ? (
-                      <div className="text-center border-l border-border pl-4">
-                        <div className="text-2xl font-bold tabular-nums text-accent">
-                          {formatSocialDuration(runSummary.movingTime)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Temps de course</div>
-                      </div>
-                    ) : null}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="text-center">
-                      <div className="text-lg font-semibold tabular-nums">
-                        {formatPaceFromSeconds(runSummary.duration, runSummary.distance)}
-                      </div>
-                      <div className="text-xs text-muted-foreground">Allure moyenne</div>
-                    </div>
-                    {runSummary.movingTime && Math.abs(runSummary.duration - runSummary.movingTime) > 30 ? (
-                      <div className="text-center border-l border-border pl-4">
-                        <div className="text-lg font-semibold tabular-nums text-accent">
-                          {formatPaceFromSeconds(runSummary.movingTime, runSummary.distance)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">Allure de course</div>
-                      </div>
-                    ) : null}
-                  </div>
-                    </div>
-                    <div className="space-y-2">
-                  <Label htmlFor="run-title">Nom de la course</Label>
-                  <Input
-                    id="run-title"
-                    value={title}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setTitle(v);
-                      setCompletedActivity((a) => (a ? { ...a, title: v } : null));
-                      setCompletedPost((p) => (p ? { ...p, title: v } : null));
-                    }}
-                    placeholder="Nom de votre course"
-                    className="border-border"
-                  />
-                    </div>
-                    <div className="space-y-2">
-                  <Label>Audience de cette course</Label>
-                  <Select value={postAudience} onValueChange={(value) => void handleAudienceChange(value as "private" | "friends" | "public")}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Choisir l'audience" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="private">Moi uniquement</SelectItem>
-                      <SelectItem value="friends">Mes amis</SelectItem>
-                      <SelectItem value="public">Tout le monde</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {postAudience === "public"
-                      ? "Cette course apparaît dans le fil public."
-                      : postAudience === "friends"
-                        ? "Cette course est masquée du fil public et réservée à l'audience amis."
-                        : "Cette course reste visible uniquement par vous."}
-                  </p>
-                  {isUpdatingAudience ? <p className="text-xs text-muted-foreground">Mise à jour de l'audience...</p> : null}
-                    </div>
-                    {user && !completedPostId ? (
-                      <Button
-                        type="button"
-                        className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
-                        disabled={isSaving}
-                        onClick={() => handlePersistCompletedRun()}
-                      >
-                        {isSaving ? "Enregistrement…" : "Enregistrer la course"}
-                      </Button>
-                    ) : null}
-                    {completedPost ? <ActivityPostCard post={completedPost} onOpen={() => setShowCompletedActivityDetail(true)} /> : null}
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          </ScrollReveal>
+          <RunPerformanceRecapCard
+            runSummary={runSummary}
+            title={title}
+            setTitle={setTitle}
+            distance={distance}
+            elapsed={elapsed}
+            setDistance={setDistance}
+            stop={stop}
+            isTreadmill={treadmill.isTreadmill}
+            showTreadmillCorrection={treadmill.showTreadmillCorrection}
+            treadmillSpeedKmh={treadmill.treadmillSpeedKmh}
+            correctedDistanceKm={treadmill.correctedDistanceKm}
+            setCorrectedDistanceKm={treadmill.setCorrectedDistanceKm}
+            setShowTreadmillCorrection={treadmill.setShowTreadmillCorrection}
+            postAudience={postAudience}
+            handleAudienceChange={handleAudienceChange}
+            isUpdatingAudience={isUpdatingAudience}
+            user={user}
+            completedPostId={completedPostId}
+            isSaving={isSaving}
+            handlePersistCompletedRun={handlePersistCompletedRun}
+            completedPost={completedPost}
+            setCompletedActivity={setCompletedActivity}
+            setCompletedPost={setCompletedPost}
+            setShowCompletedActivityDetail={setShowCompletedActivityDetail}
+          />
         )}
 
-        {elapsed > 0 && status !== "idle" && (
-          <ScrollReveal>
-            <Card>
-              <CardContent className="p-4 space-y-2">
-                <div className="flex items-center justify-between"><h3 className="text-sm font-semibold">Splits ({distanceUnitShortLabel.toUpperCase()})</h3><ChevronUp className="h-4 w-4 text-muted-foreground" /></div>
-                {gpsTrace.length > 0 ? (
-                  Array.from({ length: Math.floor(distance / splitDistanceKm) }, (_, i) => {
-                    const splitStart = gpsTrace.findIndex((p) => {
-                      const d = gpsTrace.slice(0, gpsTrace.indexOf(p) + 1).reduce((acc, curr, idx) => {
-                        if (idx === 0) return 0;
-                        return acc + haversineDistanceKm(gpsTrace[idx - 1], curr);
-                      }, 0);
-                      return d >= i * splitDistanceKm;
-                    });
-                    const splitEnd = gpsTrace.findIndex((p) => {
-                      const d = gpsTrace.slice(0, gpsTrace.indexOf(p) + 1).reduce((acc, curr, idx) => {
-                        if (idx === 0) return 0;
-                        return acc + haversineDistanceKm(gpsTrace[idx - 1], curr);
-                      }, 0);
-                      return d >= (i + 1) * splitDistanceKm;
-                    });
-
-                    if (splitStart >= 0 && splitEnd > splitStart) {
-                      const splitTime = (gpsTrace[splitEnd].time - gpsTrace[splitStart].time) / 1000;
-                      const splitPace = (splitTime / 60) / splitDistanceKm;
-                      return (
-                        <div key={i} className="flex items-center justify-between text-sm py-1.5 border-b border-border last:border-0">
-                          <span className="text-muted-foreground">
-                            {runPreferences.distanceUnit === "mi" ? "Mile" : "Km"} {i + 1}
-                          </span>
-                          <span className="font-bold tabular-nums">{formatPace(convertPaceFromMinutesPerKm(splitPace, runPreferences.distanceUnit))}</span>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }).filter(Boolean)
-                ) : (
-                  <p className="text-xs text-muted-foreground text-center py-2">Attendez les données GPS...</p>
-                )}
-                {Math.floor(distance / splitDistanceKm) === 0 && (
-                  <p className="text-xs text-muted-foreground text-center py-2">
-                    Le premier split apparaîtra à 1 {runPreferences.distanceUnit === "mi" ? "mile" : "km"}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </ScrollReveal>
-        )}
-
+        <RunSplitsCard
+          elapsed={elapsed}
+          status={status}
+          distance={distance}
+          gpsTrace={gpsTrace}
+          splitDistanceKm={splitDistanceKm}
+          distanceUnitShortLabel={distanceUnitShortLabel}
+          runPreferences={runPreferences}
+          formatPace={formatPace}
+        />
       </div>
     </div>
   );
