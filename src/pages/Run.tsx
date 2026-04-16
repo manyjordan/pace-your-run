@@ -18,10 +18,11 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2, Gauge, ChevronRight, Trash2,
+  Play, Pause, Square, MapPin, Map, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2, Gauge, Trash2,
+  Settings,
 } from "lucide-react";
 import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useGpsTracking } from "@/hooks/useGpsTracking";
 import { useRunTimer } from "@/hooks/useRunTimer";
@@ -108,6 +109,7 @@ function generateDefaultTitle(): string {
 
 /* ── Run component ── */
 export default function Run() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [postAudience, setPostAudience] = useState<"private" | "friends" | "public">("public");
   const [status, setStatus] = useState<"idle" | "running" | "paused">("idle");
@@ -960,20 +962,6 @@ export default function Run() {
           </div>
         )}
 
-        {status === "idle" && (
-          <Link
-            to="/routes"
-            className="flex items-center gap-2 rounded-lg border border-accent/20 bg-card p-4 hover:border-accent/50 transition-colors"
-          >
-            <MapPin className="h-5 w-5 text-accent" />
-            <div>
-              <p className="text-sm font-semibold">Mes parcours</p>
-              <p className="text-xs text-muted-foreground">Importez et naviguez sur vos parcours GPX</p>
-            </div>
-            <ChevronRight className="h-4 w-4 ml-auto text-muted-foreground" />
-          </Link>
-        )}
-
         {activeRoute && status === "idle" && (
           <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
             <div>
@@ -991,6 +979,29 @@ export default function Run() {
             >
               Retirer
             </button>
+          </div>
+        )}
+
+        {status === "idle" && (
+          <div className="flex gap-3 mt-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={() => navigate("/settings")}
+            >
+              <Settings className="h-4 w-4 shrink-0" />
+              Réglages
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 gap-2"
+              onClick={() => navigate("/routes")}
+            >
+              <Map className="h-4 w-4 shrink-0" />
+              Mes parcours
+            </Button>
           </div>
         )}
 

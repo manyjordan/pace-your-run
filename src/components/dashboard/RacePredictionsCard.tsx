@@ -4,6 +4,7 @@ import type { RunRow } from "@/lib/database";
 import {
   RACE_DISTANCES,
   formatPredictionTime,
+  getPredictionEligibleRuns,
   getRacePrediction,
   type PredictionResult,
 } from "@/lib/racePredictions";
@@ -33,10 +34,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
   const [selectedLabel, setSelectedLabel] = useState(defaultDistance.label);
   const [modelsOpen, setModelsOpen] = useState(false);
 
-  const qualifyingCount = useMemo(
-    () => runs.filter((r) => r.distance_km > 3 && r.duration_seconds > 0).length,
-    [runs],
-  );
+  const qualifyingCount = useMemo(() => getPredictionEligibleRuns(runs).length, [runs]);
 
   const selectedKm = useMemo(
     () => RACE_DISTANCES.find((d) => d.label === selectedLabel)?.km ?? 10,
@@ -66,7 +64,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             <h2 className="text-sm font-semibold">Prévisions de performance</h2>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Estimations calculées à partir de vos courses enregistrées.
+            Estimations à partir de vos courses des 3 dernières semaines (référence médiane par allure).
           </p>
         </div>
         <Select value={selectedLabel} onValueChange={setSelectedLabel}>
@@ -85,7 +83,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
 
       {qualifyingCount < 2 ? (
         <p className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-          Enregistrez au moins 2 courses de plus de 3 km pour voir vos prévisions.
+          Enregistrez au moins 2 courses de plus de 3 km sur les 3 dernières semaines pour voir vos prévisions.
         </p>
       ) : !prediction ? (
         <p className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
@@ -106,8 +104,8 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
               </p>
               <p className="text-sm font-medium text-foreground">Estimation consensus</p>
               <p className="text-xs text-muted-foreground">
-                Basé sur vos {qualifyingCount} courses éligibles (&gt; 3 km). Le Riegel étendu combine encore vos 3
-                meilleures allures.
+                Basé sur vos {qualifyingCount} courses éligibles sur les 3 dernières semaines (&gt; 3 km). Le Riegel
+                étendu moyenne vos 3 meilleures allures sur cette fenêtre.
               </p>
             </CardContent>
           </Card>

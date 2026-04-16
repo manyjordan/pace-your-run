@@ -117,9 +117,6 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
     <div className="space-y-6">
       <div>
         <VO2maxCard runs={runs} />
-        <p className="text-xs text-muted-foreground mt-1">
-          Indicateur clé de votre forme physique : un VO2max en progression signifie que votre condition physique s'améliore et que vous serez capable de meilleures performances en course.
-        </p>
       </div>
       <ScrollReveal>
         <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
