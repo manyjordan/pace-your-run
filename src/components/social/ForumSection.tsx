@@ -158,12 +158,39 @@ export function ForumSection() {
   const [hasMoreThreads, setHasMoreThreads] = useState(true);
   const [isLoadingMoreThreads, setIsLoadingMoreThreads] = useState(false);
   const discussionsRef = useRef<HTMLDivElement>(null);
+  const mutualNetworkIdsRef = useRef<string[]>([]);
+  const networkFetchedRef = useRef(false);
+  const lastNetworkUserIdRef = useRef<string | undefined>(undefined);
 
   const THREADS_PAGE_SIZE = 15;
-  const mutualNetworkSet = useMemo(() => new Set(mutualNetworkIds), [mutualNetworkIds]);
+  const mutualNetworkKey = useMemo(() => [...mutualNetworkIds].sort().join(","), [mutualNetworkIds]);
+
+  useEffect(() => {
+    mutualNetworkIdsRef.current = mutualNetworkIds;
+  }, [mutualNetworkIds]);
+
+  useEffect(() => {
+    const uid = user?.id;
+    if (uid !== lastNetworkUserIdRef.current) {
+      lastNetworkUserIdRef.current = uid;
+      networkFetchedRef.current = false;
+    }
+    if (!uid) {
+      setMutualNetworkIds([]);
+      return;
+    }
+    if (networkFetchedRef.current) return;
+    networkFetchedRef.current = true;
+    void getMutualNetworkUserIds(uid)
+      .then(setMutualNetworkIds)
+      .catch(() => {
+        setMutualNetworkIds([]);
+      });
+  }, [user?.id]);
 
   const loadThreads = useCallback(
-    async (categoryId: string, pageNum = 0, allowedNetworkIds: string[] = mutualNetworkIds) => {
+    async (categoryId: string, pageNum = 0, allowedNetworkIds?: string[]) => {
+      const networkIdsForFilter = allowedNetworkIds ?? mutualNetworkIdsRef.current;
       if (pageNum === 0) {
         setThreads([]);
       }
@@ -180,7 +207,7 @@ export function ForumSection() {
           THREADS_PAGE_SIZE,
           pageNum * THREADS_PAGE_SIZE,
         );
-        const allowedNetworkSet = new Set(allowedNetworkIds);
+        const allowedNetworkSet = new Set(networkIdsForFilter);
         const newThreads = fetchedThreads.filter(
           (thread) =>
             thread.visibility !== "network" ||
@@ -221,7 +248,7 @@ export function ForumSection() {
         setIsLoadingMoreThreads(false);
       }
     },
-    [mutualNetworkIds, user?.id],
+    [user?.id],
   );
 
   const loadOverview = useCallback(async () => {
@@ -233,25 +260,14 @@ export function ForumSection() {
     try {
       const categoriesData = await getForumCategories();
       setCategories(categoriesData);
-      if (user?.id) {
-        const networkIds = await getMutualNetworkUserIds(user.id);
-        setMutualNetworkIds(networkIds);
-      } else {
-        setMutualNetworkIds([]);
-      }
-
-      if (!newThreadCategoryId && categoriesData.length > 0) {
-        setNewThreadCategoryId(categoriesData[0].id);
-      }
     } catch {
       setForumError("Impossible de charger le forum pour le moment.");
       setIsLoadingOverview(false);
       return;
     }
 
-    const networkIdsForFilter = user?.id ? await getMutualNetworkUserIds(user.id) : [];
-    await loadThreads(selectedCategoryId, 0, networkIdsForFilter);
-  }, [loadThreads, newThreadCategoryId, selectedCategoryId, user?.id]);
+    await loadThreads(selectedCategoryId, 0, mutualNetworkIdsRef.current);
+  }, [loadThreads, selectedCategoryId]);
 
   const loadThreadDetail = useCallback(async (threadId: string) => {
     setIsLoadingThread(true);
@@ -270,7 +286,12 @@ export function ForumSection() {
 
   useEffect(() => {
     void loadOverview();
-  }, [loadOverview]);
+  }, [loadOverview, mutualNetworkKey]);
+
+  useEffect(() => {
+    if (categories.length === 0) return;
+    setNewThreadCategoryId((prev) => (prev ? prev : categories[0].id));
+  }, [categories]);
 
   useEffect(() => {
     if (!selectedThreadId) {
@@ -284,16 +305,17 @@ export function ForumSection() {
 
   useEffect(() => {
     if (!selectedThreadDetail) return;
+    const allowed = new Set(mutualNetworkIdsRef.current);
     const canView =
       selectedThreadDetail.visibility !== "network" ||
       selectedThreadDetail.user_id === user?.id ||
-      mutualNetworkSet.has(selectedThreadDetail.user_id);
+      allowed.has(selectedThreadDetail.user_id);
     if (!canView) {
       toast.error("Ce sujet est réservé au réseau de l'auteur.");
       setSelectedThreadId(null);
       setSelectedThreadDetail(null);
     }
-  }, [mutualNetworkSet, selectedThreadDetail, user?.id]);
+  }, [mutualNetworkKey, selectedThreadDetail, user?.id]);
 
   const activeCategory = useMemo(
     () => categories.find((category) => category.id === selectedCategoryId) ?? null,
