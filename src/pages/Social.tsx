@@ -56,7 +56,6 @@ import {
   type CommunityPost,
 } from "@/lib/runFormatters";
 
-const GPSMap = lazy(() => import("@/components/GPSMap"));
 const ForumSection = lazy(() =>
   import("@/components/social/ForumSection").then((module) => ({ default: module.ForumSection })),
 );
@@ -71,12 +70,6 @@ function buildFallbackTrace(seed: number) {
     lng: baseLng + Math.cos((i + seed) / 4) * 0.003 + ((i % 6) - 3) * 0.00022,
     time: seed + i * 1000,
   }));
-}
-
-function ensurePostTrace(post: CommunityPost): CommunityPost {
-  if (post.gpsTrace?.length) return post;
-  if (post.type !== "run" && post.type !== "race") return post;
-  return { ...post, gpsTrace: buildFallbackTrace(post.id) };
 }
 
 type FeedPost = CommunityPost & {
@@ -164,7 +157,8 @@ function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
       duration: run ? formatDuration(run.duration_seconds) : "00:00",
       elevation: `+${Math.round(run?.elevation_gain ?? 0)} m`,
     },
-    gpsTrace: parseGpsTrace(run?.gps_trace),
+    // GPS trace is loaded lazily in ActivityDetail via getRunWithGps.
+    gpsTrace: undefined,
     likes: post.likes_count ?? 0,
     comments: 0,
     liked: post.likedByMe,
@@ -336,7 +330,7 @@ export default function Social() {
 
       try {
         const newPosts = await getPersonalizedFeed(user.id, PAGE_SIZE, pageNum * PAGE_SIZE);
-        const mappedPosts = newPosts.map(mapPersonalizedPostToFeedPost).map(ensurePostTrace);
+        const mappedPosts = newPosts.map(mapPersonalizedPostToFeedPost);
 
         if (pageNum === 0) {
           setPosts(mappedPosts);
@@ -764,16 +758,6 @@ export default function Social() {
                           <span>{ranWithLine}</span>
                         </div>
                       ) : null}
-
-                      {post.gpsTrace && post.gpsTrace.length > 0 && (
-                        <Suspense
-                          fallback={
-                            <div className="h-[220px] animate-pulse rounded-lg bg-muted" />
-                          }
-                        >
-                          <GPSMap trace={post.gpsTrace} />
-                        </Suspense>
-                      )}
 
                       <Button
                         variant="outline"

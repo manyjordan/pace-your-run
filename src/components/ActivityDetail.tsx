@@ -1,7 +1,8 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { RunRow } from "@/lib/database";
+import { getRunWithGps, type RunRow } from "@/lib/database";
+import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
 
@@ -199,6 +200,44 @@ export function ActivityDetail({
   allActivities = [],
   fallbackTrace,
 }: ActivityDetailProps) {
+  const { session } = useAuth();
+  const [fullRun, setFullRun] = useState<RunRow | null>(null);
+  const [isLoadingGpsTrace, setIsLoadingGpsTrace] = useState(false);
+  const [gpsLoadAttempted, setGpsLoadAttempted] = useState(false);
+
+  useEffect(() => {
+    setFullRun(null);
+    setGpsLoadAttempted(false);
+  }, [activity.id]);
+
+  useEffect(() => {
+    if (!activity?.id || !session?.user?.id || gpsLoadAttempted) return;
+    if (Array.isArray(activity.gps_trace) && activity.gps_trace.length > 0) {
+      setFullRun(activity);
+      setGpsLoadAttempted(true);
+      return;
+    }
+
+    let isCancelled = false;
+    setIsLoadingGpsTrace(true);
+    setGpsLoadAttempted(true);
+
+    void getRunWithGps(session.user.id, activity.id)
+      .then((run) => {
+        if (!isCancelled) setFullRun(run);
+      })
+      .catch(() => {
+        if (!isCancelled) setFullRun(null);
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoadingGpsTrace(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [activity, gpsLoadAttempted, session?.user?.id]);
+
   const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
   const normalizedAllActivities = useMemo(
     () => allActivities.map((a) => normalizeActivityDetailInput(a)),
@@ -347,7 +386,10 @@ export function ActivityDetail({
       };
     });
 
-    const trace = fallbackTrace ?? buildTraceFromActivityPolyline(resolvedActivity);
+    const loadedTrace = Array.isArray(fullRun?.gps_trace)
+      ? (fullRun.gps_trace as GPSTracePoint[])
+      : undefined;
+    const trace = loadedTrace ?? fallbackTrace ?? buildTraceFromActivityPolyline(resolvedActivity);
     const comment = formatTrendComment({
       activity: resolvedActivity,
       allActivities: normalizedAllActivities,
@@ -367,7 +409,7 @@ export function ActivityDetail({
       hasHeartRateCurve: heartRateSeries.length > 1,
       startDate: new Date(resolvedActivity.start_date),
     };
-  }, [fallbackTrace, normalizedAllActivities, resolvedActivity]);
+  }, [fallbackTrace, fullRun?.gps_trace, normalizedAllActivities, resolvedActivity]);
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
 
   return (
@@ -453,12 +495,16 @@ export function ActivityDetail({
           </div>
         </div>
 
-        {analysis.trace && (
+        {(isLoadingGpsTrace || analysis.trace) && (
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
-            <Suspense fallback={<div className="h-[220px] rounded-lg bg-muted animate-pulse" />}>
-              <GPSMap trace={analysis.trace} />
-            </Suspense>
+            {isLoadingGpsTrace ? (
+              <div className="h-[220px] rounded-lg bg-muted animate-pulse" />
+            ) : analysis.trace ? (
+              <Suspense fallback={<div className="h-[220px] rounded-lg bg-muted animate-pulse" />}>
+                <GPSMap trace={analysis.trace} />
+              </Suspense>
+            ) : null}
           </div>
         )}
 

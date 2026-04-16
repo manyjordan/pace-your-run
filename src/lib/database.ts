@@ -40,7 +40,7 @@ export type RunRow = {
   distance_km: number;
   duration_seconds: number;
   elevation_gain: number | null;
-  gps_trace: Json | null;
+  gps_trace?: RunGpsPoint[] | null;
   id: string;
   moving_time_seconds?: number | null;
   ran_with?: string[] | null;
@@ -358,12 +358,28 @@ export async function getRuns(userId: string) {
 
   const { data, error } = await supabase
     .from("runs")
-    .select("*")
+    .select(
+      "id, user_id, started_at, distance_km, duration_seconds, average_pace, average_heartrate, elevation_gain, run_type, title, moving_time_seconds, created_at, ran_with",
+    )
     .eq("user_id", userId)
     .order("started_at", { ascending: false });
 
   if (error) throw error;
   return (data ?? []) as RunRow[];
+}
+
+export async function getRunWithGps(userId: string, runId: string) {
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("runs")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("id", runId)
+    .single();
+
+  if (error) throw error;
+  return data as RunRow;
 }
 
 export async function saveRoute(
