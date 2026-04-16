@@ -5,9 +5,6 @@ import { ChevronLeft, ChevronRight, Loader2, Calendar, TrendingUp, Zap } from "l
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { birthDateDayPickerProps, futureEventDayPickerProps } from "@/lib/dateCalendarSettings";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { DaySelector } from "@/components/goal/DaySelector";
 import { DistanceSelector } from "@/components/goal/DistanceSelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
@@ -21,8 +18,6 @@ import {
 } from "@/lib/goalHelpers";
 import { selectPlan } from "@/lib/planSelector";
 import { mapSessionsToDays } from "@/lib/plans";
-import { format, parse } from "date-fns";
-import { fr } from "date-fns/locale";
 
 type OnboardingData = {
   firstName: string;
@@ -401,7 +396,23 @@ function Step1Welcome({ onNext }: { onNext: () => void }) {
   );
 }
 
-/* Date Picker Component */
+function parseIsoDateParts(iso: string): { d: number; m: number; y: number } | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null;
+  const [ys, ms, ds] = iso.split("-").map(Number);
+  const dt = new Date(ys, ms - 1, ds);
+  if (dt.getFullYear() !== ys || dt.getMonth() !== ms - 1 || dt.getDate() !== ds) return null;
+  return { d: ds, m: ms, y: ys };
+}
+
+function daysInMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+function toIsoDate(y: number, m: number, d: number): string {
+  return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/* Date picker — 3 listes natives (meilleur confort iOS que Popover + Calendar) */
 function OnboardingDatePicker({
   id,
   label,
@@ -415,54 +426,146 @@ function OnboardingDatePicker({
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
-  /** birth: années 1920→aujourd'hui ; future: année courante → +5 ans (courses, échéances) */
+  /** birth: années 1920 → année en cours ; future: année en cours → +5 ans */
   preset?: "birth" | "future";
 }) {
-  const [open, setOpen] = useState(false);
-  const selectedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
-  const rangeProps =
-    preset === "future" ? futureEventDayPickerProps(selectedDate) : birthDateDayPickerProps(selectedDate);
+  const currentYear = new Date().getFullYear();
+  const isFuture = preset === "future";
+  const parsed = parseIsoDateParts(value);
+
+  const defaultBirthYear = Math.min(currentYear - 28, currentYear - 10);
+
+  const [day, setDay] = useState(() => {
+    if (parsed) return parsed.d;
+    if (isFuture) return new Date().getDate();
+    return 1;
+  });
+  const [month, setMonth] = useState(() => {
+    if (parsed) return parsed.m;
+    if (isFuture) return new Date().getMonth() + 1;
+    return 1;
+  });
+  const [year, setYear] = useState(() => {
+    if (parsed) return parsed.y;
+    if (isFuture) return currentYear;
+    return defaultBirthYear;
+  });
+
+  useEffect(() => {
+    const p = parseIsoDateParts(value);
+    if (p) {
+      setDay(p.d);
+      setMonth(p.m);
+      setYear(p.y);
+      return;
+    }
+    const now = new Date();
+    if (isFuture) {
+      setDay(now.getDate());
+      setMonth(now.getMonth() + 1);
+      setYear(now.getFullYear());
+    } else {
+      setDay(1);
+      setMonth(1);
+      setYear(Math.min(currentYear - 28, currentYear - 10));
+    }
+  }, [value, isFuture, currentYear]);
+
+  const months = [
+    { value: 1, label: "Janvier" },
+    { value: 2, label: "Février" },
+    { value: 3, label: "Mars" },
+    { value: 4, label: "Avril" },
+    { value: 5, label: "Mai" },
+    { value: 6, label: "Juin" },
+    { value: 7, label: "Juillet" },
+    { value: 8, label: "Août" },
+    { value: 9, label: "Septembre" },
+    { value: 10, label: "Octobre" },
+    { value: 11, label: "Novembre" },
+    { value: 12, label: "Décembre" },
+  ];
+
+  const maxDay = daysInMonth(year, month);
+  const days = Array.from({ length: maxDay }, (_, i) => i + 1);
+
+  const years = isFuture
+    ? Array.from({ length: 6 }, (_, i) => currentYear + i)
+    : Array.from({ length: currentYear - 1920 + 1 }, (_, i) => currentYear - i);
+
+  const clampDay = (d: number, m: number, y: number) => Math.min(d, daysInMonth(y, m));
+
+  const commit = (d: number, m: number, y: number) => {
+    const dm = clampDay(d, m, y);
+    const date = new Date(y, m - 1, dm);
+    if (!Number.isNaN(date.getTime())) {
+      onChange(toIsoDate(y, m, dm));
+    }
+  };
 
   return (
-    <div className="space-y-3">
-      <Label htmlFor={id}>{required ? `${label}` : label}</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            id={id}
-            variant="outline"
-            className="w-full justify-between rounded-lg border-border bg-card text-left font-normal hover:border-accent hover:bg-accent/10"
-          >
-            <span className={selectedDate ? "text-foreground" : "text-muted-foreground"}>
-              {selectedDate ? format(selectedDate, "d MMMM yyyy", { locale: fr }) : "Choisir une date"}
-            </span>
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="z-[70] w-auto rounded-lg border-border bg-card p-0 shadow-md"
+    <div className="space-y-2">
+      <Label htmlFor={`${id}-day`} className="text-sm font-medium text-foreground">
+        {label}
+        {required ? <span className="text-destructive"> *</span> : null}
+      </Label>
+      <div className="grid grid-cols-3 gap-2">
+        <select
+          id={`${id}-day`}
+          aria-label={`${label} — jour`}
+          value={Math.min(day, maxDay)}
+          onChange={(e) => {
+            const d = Number(e.target.value);
+            setDay(d);
+            commit(d, month, year);
+          }}
+          className="min-h-[44px] rounded-lg border border-border bg-background px-3 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
         >
-          <CalendarComponent
-            mode="single"
-            {...rangeProps}
-            selected={selectedDate}
-            onSelect={(date) => {
-              if (!date) return;
-              onChange(format(date, "yyyy-MM-dd"));
-              setOpen(false);
-            }}
-            className="rounded-lg bg-card p-3"
-            classNames={{
-              caption_label: "text-sm font-semibold text-foreground",
-              head_cell: "w-9 rounded-md text-[0.75rem] font-medium text-muted-foreground",
-              nav_button: "h-8 w-8 rounded-lg border border-accent/20 bg-card p-0 text-foreground opacity-100 hover:bg-accent hover:text-accent-foreground",
-              day_today: "bg-accent/15 text-foreground",
-              day_selected:
-                "bg-accent text-accent-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground",
-            }}
-          />
-        </PopoverContent>
-      </Popover>
+          {days.map((d) => (
+            <option key={d} value={d}>
+              {d}
+            </option>
+          ))}
+        </select>
+        <select
+          id={`${id}-month`}
+          aria-label={`${label} — mois`}
+          value={month}
+          onChange={(e) => {
+            const m = Number(e.target.value);
+            setMonth(m);
+            const nextDay = clampDay(day, m, year);
+            if (nextDay !== day) setDay(nextDay);
+            commit(nextDay, m, year);
+          }}
+          className="min-h-[44px] rounded-lg border border-border bg-background px-3 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+        >
+          {months.map((mo) => (
+            <option key={mo.value} value={mo.value}>
+              {mo.label}
+            </option>
+          ))}
+        </select>
+        <select
+          id={`${id}-year`}
+          aria-label={`${label} — année`}
+          value={year}
+          onChange={(e) => {
+            const y = Number(e.target.value);
+            setYear(y);
+            const nextDay = clampDay(day, month, y);
+            if (nextDay !== day) setDay(nextDay);
+            commit(nextDay, month, y);
+          }}
+          className="min-h-[44px] rounded-lg border border-border bg-background px-3 py-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent"
+        >
+          {years.map((y) => (
+            <option key={y} value={y}>
+              {y}
+            </option>
+          ))}
+        </select>
+      </div>
     </div>
   );
 }
