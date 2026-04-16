@@ -1,7 +1,7 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, List, TrendingUp } from "lucide-react";
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getRuns, type RunGpsPoint, type RunRow } from "@/lib/database";
@@ -72,14 +72,21 @@ const Dashboard = () => {
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
   const [period, setPeriod] = useState<DashboardPeriod>("3m");
+  const isLoadingRef = useRef(false);
+  const hasMountedRef = useRef(false);
+  const loadUserDataRef = useRef<() => Promise<void>>(async () => {});
 
   const loadUserData = useCallback(async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
+
     if (!session?.user.id) {
       setUserGoal(null);
       setRunCount(0);
       setRecentRuns([]);
       setAthleteName("Coureur");
       setIsLoading(false);
+      isLoadingRef.current = false;
       return;
     }
 
@@ -107,8 +114,13 @@ const Dashboard = () => {
       setRecentRuns([]);
     } finally {
       setIsLoading(false);
+      isLoadingRef.current = false;
     }
   }, [session?.user.id]);
+
+  useEffect(() => {
+    loadUserDataRef.current = loadUserData;
+  }, [loadUserData]);
 
   useEffect(() => {
     void loadUserData();
@@ -127,7 +139,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const refreshRunsData = () => {
-      void loadUserData();
+      void loadUserDataRef.current();
     };
 
     const handleVisibilityRefresh = () => {
@@ -145,9 +157,13 @@ const Dashboard = () => {
       window.removeEventListener("pageshow", refreshRunsData);
       document.removeEventListener("visibilitychange", handleVisibilityRefresh);
     };
-  }, [loadUserData]);
+  }, []);
 
   useEffect(() => {
+    if (!hasMountedRef.current) {
+      hasMountedRef.current = true;
+      return;
+    }
     if (location.pathname === "/") {
       void loadUserData();
     }
