@@ -2,7 +2,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, List, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getRuns, type RunGpsPoint, type RunRow } from "@/lib/database";
 import { normalizeGoalData } from "@/lib/goalHelpers";
@@ -62,6 +62,7 @@ function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | und
 }
 
 const Dashboard = () => {
+  const location = useLocation();
   const { session } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [athleteName, setAthleteName] = useState("Coureur");
@@ -123,6 +124,34 @@ const Dashboard = () => {
       window.removeEventListener("pace-runs-updated", handleRefresh);
     };
   }, [loadUserData]);
+
+  useEffect(() => {
+    const refreshRunsData = () => {
+      void loadUserData();
+    };
+
+    const handleVisibilityRefresh = () => {
+      if (document.visibilityState === "visible") {
+        refreshRunsData();
+      }
+    };
+
+    window.addEventListener("focus", refreshRunsData);
+    window.addEventListener("pageshow", refreshRunsData);
+    document.addEventListener("visibilitychange", handleVisibilityRefresh);
+
+    return () => {
+      window.removeEventListener("focus", refreshRunsData);
+      window.removeEventListener("pageshow", refreshRunsData);
+      document.removeEventListener("visibilitychange", handleVisibilityRefresh);
+    };
+  }, [loadUserData]);
+
+  useEffect(() => {
+    if (location.pathname === "/") {
+      void loadUserData();
+    }
+  }, [location.pathname, loadUserData]);
 
   const handleCloseActivityDetail = () => {
     setSelectedRunForDetail(null);

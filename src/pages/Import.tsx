@@ -156,6 +156,7 @@ export default function ImportPage() {
 
     setImportResult({ imported, skipped, errors });
     if (imported > 0) {
+      sessionStorage.setItem("pace-runs-last-import-at", String(Date.now()));
       window.dispatchEvent(new Event("pace-runs-updated"));
       window.dispatchEvent(new Event("pace-community-updated"));
     }
@@ -280,7 +281,10 @@ export default function ImportPage() {
                 </Button>
                 <Button
                   className="flex-1 bg-accent text-accent-foreground"
-                  onClick={() => navigate("/")}
+                  onClick={() => {
+                    window.dispatchEvent(new Event("pace-runs-updated"));
+                    navigate("/");
+                  }}
                 >
                   Voir mes courses
                 </Button>

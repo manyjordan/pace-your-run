@@ -259,12 +259,22 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className="flex flex-col items-center gap-0.5 py-1 -mt-5"
+                  className={`-mt-5 flex flex-col items-center gap-0.5 border-t-2 px-1 py-1 transition-all ${
+                    isActive ? "border-accent text-accent" : "border-transparent text-muted-foreground opacity-50"
+                  }`}
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-accent text-accent-foreground shadow-lg shadow-accent/30">
-                    <item.icon className="h-6 w-6" />
+                  <div
+                    className={`flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all ${
+                      isActive
+                        ? "bg-accent text-accent-foreground shadow-accent/30"
+                        : "bg-accent/10 text-muted-foreground shadow-accent/10"
+                    }`}
+                  >
+                    <item.icon className={`h-6 w-6 ${isActive ? "stroke-[2.5]" : ""}`} />
                   </div>
-                  <span className="text-[10px] font-bold text-accent">{item.label}</span>
+                  <span className={`text-[10px] whitespace-nowrap ${isActive ? "font-semibold text-accent" : "font-medium"}`}>
+                    {item.label}
+                  </span>
                 </NavLink>
               );
             }
@@ -273,17 +283,17 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex min-w-0 flex-col items-center gap-0.5 py-1 text-xs transition-colors ${
-                  isActive ? "text-accent" : "text-muted-foreground"
+                className={`flex min-w-0 flex-col items-center gap-1 border-t-2 px-1 py-1 text-xs transition-all ${
+                  isActive ? "border-accent text-accent" : "border-transparent text-muted-foreground opacity-50"
                 }`}
               >
-                <span className="relative inline-flex">
-                  <item.icon className="h-5 w-5" />
+                <span className={`relative inline-flex rounded-full px-3 py-1 ${isActive ? "bg-accent/10" : ""}`}>
+                  <item.icon className={`h-5 w-5 ${isActive ? "stroke-[2.5]" : ""}`} />
                   {item.to === "/social" && socialUnread > 0 ? (
                     <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
                   ) : null}
                 </span>
-                <span className="font-medium whitespace-nowrap">{item.label}</span>
+                <span className={`whitespace-nowrap ${isActive ? "font-semibold" : "font-medium"}`}>{item.label}</span>
               </NavLink>
             );
           })}
