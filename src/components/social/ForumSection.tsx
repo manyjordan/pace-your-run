@@ -65,7 +65,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 type CategoryMeta = {
@@ -147,6 +147,7 @@ export function ForumSection() {
   const [threadsPage, setThreadsPage] = useState(0);
   const [hasMoreThreads, setHasMoreThreads] = useState(true);
   const [isLoadingMoreThreads, setIsLoadingMoreThreads] = useState(false);
+  const discussionsRef = useRef<HTMLDivElement>(null);
 
   const THREADS_PAGE_SIZE = 15;
 
@@ -293,6 +294,19 @@ export function ForumSection() {
     } finally {
       setIsSubmittingThread(false);
     }
+  };
+
+  const scrollToDiscussions = () => {
+    window.setTimeout(() => {
+      discussionsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  };
+
+  const handleCategoryClick = (categoryId: string) => {
+    setThreadsPage(0);
+    setHasMoreThreads(true);
+    setSelectedCategoryId((current) => (current === categoryId ? "all" : categoryId));
+    scrollToDiscussions();
   };
 
   const handleReply = async () => {
@@ -584,11 +598,7 @@ export function ForumSection() {
                 <ScrollReveal key={category.id}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setThreadsPage(0);
-                      setHasMoreThreads(true);
-                      setSelectedCategoryId((current) => (current === category.id ? "all" : category.id));
-                    }}
+                    onClick={() => handleCategoryClick(category.id)}
                     className="text-left"
                   >
                     <Card
@@ -634,7 +644,7 @@ export function ForumSection() {
             })}
       </div>
 
-      <div className="space-y-4">
+      <div ref={discussionsRef} className="space-y-4">
         <ScrollReveal>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -653,6 +663,7 @@ export function ForumSection() {
                   setThreadsPage(0);
                   setHasMoreThreads(true);
                   setSelectedCategoryId("all");
+                  scrollToDiscussions();
                 }}
               >
                 Voir tout

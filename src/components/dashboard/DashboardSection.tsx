@@ -183,7 +183,7 @@ export const DashboardSection = ({
         return (
           <ScrollReveal key={metric.title} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
             <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
-              <div className="mb-4 flex items-start justify-between gap-4">
+              <div className="mb-4 flex items-start gap-4">
                 <div>
                   <div className="flex items-center gap-2">
                     <Icon className="h-4 w-4 text-muted-foreground" />
@@ -191,12 +191,10 @@ export const DashboardSection = ({
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{metricSubtitle(metric.metricKind, period)}</p>
                 </div>
-                <span className="rounded-lg bg-accent/10 px-2.5 py-1 text-[11px] font-semibold leading-4 text-lime">
-                  {metric.currentValue}
-                </span>
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
+                <p className="mt-1 text-xs text-muted-foreground">semaine en cours</p>
                 <p className="mt-1 text-xs text-muted-foreground">{metric.change}</p>
               </div>
               <div className="h-44">
