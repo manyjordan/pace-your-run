@@ -29,7 +29,7 @@ type OnboardingData = {
   gender: "homme" | "femme" | null;
   dateOfBirth: string;
   fitnessLevel: "beginner" | "intermediate" | "advanced" | null;
-  goalType: "weight" | "distance" | "race" | null;
+  goalType: "weight" | "distance" | "race" | "none" | null;
   raceType?: "5k" | "10k" | "20k" | "semi" | "marathon" | "other";
   raceDistance?: string;
   raceTargetDate?: string;
@@ -38,6 +38,23 @@ type OnboardingData = {
 };
 
 function buildOnboardingPlanData(data: OnboardingData) {
+  if (data.goalType === "none") {
+    return {
+      goalData: {
+        goalType: "none",
+        goal_type: "none",
+        level: data.fitnessLevel,
+        fitnessLevel: data.fitnessLevel,
+        availableDays: [],
+        availableDaysPerWeek: "0",
+        daysPerWeek: 0,
+        selectedPlanId: null,
+        goalSavedAt: new Date().toISOString(),
+      },
+      plan: null,
+    };
+  }
+
   const targetDistance =
     data.goalType === "race"
       ? mapRaceTypeToTargetDistance(data.raceType || "5k")
@@ -159,8 +176,8 @@ const Onboarding = () => {
         gender: data.gender,
         date_of_birth: data.dateOfBirth || null,
         goal_type: data.goalType,
-        goal_data: goalData,
-        available_days: data.availableDays ?? [],
+        goal_data: data.goalType === "none" ? null : goalData,
+        available_days: data.goalType === "none" ? [] : (data.availableDays ?? []),
       });
 
       setIsLoading(false);
@@ -617,7 +634,7 @@ function Step4Goal({
   const raceDistanceKm = Number(data.raceDistance || 0);
   const targetTimeError =
     data.goalType === "race" ? validateRaceTargetTime(raceDistanceKm, data.raceTargetTime || "") : null;
-  const goals: Array<{ id: "weight" | "distance" | "race"; title: string; desc: string }> = [
+  const goals: Array<{ id: "weight" | "distance" | "race" | "none"; title: string; desc: string }> = [
     {
       id: "weight",
       title: "Perdre du poids",
@@ -628,6 +645,11 @@ function Step4Goal({
       id: "race",
       title: "Préparer une course",
       desc: "M'entraîner pour une compétition avec un objectif de temps",
+    },
+    {
+      id: "none",
+      title: "Je cours sans objectif précis",
+      desc: "Continuer à courir librement, sans objectif de course ou de distance.",
     },
   ];
 
@@ -750,24 +772,36 @@ function Step4Goal({
         </motion.div>
       )}
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-2 rounded-xl border border-border bg-card/50 p-4"
-      >
-        <Label>Quels jours pouvez-vous vous entraîner ?</Label>
-        <DaySelector
-          selectedDays={data.availableDays}
-          onChange={(days) => setData({ ...data, availableDays: days })}
-        />
-      </motion.div>
+      {data.goalType !== "none" ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-2 rounded-xl border border-border bg-card/50 p-4"
+        >
+          <Label>Quels jours pouvez-vous vous entraîner ?</Label>
+          <DaySelector
+            selectedDays={data.availableDays}
+            onChange={(days) => setData({ ...data, availableDays: days })}
+          />
+        </motion.div>
+      ) : (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-border bg-card/50 p-4"
+        >
+          <p className="text-sm text-muted-foreground">
+            Aucun objectif précis sélectionné. Vous pourrez en définir un plus tard depuis l&apos;onglet Plan.
+          </p>
+        </motion.div>
+      )}
 
       <Button
         onClick={onNext}
         disabled={
           !data.goalType ||
-          data.availableDays.length < 2 ||
-          (data.goalType !== "weight" && !data.raceType) ||
+          (data.goalType !== "none" && data.availableDays.length < 2) ||
+          (data.goalType !== "weight" && data.goalType !== "none" && !data.raceType) ||
           (data.goalType === "race" && (!data.raceTargetTime || Boolean(targetTimeError)))
         }
         className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
@@ -796,6 +830,7 @@ function Step5Summary({
     weight: "Perte de poids",
     distance: `Courir ${data.raceDistance || data.raceType?.toUpperCase()}`,
     race: `Préparer ${data.raceDistance ? `une ${data.raceDistance}km` : `une ${data.raceType?.toUpperCase()}`}`,
+    none: "Course libre sans objectif précis",
   };
 
   const levelLabels: Record<string, string> = {
@@ -852,15 +887,27 @@ function Step5Summary({
         </div>
 
         {/* Training plan preview */}
-        <div className="flex items-center gap-3">
-          <div className="rounded-lg bg-accent/10 p-2">
-            <Calendar className="h-5 w-5 text-accent" />
+        {plan ? (
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-accent/10 p-2">
+              <Calendar className="h-5 w-5 text-accent" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Plan proposé</p>
+              <p className="font-semibold">{plan.name}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Plan proposé</p>
-            <p className="font-semibold">{plan.name}</p>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="rounded-lg bg-accent/10 p-2">
+              <Calendar className="h-5 w-5 text-accent" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Plan proposé</p>
+              <p className="font-semibold">Aucun plan imposé</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="space-y-3">

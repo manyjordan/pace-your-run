@@ -146,6 +146,7 @@ export default function GoalTab() {
   const [showPlanPreview, setShowPlanPreview] = useState(false);
   const [showCustomDistance, setShowCustomDistance] = useState(false);
   const [showCustomRaceDistance, setShowCustomRaceDistance] = useState(false);
+  const [hasNoGoalDefined, setHasNoGoalDefined] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -164,6 +165,21 @@ export default function GoalTab() {
           getProfile(user.id),
           getRuns(user.id),
         ]);
+
+        const profileGoalType = typeof profile?.goal_type === "string" ? profile.goal_type : null;
+        if (!profileGoalType || profileGoalType === "none") {
+          const autoDetectedLevel = detectLevel(runs);
+          setDetectedLevel(autoDetectedLevel);
+          setFormData({ ...defaultData, level: autoDetectedLevel });
+          setSelectedPlan(null);
+          setSavedAt(null);
+          setIsDefining(false);
+          setIsChanging(false);
+          setHasNoGoalDefined(true);
+          setShowCustomDistance(false);
+          setShowCustomRaceDistance(false);
+          return;
+        }
 
         const goalData = profile?.goal_data;
         const normalizedGoalData = normalizeGoalData(goalData as Partial<ProfileGoalData>);
@@ -232,6 +248,7 @@ export default function GoalTab() {
         setShowCustomDistance(Number(newFormData.distanceKm) > 0 && !["5", "10", "20", "21.097", "42.195"].includes(newFormData.distanceKm));
         setShowCustomRaceDistance(newFormData.raceType === "other");
         setFormData(newFormData);
+        setHasNoGoalDefined(false);
 
         if (goalData && typeof goalData === "object" && !Array.isArray(goalData)) {
           setSavedAt("Enregistré");
@@ -246,6 +263,7 @@ export default function GoalTab() {
         setFormData(defaultData);
         setSavedAt(null);
         setIsDefining(true);
+        setHasNoGoalDefined(false);
       } finally {
         setIsLoading(false);
       }
@@ -482,6 +500,7 @@ export default function GoalTab() {
       setSavedAt(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
       setIsDefining(false);
       setIsChanging(false);
+      setHasNoGoalDefined(false);
     } catch {
       setSaveError("Impossible d'enregistrer le profil pour le moment.");
     }
@@ -503,7 +522,34 @@ export default function GoalTab() {
       )}
 
       {/* État initial : Aucun objectif défini */}
-      {!savedAt && !isDefining && (
+      {hasNoGoalDefined && !isDefining && !isChanging && (
+        <ScrollReveal>
+          <Card className="border-accent/30 bg-card/95">
+            <CardContent className="space-y-4 p-5">
+              <div className="rounded-xl bg-accent/10 p-3 text-accent">
+                <Target className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Vous courez sans objectif défini.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Vous pouvez en ajouter un à tout moment pour personnaliser votre plan.
+                </p>
+              </div>
+              <Button
+                className="w-full bg-accent text-accent-foreground"
+                onClick={() => {
+                  setIsDefining(true);
+                  setHasNoGoalDefined(false);
+                }}
+              >
+                Définir un objectif
+              </Button>
+            </CardContent>
+          </Card>
+        </ScrollReveal>
+      )}
+
+      {!savedAt && !isDefining && !hasNoGoalDefined && (
         <ScrollReveal>
           <button
             onClick={() => setIsDefining(true)}
