@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
-  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2, Gauge, ChevronRight,
+  Play, Pause, Square, MapPin, Zap, Heart, ChevronUp, AlertCircle, SlidersHorizontal, Volume2, Gauge, ChevronRight, Trash2,
 } from "lucide-react";
 import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
@@ -27,6 +27,7 @@ import { useGpsTracking } from "@/hooks/useGpsTracking";
 import { useRunTimer } from "@/hooks/useRunTimer";
 import { useRunSave } from "@/hooks/useRunSave";
 import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
+import { INTERVAL_TEMPLATES, useSessionProgram } from "@/hooks/useSessionProgram";
 import { cn } from "@/lib/utils";
 import { updatePostAudience, type RouteRow, type RunGpsPoint, type RunRow } from "@/lib/database";
 import {
@@ -173,6 +174,29 @@ export default function Run() {
   });
 
   const { elapsed, setElapsed, startInterval, stopInterval, formatTime } = useRunTimer();
+  const {
+    runMode,
+    setRunMode,
+    programSource,
+    setProgramSource,
+    selectedTemplateId,
+    loadTemplate,
+    segments,
+    addSegment,
+    removeSegment,
+    updateSegment,
+    isProgrammedMode,
+    isProgramActive,
+    currentSegmentIndex,
+    currentSegment,
+    nextSegment,
+    secondsRemainingInCurrentSegment,
+    currentSegmentDurationSeconds,
+    totalProgramDurationSeconds,
+    resetProgramProgress,
+    thirtySecondAnnouncedRef,
+    segmentTransitionAnnouncedRef,
+  } = useSessionProgram({ elapsed, status });
 
   const { persistCompletedRun, isSaving, saveError, setSaveError } = useRunSave();
 
@@ -189,6 +213,12 @@ export default function Run() {
     activeRoute,
     routeProgress,
     routeArrivalAnnouncedRef,
+    isProgrammedSessionActive: isProgramActive,
+    programmedSegments: segments,
+    currentProgramSegmentIndex: currentSegmentIndex,
+    secondsRemainingInCurrentSegment,
+    thirtySecondAnnouncedRef,
+    segmentTransitionAnnouncedRef,
   });
   const formatPace = useCallback(
     (p: number) => (p > 0 ? `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, "0")}` : "--:--"),
@@ -389,6 +419,7 @@ export default function Run() {
     runStartedAtRef.current = new Date().toISOString();
     speechPrefsRef.current = loadRunPreferences(user?.id);
     resetAnnouncementRefs();
+    resetProgramProgress();
     currentIntervalRepRef.current = 0;
     setRouteProgress(0);
     routeArrivalAnnouncedRef.current = false;
@@ -537,6 +568,7 @@ export default function Run() {
     routeArrivalAnnouncedRef.current = false;
     setShowTreadmillCorrection(false);
     setCorrectedDistanceKm("");
+    resetProgramProgress();
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
@@ -714,6 +746,154 @@ export default function Run() {
         )}
 
         {status === "idle" && (
+          <Card className="border-accent/30 bg-card/95">
+            <CardContent className="space-y-3 p-4">
+              <p className="text-sm font-semibold">Type de session</p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRunMode("free")}
+                  className={cn(
+                    "rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all",
+                    runMode === "free"
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted-foreground hover:border-accent/50",
+                  )}
+                >
+                  Course libre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRunMode("programmed")}
+                  className={cn(
+                    "rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all",
+                    runMode === "programmed"
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted-foreground hover:border-accent/50",
+                  )}
+                >
+                  Session programmée
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {status === "idle" && isProgrammedMode && (
+          <Card className="border-accent/30 bg-card/95">
+            <CardContent className="space-y-4 p-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setProgramSource("custom")}
+                  className={cn(
+                    "rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all",
+                    programSource === "custom"
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted-foreground hover:border-accent/50",
+                  )}
+                >
+                  Session personnalisée
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProgramSource("template")}
+                  className={cn(
+                    "rounded-lg border-2 px-3 py-2 text-xs font-semibold transition-all",
+                    programSource === "template"
+                      ? "border-accent bg-accent/10 text-accent"
+                      : "border-border text-muted-foreground hover:border-accent/50",
+                  )}
+                >
+                  Session type fractionné
+                </button>
+              </div>
+
+              {programSource === "template" ? (
+                <div className="space-y-2">
+                  <Label>Template</Label>
+                  <Select value={selectedTemplateId} onValueChange={loadTemplate}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choisir une session type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {INTERVAL_TEMPLATES.map((template) => (
+                        <SelectItem key={template.id} value={template.id}>
+                          {template.name} — {template.description}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
+              <div className="space-y-3">
+                {segments.map((segment, index) => (
+                  <div key={segment.id} className="space-y-2 rounded-lg border border-border p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-muted-foreground">Segment {index + 1}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => removeSegment(segment.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Durée (min)</Label>
+                        <Input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={segment.duration_minutes}
+                          onChange={(event) =>
+                            updateSegment(segment.id, {
+                              duration_minutes: Math.max(0.1, Number(event.target.value) || 0.1),
+                            })
+                          }
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs">Allure cible</Label>
+                        <Input
+                          value={segment.target_pace}
+                          onChange={(event) => updateSegment(segment.id, { target_pace: event.target.value })}
+                          placeholder="4:30"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Label (optionnel)</Label>
+                      <Input
+                        value={segment.label ?? ""}
+                        onChange={(event) => updateSegment(segment.id, { label: event.target.value })}
+                        placeholder="Échauffement"
+                      />
+                    </div>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" className="w-full" onClick={addSegment}>
+                  + Ajouter un segment
+                </Button>
+                {segments.length > 0 ? (
+                  <p className="text-xs text-muted-foreground">
+                    {segments.map((segment) => `${segment.duration_minutes} min à ${segment.target_pace}`).join(" → ")}
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Ajoutez au moins un segment pour démarrer la session programmée.
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {status === "idle" && (
           <div className="flex w-full gap-2">
             <button
               onClick={() => setIsTreadmill(false)}
@@ -813,6 +993,50 @@ export default function Run() {
             </button>
           </div>
         )}
+
+        {isRunActive && isProgramActive && currentSegment ? (
+          <Card className="border-accent/30 bg-card/95">
+            <CardContent className="space-y-3 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold">
+                  Segment {currentSegmentIndex + 1}/{segments.length}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {Math.round(((currentSegmentIndex + 1) / Math.max(segments.length, 1)) * 100)}%
+                </p>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full bg-accent transition-all"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      Math.round(((currentSegmentIndex + 1) / Math.max(segments.length, 1)) * 100),
+                    )}%`,
+                  }}
+                />
+              </div>
+              <div className="space-y-1">
+                <p className="text-lg font-bold">Objectif : {currentSegment.target_pace} /km</p>
+                <p className="text-xs text-muted-foreground">
+                  {currentSegment.label?.trim() || `Segment ${currentSegmentIndex + 1}`}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Temps restant : {formatTime(secondsRemainingInCurrentSegment)}
+                </p>
+                {nextSegment ? (
+                  <p className="text-xs text-muted-foreground">
+                    Ensuite : {nextSegment.label?.trim() || "Segment suivant"} ({nextSegment.target_pace} /km)
+                  </p>
+                ) : null}
+                <p className="text-[11px] text-muted-foreground">
+                  Durée programmée : {formatTime(totalProgramDurationSeconds)} · Segment actuel :{" "}
+                  {formatTime(currentSegmentDurationSeconds)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {!isTreadmill && isRunActive && (
           <ScrollReveal>
@@ -977,7 +1201,12 @@ export default function Run() {
               </div>
               <div className="flex items-center gap-4">
                 {status === "idle" && (
-                  <Button size="lg" onClick={start} className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25">
+                  <Button
+                    size="lg"
+                    onClick={start}
+                    disabled={isProgrammedMode && !isProgramActive}
+                    className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"
+                  >
                     <Play className="h-7 w-7 ml-0.5" />
                   </Button>
                 )}

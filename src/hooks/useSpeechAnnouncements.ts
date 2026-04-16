@@ -2,6 +2,7 @@ import { useRef, useEffect, useCallback, type MutableRefObject } from "react";
 import type { RouteRow, RunGpsPoint } from "@/lib/database";
 import { convertPaceFromMinutesPerKm, type RunPreferences } from "@/lib/runPreferences";
 import type { ActiveSession } from "@/lib/activeSession";
+import type { SessionSegment } from "@/hooks/useSessionProgram";
 import { haversineDistanceKm } from "@/lib/parsers/gpxParser";
 
 /** Minutes per km over the trace from kilometre (endKm - 1) to endKm; null if GPS data is insufficient. */
@@ -53,6 +54,12 @@ type UseSpeechAnnouncementsParams = {
   activeRoute: RouteRow | null;
   routeProgress: number;
   routeArrivalAnnouncedRef: MutableRefObject<boolean>;
+  isProgrammedSessionActive?: boolean;
+  programmedSegments?: SessionSegment[];
+  currentProgramSegmentIndex?: number;
+  secondsRemainingInCurrentSegment?: number;
+  thirtySecondAnnouncedRef?: MutableRefObject<Set<number>>;
+  segmentTransitionAnnouncedRef?: MutableRefObject<Set<number>>;
 };
 
 export function useSpeechAnnouncements({
@@ -66,9 +73,66 @@ export function useSpeechAnnouncements({
   activeRoute,
   routeProgress,
   routeArrivalAnnouncedRef,
+  isProgrammedSessionActive = false,
+  programmedSegments = [],
+  currentProgramSegmentIndex = 0,
+  secondsRemainingInCurrentSegment = 0,
+  thirtySecondAnnouncedRef,
+  segmentTransitionAnnouncedRef,
 }: UseSpeechAnnouncementsParams) {
   const lastAnnouncedKmRef = useRef(0);
   const lastPaceAlertRef = useRef(0);
+
+  useEffect(() => {
+    if (!isProgrammedSessionActive || status !== "running") return;
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    if (!programmedSegments.length) return;
+
+    const current = programmedSegments[currentProgramSegmentIndex];
+    const next = programmedSegments[currentProgramSegmentIndex + 1];
+    if (!current) return;
+
+    if (
+      next &&
+      secondsRemainingInCurrentSegment <= 30 &&
+      secondsRemainingInCurrentSegment > 0 &&
+      thirtySecondAnnouncedRef &&
+      !thirtySecondAnnouncedRef.current.has(currentProgramSegmentIndex)
+    ) {
+      const nextLabel = next.label?.trim() || `segment ${currentProgramSegmentIndex + 2}`;
+      const utterance = new SpeechSynthesisUtterance(
+        `Dans 30 secondes, passage à ${nextLabel} à ${next.target_pace}.`,
+      );
+      utterance.lang = "fr-FR";
+      utterance.rate = 1.0;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      thirtySecondAnnouncedRef.current.add(currentProgramSegmentIndex);
+    }
+
+    if (
+      segmentTransitionAnnouncedRef &&
+      !segmentTransitionAnnouncedRef.current.has(currentProgramSegmentIndex)
+    ) {
+      const label = current.label?.trim() || `segment ${currentProgramSegmentIndex + 1}`;
+      const utterance = new SpeechSynthesisUtterance(
+        `Nouveau segment : ${label} — objectif ${current.target_pace} par kilomètre.`,
+      );
+      utterance.lang = "fr-FR";
+      utterance.rate = 1.0;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      segmentTransitionAnnouncedRef.current.add(currentProgramSegmentIndex);
+    }
+  }, [
+    currentProgramSegmentIndex,
+    isProgrammedSessionActive,
+    programmedSegments,
+    secondsRemainingInCurrentSegment,
+    segmentTransitionAnnouncedRef,
+    status,
+    thirtySecondAnnouncedRef,
+  ]);
 
   useEffect(() => {
     if (!activeRoute || status !== "running" || routeArrivalAnnouncedRef.current) return;
@@ -147,7 +211,11 @@ export function useSpeechAnnouncements({
     const timeSinceLastAlert = (now - lastPaceAlertRef.current) / 1000;
     if (timeSinceLastAlert < 15) return;
 
-    const targetPaceSeconds = parsePaceToSeconds(activeSession.session.pace);
+    const programmedTargetPace =
+      isProgrammedSessionActive && programmedSegments[currentProgramSegmentIndex]
+        ? programmedSegments[currentProgramSegmentIndex].target_pace
+        : null;
+    const targetPaceSeconds = parsePaceToSeconds(programmedTargetPace ?? activeSession.session.pace);
     if (targetPaceSeconds <= 0) return;
 
     const currentPaceSeconds = pace * 60;
@@ -173,7 +241,7 @@ export function useSpeechAnnouncements({
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
     lastPaceAlertRef.current = now;
-  }, [activeSession, pace, speechPrefsRef, status]);
+  }, [activeSession, currentProgramSegmentIndex, isProgrammedSessionActive, pace, programmedSegments, speechPrefsRef, status]);
 
   const resetAnnouncementRefs = useCallback(() => {
     lastAnnouncedKmRef.current = 0;
