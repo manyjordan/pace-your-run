@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import { Calendar, Route, Clock, type LucideIcon } from "lucide-react";
@@ -199,19 +199,18 @@ export const DashboardSection = ({
               </div>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                    <defs>
-                      <linearGradient id={`dashboardGradient-${metric.metricKind}-${index}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                      </linearGradient>
-                    </defs>
+                  <BarChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
                     <XAxis
                       dataKey="week"
                       axisLine={false}
                       tickLine={false}
                       height={64}
-                      tick={<CompactWeekTick granularity={metric.granularity ?? "week"} />}
+                      tick={
+                        <CompactWeekTick
+                          granularity={metric.granularity ?? "week"}
+                          period={metric.period ?? period}
+                        />
+                      }
                       interval={0}
                     />
                     <YAxis hide />
@@ -219,15 +218,14 @@ export const DashboardSection = ({
                       contentStyle={chartTooltipStyle}
                       formatter={(value) => formatDashboardTooltipForKind(metric.metricKind, Number(value))}
                     />
-                    <Area
-                      type="monotone"
+                    <Bar
                       dataKey="value"
-                      stroke="hsl(var(--accent))"
-                      strokeWidth={2}
-                      fill={`url(#dashboardGradient-${metric.metricKind}-${index})`}
-                      dot={false}
+                      fill="hsl(var(--accent))"
+                      fillOpacity={0.85}
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={48}
                     />
-                  </AreaChart>
+                  </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>

@@ -9,6 +9,17 @@ export type MetricKind = "distance" | "duration" | "elevation";
 export type MetricChartPeriod = "1m" | "3m" | "6m" | "1y" | "all";
 export type AggregationUnit = "week" | "month" | "quarter";
 
+/** X-axis tick label: for 1y monthly view, drop the year suffix (e.g. "Janv 24" → "Janv"). */
+export function formatXLabel(label: string, period: MetricChartPeriod): string {
+  if (period === "1y") {
+    return label.split(" ")[0] ?? label;
+  }
+  if (period === "all") {
+    return label;
+  }
+  return label;
+}
+
 export function getAggregationUnit(period: MetricChartPeriod): AggregationUnit {
   if (period === "all") return "quarter";
   if (period === "1y") return "month";

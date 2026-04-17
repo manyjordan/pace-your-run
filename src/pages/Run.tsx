@@ -4,12 +4,11 @@ import { RunCourseSettingsDialog } from "@/components/run/RunCourseSettingsDialo
 import { RunLiveMapBlock } from "@/components/run/RunLiveMapBlock";
 import { RunMainTimerCard } from "@/components/run/RunMainTimerCard";
 import { RunPerformanceRecapCard } from "@/components/run/RunPerformanceRecapCard";
-import { RunProgrammedSessionCard } from "@/components/run/RunProgrammedSessionCard";
 import { RunSplitsCard } from "@/components/run/RunSplitsCard";
 import { RunTreadmillSpeedPanel } from "@/components/run/RunTreadmillSpeedPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Map, AlertCircle, Gauge, Settings } from "lucide-react";
+import { Map, AlertCircle } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +18,6 @@ import { useRunSession, type RunSummary } from "@/hooks/useRunSession";
 import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
 import { INTERVAL_TEMPLATES, useSessionProgram } from "@/hooks/useSessionProgram";
 import { useTreadmill } from "@/hooks/useTreadmill";
-import { cn } from "@/lib/utils";
 import { updatePostAudience, type RouteRow, type RunRow } from "@/lib/database";
 import type { CommunityPost } from "@/lib/runFormatters";
 import {
@@ -291,88 +289,6 @@ export default function Run() {
       )}
 
       <div className="space-y-6">
-        {status === "idle" && (
-          <RunCourseSettingsDialog runPreferences={runPreferences} setRunPreferences={setRunPreferences} />
-        )}
-
-        {status === "idle" && (
-          <Card className="border-accent/30 bg-card/95">
-            <CardContent className="space-y-3 p-4">
-              <p className="text-sm font-semibold">Type de session</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setRunMode("free")}
-                  className={cn(
-                    "rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all",
-                    runMode === "free"
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border text-muted-foreground hover:border-accent/50",
-                  )}
-                >
-                  Course libre
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRunMode("programmed")}
-                  className={cn(
-                    "rounded-lg border-2 px-3 py-2 text-sm font-semibold transition-all",
-                    runMode === "programmed"
-                      ? "border-accent bg-accent/10 text-accent"
-                      : "border-border text-muted-foreground hover:border-accent/50",
-                  )}
-                >
-                  Session programmée
-                </button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {status === "idle" && isProgrammedMode && (
-          <RunProgrammedSessionCard
-            programSource={programSource}
-            setProgramSource={setProgramSource}
-            selectedTemplateId={selectedTemplateId}
-            loadTemplate={loadTemplate}
-            segments={segments}
-            addSegment={addSegment}
-            removeSegment={removeSegment}
-            updateSegment={updateSegment}
-          />
-        )}
-
-        {status === "idle" && (
-          <div className="flex w-full gap-2">
-            <button
-              type="button"
-              onClick={() => treadmill.setIsTreadmill(false)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-semibold transition-all",
-                !treadmill.isTreadmill
-                  ? "border-accent bg-accent/10 text-accent"
-                  : "border-border text-muted-foreground hover:border-accent/50",
-              )}
-            >
-              <MapPin className="h-4 w-4" />
-              Course extérieure
-            </button>
-            <button
-              type="button"
-              onClick={() => treadmill.setIsTreadmill(true)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-2 rounded-lg border-2 py-3 text-sm font-semibold transition-all",
-                treadmill.isTreadmill
-                  ? "border-accent bg-accent/10 text-accent"
-                  : "border-border text-muted-foreground hover:border-accent/50",
-              )}
-            >
-              <Gauge className="h-4 w-4" />
-              Tapis roulant
-            </button>
-          </div>
-        )}
-
         {activeSession && status === "idle" && (
           <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/5 p-4">
             <div className="flex items-center justify-between">
@@ -531,6 +447,34 @@ export default function Run() {
           isProgrammedMode={isProgrammedMode}
           isProgramActive={isProgramActive}
         />
+
+        {status === "idle" && (
+          <div className="flex flex-col gap-3 pt-1">
+            <Button type="button" variant="outline" className="h-12 w-full gap-2" onClick={() => navigate("/routes")}>
+              <Map className="h-4 w-4 shrink-0" />
+              Mes parcours
+            </Button>
+            <RunCourseSettingsDialog
+              runPreferences={runPreferences}
+              setRunPreferences={setRunPreferences}
+              runMode={runMode}
+              setRunMode={setRunMode}
+              isProgrammedMode={isProgrammedMode}
+              isTreadmill={treadmill.isTreadmill}
+              setIsTreadmill={treadmill.setIsTreadmill}
+              programmed={{
+                programSource,
+                setProgramSource,
+                selectedTemplateId,
+                loadTemplate,
+                segments,
+                addSegment,
+                removeSegment,
+                updateSegment,
+              }}
+            />
+          </div>
+        )}
 
         {runSummary && status === "idle" && (
           <RunPerformanceRecapCard

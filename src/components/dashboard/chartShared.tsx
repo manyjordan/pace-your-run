@@ -1,3 +1,5 @@
+import { formatXLabel, type MetricChartPeriod } from "@/lib/dashboardHelpers";
+
 export const chartTooltipStyle = {
   background: "hsl(var(--card))",
   border: "1px solid hsl(var(--border))",
@@ -11,15 +13,19 @@ export function CompactWeekTick({
   y,
   payload,
   granularity = "week",
+  period = "3m",
 }: {
   x?: number;
   y?: number;
   payload?: { value: string; payload?: { showTick?: boolean } };
   granularity?: "week" | "month" | "quarter";
+  period?: MetricChartPeriod;
 }) {
   if (typeof x !== "number" || typeof y !== "number" || !payload) return null;
   if (payload.payload?.showTick === false) return null;
   const rotate = granularity === "week";
+
+  const display = formatXLabel(String(payload.value ?? ""), period);
 
   return (
     <g transform={`translate(${x},${y})`}>
@@ -33,7 +39,7 @@ export function CompactWeekTick({
         fontWeight={500}
         transform={rotate ? "rotate(-35)" : undefined}
       >
-        {payload.value}
+        {display}
       </text>
     </g>
   );

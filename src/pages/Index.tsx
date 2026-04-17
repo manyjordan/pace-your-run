@@ -247,12 +247,12 @@ const Dashboard = () => {
         {isLoading ? (
           <SkeletonHeroBanner />
         ) : (
-          <div className="rounded-2xl border border-accent/70 bg-accent px-5 py-5 text-accent-foreground shadow-[0_18px_44px_hsl(var(--accent)/0.2)]">
+          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/20 via-background to-background px-5 py-5 text-foreground shadow-[0_12px_30px_hsl(var(--foreground)/0.06)]">
             <div>
               <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
-                Bonjour <span className="text-accent-foreground">{athleteName}</span>
+                Bonjour <span className="text-foreground">{athleteName}</span>
               </h1>
-              <p className="mt-1 text-sm text-accent-foreground/80">{weeklyInsight}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{weeklyInsight}</p>
             </div>
           </div>
         )}

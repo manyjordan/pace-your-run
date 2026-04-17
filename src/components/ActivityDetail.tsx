@@ -240,7 +240,7 @@ export function ActivityDetail({
     return () => {
       cancelled = true;
     };
-  }, [activity, activity.id, resolvedUserId, traceLen]);
+  }, [activity, resolvedUserId, traceLen]);
 
   const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
   const normalizedAllActivities = useMemo(

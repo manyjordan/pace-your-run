@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
 import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
-import { getStartOfWeek } from "@/lib/dashboardHelpers";
+import { getStartOfWeek, type MetricChartPeriod } from "@/lib/dashboardHelpers";
 import { formatDistance, formatDuration, formatPace } from "@/lib/runFormatters";
 
 const WEEKS_BACK = 12;
@@ -68,6 +68,8 @@ function weekBuckets(runs: RunRow[]) {
 
   return { paceSeries, distanceSeries };
 }
+
+const PERFORMANCE_CHART_PERIOD: MetricChartPeriod = "3m";
 
 export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
   const { paceSeries, distanceSeries } = useMemo(() => weekBuckets(runs), [runs]);
@@ -138,14 +140,15 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                <defs>
-                  <linearGradient id="performancePaceGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick granularity="week" />} interval={0} />
+              <BarChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                <XAxis
+                  dataKey="week"
+                  axisLine={false}
+                  tickLine={false}
+                  height={64}
+                  tick={<CompactWeekTick granularity="week" period={PERFORMANCE_CHART_PERIOD} />}
+                  interval={0}
+                />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
@@ -154,15 +157,14 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
                     return [p?.paceLabel || "—", "Allure moy."];
                   }}
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="value"
-                  stroke="hsl(var(--accent))"
-                  strokeWidth={2}
-                  fill="url(#performancePaceGradient)"
-                  dot={false}
+                  fill="hsl(var(--accent))"
+                  fillOpacity={0.85}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
                 />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -188,28 +190,28 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                <defs>
-                  <linearGradient id="performanceDistanceGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick granularity="week" />} interval={0} />
+              <BarChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                <XAxis
+                  dataKey="week"
+                  axisLine={false}
+                  tickLine={false}
+                  height={64}
+                  tick={<CompactWeekTick granularity="week" period={PERFORMANCE_CHART_PERIOD} />}
+                  interval={0}
+                />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} km`, "Distance"]}
                 />
-                <Area
-                  type="monotone"
+                <Bar
                   dataKey="value"
-                  stroke="hsl(var(--accent))"
-                  strokeWidth={2}
-                  fill="url(#performanceDistanceGradient)"
-                  dot={false}
+                  fill="hsl(var(--accent))"
+                  fillOpacity={0.85}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
                 />
-              </AreaChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
