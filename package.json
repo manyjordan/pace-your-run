@@ -15,8 +15,10 @@
   },
   "dependencies": {
     "@capacitor/app": "8.0.0",
+    "@capacitor/background-runner": "^2.3.1",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
+    "@capacitor/geolocation": "^8.2.0",
     "@capacitor/ios": "^8.3.0",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",

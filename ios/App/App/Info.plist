@@ -58,6 +58,24 @@
 			</array>
 		</dict>
 	</array>
+
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+		<string>location</string>
+		<string>audio</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.pace.runapp.background</string>
+	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activité.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Pace utilise votre position GPS pour enregistrer votre course, même lorsque l'écran est verrouillé.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Pace utilise votre position GPS pour enregistrer votre course, même lorsque l'écran est verrouillé.</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>

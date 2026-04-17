@@ -180,22 +180,24 @@ export function useRunSession({
       if (treadmill.isTreadmill) {
         startInterval();
       } else {
-        const startOk = startGpsTracking();
-        if (startOk) {
-          startInterval();
-        }
+        void (async () => {
+          const startOk = await startGpsTracking();
+          if (startOk) {
+            startInterval();
+          }
+        })();
       }
     } else if (status === "paused") {
-      stopGpsTracking();
+      void stopGpsTracking();
       stopInterval();
     } else if (status === "idle") {
-      stopGpsTracking();
+      void stopGpsTracking();
       stopInterval();
     }
 
     return () => {
       stopInterval();
-      if (status === "idle") stopGpsTracking();
+      void stopGpsTracking();
     };
   }, [
     treadmill.isTreadmill,
@@ -317,7 +319,7 @@ export function useRunSession({
 
     if (treadmill.isTreadmill && !treadmill.showTreadmillCorrection) {
       bluetooth.disconnectHardware();
-      stopGpsTracking();
+      await stopGpsTracking();
       stopInterval();
       if (status !== "idle" && finalElapsed > 0 && finalDistance > 0) {
         setRunSummary({
@@ -407,7 +409,7 @@ export function useRunSession({
     }
 
     bluetooth.disconnectHardware();
-    stopGpsTracking();
+    await stopGpsTracking();
     setStatus("idle");
     setElapsed(0);
     setDistance(0);
