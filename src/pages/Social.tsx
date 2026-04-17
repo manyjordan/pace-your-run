@@ -124,7 +124,7 @@ function inferPostType(title: string, description: string) {
   return "run" as const;
 }
 
-const PAGE_SIZE = 20;
+const FEED_PAGE_SIZE = 10;
 
 function ranWithBadgeText(description: string): string | null {
   const idx = description.indexOf("Couru avec");
@@ -330,20 +330,22 @@ export default function Social() {
       }
 
       try {
-        const newPosts = await getPersonalizedFeed(user.id, PAGE_SIZE, pageNum * PAGE_SIZE);
+        const newPosts = await getPersonalizedFeed(user.id, FEED_PAGE_SIZE, pageNum * FEED_PAGE_SIZE);
         const mappedPosts = newPosts.map(mapPersonalizedPostToFeedPost);
 
         if (pageNum === 0) {
           setPosts(mappedPosts);
           setActivities(newPosts.filter((post) => post.run).map((post) => post.run as RunRow));
+          setPage(0);
         } else {
           setPosts((prev) => [...prev, ...mappedPosts]);
           setActivities((prev) => [
             ...prev,
             ...newPosts.filter((post) => post.run).map((post) => post.run as RunRow),
           ]);
+          setPage(pageNum);
         }
-        setHasMore(newPosts.length === PAGE_SIZE);
+        setHasMore(newPosts.length >= FEED_PAGE_SIZE);
       } catch (error) {
         logger.error("Failed to load feed", error);
         if (pageNum === 0) {
@@ -864,13 +866,11 @@ export default function Social() {
                 <button
                   type="button"
                   onClick={() => {
-                    const nextPage = page + 1;
-                    setPage(nextPage);
-                    void loadFeed(nextPage);
+                    void loadFeed(page + 1);
                   }}
                   className="w-full rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground hover:border-accent/50 hover:text-foreground transition-colors"
                 >
-                  Charger plus de publications
+                  Voir plus
                 </button>
               )}
 

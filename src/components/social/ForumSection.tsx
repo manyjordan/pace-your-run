@@ -217,10 +217,12 @@ export function ForumSection() {
 
         if (pageNum === 0) {
           setThreads(newThreads);
+          setThreadsPage(0);
         } else {
           setThreads((prev) => [...prev, ...newThreads]);
+          setThreadsPage(pageNum);
         }
-        setHasMoreThreads(fetchedThreads.length === THREADS_PAGE_SIZE);
+        setHasMoreThreads(fetchedThreads.length >= THREADS_PAGE_SIZE);
 
         if (user?.id && newThreads.length > 0) {
           try {
@@ -367,6 +369,8 @@ export function ForumSection() {
   const handleCategoryClick = (categoryId: string) => {
     setThreadsPage(0);
     setHasMoreThreads(true);
+    setThreads([]);
+    setLikedThreadIds([]);
     setSelectedCategoryId((current) => (current === categoryId ? "all" : categoryId));
     scrollToDiscussions();
   };
@@ -993,13 +997,11 @@ export function ForumSection() {
                   <button
                     type="button"
                     onClick={() => {
-                      const next = threadsPage + 1;
-                      setThreadsPage(next);
-                      void loadThreads(selectedCategoryId, next);
+                      void loadThreads(selectedCategoryId, threadsPage + 1);
                     }}
                     className="w-full rounded-xl border border-border py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    Voir plus de sujets
+                    Voir plus
                   </button>
                 )}
 
