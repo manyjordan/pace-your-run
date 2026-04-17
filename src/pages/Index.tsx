@@ -74,11 +74,15 @@ const Dashboard = () => {
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
   const [period, setPeriod] = useState<DashboardPeriod>("3m");
   const isLoadingRef = useRef(false);
+  const lastFetchRef = useRef<number>(0);
   const hasMountedRef = useRef(false);
   const loadUserDataRef = useRef<() => Promise<void>>(async () => {});
 
   const loadUserData = useCallback(async () => {
+    const now = Date.now();
     if (isLoadingRef.current) return;
+    if (now - lastFetchRef.current < 30_000) return;
+    lastFetchRef.current = now;
     isLoadingRef.current = true;
 
     if (!session?.user.id) {

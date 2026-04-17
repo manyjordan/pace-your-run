@@ -349,7 +349,8 @@ export async function getProfilesByIds(userIds: string[]): Promise<ProfileRow[]>
   const { data, error } = await supabase
     .from("profiles")
     .select("id, first_name, full_name, username, avatar_url")
-    .in("id", userIds);
+    .in("id", userIds)
+    .limit(500);
   if (error) throw error;
   return (data ?? []) as ProfileRow[];
 }
@@ -363,7 +364,8 @@ export async function getRuns(userId: string) {
       "id, user_id, started_at, distance_km, duration_seconds, average_pace, average_heartrate, elevation_gain, run_type, title, moving_time_seconds, created_at, ran_with",
     )
     .eq("user_id", userId)
-    .order("started_at", { ascending: false });
+    .order("started_at", { ascending: false })
+    .limit(100);
 
   if (error) throw error;
   return (data ?? []) as RunRow[];
@@ -408,7 +410,8 @@ export async function getRoutes(userId: string): Promise<RouteRow[]> {
     .from("routes")
     .select("*")
     .eq("user_id", userId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(100);
   if (error) throw error;
   return (data ?? []) as RouteRow[];
 }
@@ -484,13 +487,13 @@ export async function getPublicPosts() {
     { data: likes, error: likesError },
   ] = await Promise.all([
     runIds.length
-      ? supabase.from("runs").select("*").in("id", runIds)
+      ? supabase.from("runs").select("*").in("id", runIds).limit(100)
       : Promise.resolve({ data: [], error: null }),
     userIds.length
-      ? supabase.from("profiles").select("*").in("id", userIds)
+      ? supabase.from("profiles").select("*").in("id", userIds).limit(500)
       : Promise.resolve({ data: [], error: null }),
     postIds.length
-      ? supabase.from("post_likes").select("post_id").eq("user_id", currentUserId).in("post_id", postIds)
+      ? supabase.from("post_likes").select("post_id").eq("user_id", currentUserId).in("post_id", postIds).limit(500)
       : Promise.resolve({ data: [], error: null }),
   ]);
 
@@ -563,7 +566,8 @@ export async function getFollowing(userId: string): Promise<string[]> {
   const { data, error } = await supabase
     .from("follows")
     .select("following_id")
-    .eq("follower_id", userId);
+    .eq("follower_id", userId)
+    .limit(500);
 
   if (error) throw error;
   return (data ?? []).map((row) => row.following_id as string);
@@ -575,7 +579,8 @@ export async function getFollowers(userId: string): Promise<string[]> {
   const { data, error } = await supabase
     .from("follows")
     .select("follower_id")
-    .eq("following_id", userId);
+    .eq("following_id", userId)
+    .limit(500);
 
   if (error) throw error;
   return (data ?? []).map((row) => row.follower_id as string);
@@ -603,7 +608,7 @@ export async function getMutualNetworkUserIds(userId: string): Promise<string[]>
  */
 export async function getPersonalizedFeed(
   userId: string,
-  limit = 20,
+  limit = 10,
   offset = 0,
 ): Promise<PersonalizedFeedPost[]> {
   await requireCurrentUserId(userId);
@@ -719,7 +724,11 @@ export async function getNotifications(userId: string): Promise<NotificationWith
   if (!rows?.length) return [];
 
   const actorIds = [...new Set(rows.map((r) => r.actor_id as string))];
-  const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*").in("id", actorIds);
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("*")
+    .in("id", actorIds)
+    .limit(100);
   if (profilesError) throw profilesError;
 
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as ProfileRow]));
@@ -771,7 +780,8 @@ export async function getSuggestedUsersToFollow(
     .from("runs")
     .select("user_id")
     .gte("started_at", since.toISOString())
-    .not("user_id", "is", null);
+    .not("user_id", "is", null)
+    .limit(2000);
 
   if (error) throw error;
 
@@ -787,7 +797,11 @@ export async function getSuggestedUsersToFollow(
   if (!sorted.length) return [];
 
   const userIds = sorted.map(([id]) => id);
-  const { data: profiles, error: profilesError } = await supabase.from("profiles").select("*").in("id", userIds);
+  const { data: profiles, error: profilesError } = await supabase
+    .from("profiles")
+    .select("*")
+    .in("id", userIds)
+    .limit(500);
   if (profilesError) throw profilesError;
 
   const profileMap = new Map((profiles ?? []).map((p) => [p.id, p as ProfileRow]));
@@ -918,8 +932,8 @@ export async function toggleLike(postId: string, userId: string) {
 
 export async function getForumCategories() {
   const [{ data: categories, error: categoriesError }, { data: threads, error: threadsError }] = await Promise.all([
-    supabase.from("forum_categories").select("*").order("sort_order", { ascending: true }),
-    supabase.from("forum_threads").select("id, category_id, updated_at"),
+    supabase.from("forum_categories").select("*").order("sort_order", { ascending: true }).limit(100),
+    supabase.from("forum_threads").select("id, category_id, updated_at").limit(1000),
   ]);
 
   if (categoriesError) throw categoriesError;
@@ -977,9 +991,15 @@ export async function getForumThreads(categoryId?: string, limit = 20, offset = 
     { data: categories, error: categoriesError },
     { data: replies, error: repliesError },
   ] = await Promise.all([
-    userIds.length ? supabase.from("profiles").select("*").in("id", userIds) : Promise.resolve({ data: [], error: null }),
-    categoryIds.length ? supabase.from("forum_categories").select("*").in("id", categoryIds) : Promise.resolve({ data: [], error: null }),
-    threadIds.length ? supabase.from("forum_replies").select("id, thread_id").in("thread_id", threadIds) : Promise.resolve({ data: [], error: null }),
+    userIds.length
+      ? supabase.from("profiles").select("*").in("id", userIds).limit(500)
+      : Promise.resolve({ data: [], error: null }),
+    categoryIds.length
+      ? supabase.from("forum_categories").select("*").in("id", categoryIds).limit(100)
+      : Promise.resolve({ data: [], error: null }),
+    threadIds.length
+      ? supabase.from("forum_replies").select("id, thread_id").in("thread_id", threadIds).limit(2000)
+      : Promise.resolve({ data: [], error: null }),
   ]);
 
   if (profilesError) throw profilesError;
@@ -1022,7 +1042,7 @@ export async function getForumThreadDetail(threadId: string) {
   ] = await Promise.all([
     supabase.from("forum_categories").select("*").eq("id", thread.category_id).maybeSingle(),
     supabase.from("profiles").select("*").eq("id", thread.user_id).maybeSingle(),
-    supabase.from("forum_replies").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }),
+    supabase.from("forum_replies").select("*").eq("thread_id", threadId).order("created_at", { ascending: true }).limit(500),
   ]);
 
   if (categoryError) throw categoryError;
@@ -1031,7 +1051,7 @@ export async function getForumThreadDetail(threadId: string) {
 
   const replyUserIds = Array.from(new Set((replies ?? []).map((reply) => reply.user_id).filter(Boolean)));
   const { data: replyProfiles, error: replyProfilesError } = replyUserIds.length
-    ? await supabase.from("profiles").select("*").in("id", replyUserIds)
+    ? await supabase.from("profiles").select("*").in("id", replyUserIds).limit(500)
     : { data: [], error: null };
 
   if (replyProfilesError) throw replyProfilesError;
@@ -1173,7 +1193,8 @@ export async function getForumLikedThreadIds(threadIds: string[], userId: string
     .from("forum_likes")
     .select("thread_id")
     .eq("user_id", userId)
-    .in("thread_id", threadIds);
+    .in("thread_id", threadIds)
+    .limit(500);
 
   if (error) throw error;
   return (data ?? []).map((r) => r.thread_id as string);
@@ -1267,6 +1288,7 @@ export async function toggleSessionCompleted(
     .eq("plan_id", planId)
     .eq("week_number", weekNumber)
     .eq("session_day", sessionDay)
+    .limit(1)
     .maybeSingle();
 
   if (existingError) throw existingError;
@@ -1331,7 +1353,8 @@ export async function getWeekSessions(
     .select("*")
     .eq("user_id", userId)
     .eq("plan_id", planId)
-    .eq("week_number", weekNumber);
+    .eq("week_number", weekNumber)
+    .limit(500);
 
   if (error) throw error;
   return (data ?? []) as TrainingPlanSessionRow[];
@@ -1348,7 +1371,8 @@ export async function getCompletedSessionsCount(
     .select("*")
     .eq("user_id", userId)
     .eq("plan_id", planId)
-    .eq("completed", true);
+    .eq("completed", true)
+    .limit(1000);
 
   if (error) throw error;
   return (data ?? []).length;
@@ -1366,7 +1390,8 @@ export async function getPlanProgress(
     .select("*")
     .eq("user_id", userId)
     .eq("plan_id", planId)
-    .eq("completed", true);
+    .eq("completed", true)
+    .limit(1000);
 
   if (error) throw error;
 
