@@ -14,9 +14,16 @@ export type SessionTemplate = {
   segments: Array<Omit<SessionSegment, "id">>;
 };
 
+function newSegmentId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `seg-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+}
+
 function makeSegment(partial?: Partial<SessionSegment>): SessionSegment {
   return {
-    id: crypto.randomUUID(),
+    id: newSegmentId(),
     duration_minutes: partial?.duration_minutes ?? 5,
     target_pace: partial?.target_pace ?? "6:00",
     label: partial?.label ?? "",

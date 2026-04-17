@@ -16,7 +16,7 @@ import { useBluetoothHR, type RunBluetoothStatus } from "@/hooks/useBluetoothHR"
 import { useRunSave } from "@/hooks/useRunSave";
 import { useRunSession, type RunSummary } from "@/hooks/useRunSession";
 import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
-import { INTERVAL_TEMPLATES, useSessionProgram } from "@/hooks/useSessionProgram";
+import { useSessionProgram } from "@/hooks/useSessionProgram";
 import { useTreadmill } from "@/hooks/useTreadmill";
 import { updatePostAudience, type RouteRow, type RunRow } from "@/lib/database";
 import type { CommunityPost } from "@/lib/runFormatters";

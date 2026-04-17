@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertCircle } from "lucide-react";
+import { logger } from "@/lib/logger";
 
 interface Props {
   children: ReactNode;
@@ -20,10 +21,10 @@ export class ErrorBoundary extends Component<Props, State> {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("ErrorBoundary caught:", error, errorInfo);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    logger.error("Run tab crashed", error, { componentStack: errorInfo.componentStack });
     void import("@sentry/react").then(({ captureException }) => {
-      captureException(error, { extra: { errorInfo } });
+      captureException(error, { extra: { componentStack: errorInfo.componentStack } });
     });
   }
 

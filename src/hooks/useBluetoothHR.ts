@@ -1,10 +1,12 @@
 import { useState, useRef, useCallback, useEffect, type MutableRefObject } from "react";
+import { Capacitor } from "@capacitor/core";
 import {
   connectHeartRateMonitor,
   disconnectHeartRateMonitor,
   isBluetoothAvailable,
   type BluetoothConnection,
 } from "@/lib/bluetooth";
+import { logger } from "@/lib/logger";
 
 export type RunBluetoothStatus = "idle" | "running" | "paused";
 
@@ -17,7 +19,9 @@ export function useBluetoothHR({ statusRef }: UseBluetoothHROptions) {
   const [isConnectingBluetooth, setIsConnectingBluetooth] = useState(false);
   const [bluetoothError, setBluetoothError] = useState("");
   const [heartRate, setHeartRate] = useState<number | null>(null);
-  const [bluetoothAvailable] = useState(() => isBluetoothAvailable());
+  const [bluetoothAvailable] = useState(
+    () => !Capacitor.isNativePlatform() && isBluetoothAvailable(),
+  );
 
   const bluetoothConnectionRef = useRef<BluetoothConnection | null>(null);
   const heartRateSamplesRef = useRef<number[]>([]);
@@ -102,7 +106,11 @@ export function useBluetoothHR({ statusRef }: UseBluetoothHROptions) {
 
   useEffect(() => {
     return () => {
-      disconnectHeartRateMonitor();
+      try {
+        disconnectHeartRateMonitor();
+      } catch (e) {
+        logger.error("Bluetooth cleanup on unmount failed", e);
+      }
     };
   }, []);
 

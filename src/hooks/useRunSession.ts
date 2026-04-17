@@ -10,6 +10,7 @@ import {
 import type { User } from "@supabase/supabase-js";
 import type { RouteRow, RunGpsPoint, RunRow } from "@/lib/database";
 import {
+  formatDuration as formatSocialDuration,
   formatPace as formatSocialPace,
   formatRelativeTime,
   getInitials,

@@ -122,16 +122,20 @@ export async function connectHeartRateMonitor(): Promise<BluetoothConnection> {
 }
 
 export function disconnectHeartRateMonitor() {
-  if (!activeConnection) return;
-
-  const device = activeConnection.device;
-  cleanupConnection();
-
   try {
-    if (device.gatt?.connected) {
-      device.gatt.disconnect();
+    if (!activeConnection) return;
+
+    const device = activeConnection.device;
+    cleanupConnection();
+
+    try {
+      if (device.gatt?.connected) {
+        device.gatt.disconnect();
+      }
+    } catch {
+      // Ignore disconnect failures and still clear local listeners/state.
     }
   } catch {
-    // Ignore disconnect failures and still clear local listeners/state.
+    activeConnection = null;
   }
 }
