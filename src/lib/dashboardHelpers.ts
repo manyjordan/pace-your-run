@@ -1,10 +1,19 @@
 import type { RunRow } from "@/lib/database";
 import { Route, Clock, Mountain } from "lucide-react";
+import { format, getMonth, getYear } from "date-fns";
+import { fr } from "date-fns/locale";
 
 export type MetricKind = "distance" | "duration" | "elevation";
 
 /** Supported time windows for dashboard metric charts (buildMetricData). */
 export type MetricChartPeriod = "1m" | "3m" | "6m" | "1y" | "all";
+export type AggregationUnit = "week" | "month" | "quarter";
+
+export function getAggregationUnit(period: MetricChartPeriod): AggregationUnit {
+  if (period === "all") return "quarter";
+  if (period === "1y") return "month";
+  return "week";
+}
 
 function runActivityDate(run: RunRow): string {
   return run.started_at ?? run.created_at ?? new Date().toISOString();
@@ -177,31 +186,19 @@ export function formatWeeklyDurationLabel(seconds: number) {
 export function formatAxisDateLabel(
   start: Date,
   granularity: "week" | "month" | "quarter",
-  period: MetricChartPeriod,
+  _period: MetricChartPeriod,
 ) {
-  const month = start.toLocaleDateString("fr-FR", { month: "short" }).replace(".", "");
-  const monthLabel = `${month.charAt(0).toUpperCase()}${month.slice(1)}`;
-  const year = String(start.getFullYear()).slice(-2);
-
-  if (granularity === "month" && (period === "1y" || period === "all")) {
-    return `${monthLabel} ${year}`;
-  }
-
-  if (period === "1y" || period === "all") {
-    const day = String(start.getDate()).padStart(2, "0");
-    return `${day} ${monthLabel} ${year}`;
-  }
-
-  if (granularity === "week") {
-    return `${start.getDate()} ${monthLabel}`;
-  }
-
   if (granularity === "month") {
-    return monthLabel;
+    return format(start, "MMM yy", { locale: fr })
+      .replace(".", "")
+      .replace(/^./, (c) => c.toUpperCase());
   }
-
-  const quarter = Math.floor(start.getMonth() / 3) + 1;
-  return `Q${quarter}`;
+  if (granularity === "quarter") {
+    const quarter = Math.floor(getMonth(start) / 3) + 1;
+    return `T${quarter} ${getYear(start)}`;
+  }
+  const month = format(start, "MMM", { locale: fr }).replace(".", "");
+  return `${start.getDate()} ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
 }
 
 export function trimLeadingZeroPeriods<T extends { value: number }>(series: T[]) {
@@ -331,85 +328,70 @@ export function buildMetricData(
     return actDate >= startDate && actDate <= now;
   });
 
-  let periods: Array<{ label: string; start: Date; distanceKm: number; durationSeconds: number; elevation: number }> = [];
+  const effectiveGranularity = getAggregationUnit(period);
+
+  const makeWeekStart = (date: Date) => getStartOfWeek(date);
+  const makeMonthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1);
+  const makeQuarterStart = (date: Date) => new Date(date.getFullYear(), Math.floor(date.getMonth() / 3) * 3, 1);
+  const addUnit = (date: Date, unit: AggregationUnit) => {
+    const d = new Date(date);
+    if (unit === "week") d.setDate(d.getDate() + 7);
+    if (unit === "month") d.setMonth(d.getMonth() + 1);
+    if (unit === "quarter") d.setMonth(d.getMonth() + 3);
+    return d;
+  };
+  const startForUnit = (date: Date, unit: AggregationUnit) => {
+    if (unit === "week") return makeWeekStart(date);
+    if (unit === "month") return makeMonthStart(date);
+    return makeQuarterStart(date);
+  };
+
+  let periods: Array<{
+    label: string;
+    start: Date;
+    distanceKm: number;
+    durationSeconds: number;
+    elevation: number;
+    averagePaceSecondsPerKm: number;
+    averageHeartRate: number | null;
+  }> = [];
   let currentLabel = "";
 
-  if (granularity === "week") {
-    const alignedStartDate = getStartOfWeek(startDate);
-    const currentWeekStart = getStartOfWeek(now);
-    const weekCount =
-      Math.max(
-        1,
-        Math.round((currentWeekStart.getTime() - alignedStartDate.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1,
-      );
+  const alignedStartDate = startForUnit(startDate, effectiveGranularity);
+  const alignedCurrentStart = startForUnit(now, effectiveGranularity);
+  for (
+    let bucketStart = new Date(alignedStartDate);
+    bucketStart <= alignedCurrentStart;
+    bucketStart = addUnit(bucketStart, effectiveGranularity)
+  ) {
+    const bucketEnd = addUnit(bucketStart, effectiveGranularity);
+    const bucketRuns = filteredRuns.filter((run) => {
+      const actDate = new Date(runActivityDate(run));
+      return actDate >= bucketStart && actDate < bucketEnd;
+    });
+    const distanceKm = bucketRuns.reduce((sum, r) => sum + r.distance_km, 0);
+    const durationSeconds = bucketRuns.reduce((sum, r) => sum + r.duration_seconds, 0);
+    const elevation = bucketRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0);
+    const averagePaceSecondsPerKm = distanceKm > 0 ? durationSeconds / distanceKm : 0;
+    const hrSamples = bucketRuns
+      .map((r) => r.average_heartrate ?? null)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0);
+    const averageHeartRate = hrSamples.length
+      ? hrSamples.reduce((sum, bpm) => sum + bpm, 0) / hrSamples.length
+      : null;
+    const label = formatAxisDateLabel(bucketStart, effectiveGranularity, period);
 
-    for (let i = 0; i < weekCount; i++) {
-      const weekStart = new Date(alignedStartDate);
-      weekStart.setDate(alignedStartDate.getDate() + i * 7);
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 7);
+    periods.push({
+      label,
+      start: new Date(bucketStart),
+      distanceKm,
+      durationSeconds,
+      elevation,
+      averagePaceSecondsPerKm,
+      averageHeartRate,
+    });
 
-      const weekRuns = filteredRuns.filter((run) => {
-        const actDate = new Date(runActivityDate(run));
-        return actDate >= weekStart && actDate < weekEnd;
-      });
-
-      const label = formatAxisDateLabel(weekStart, "week", period);
-
-      periods.push({
-        label,
-        start: new Date(weekStart),
-        distanceKm: weekRuns.reduce((sum, r) => sum + r.distance_km, 0),
-        durationSeconds: weekRuns.reduce((sum, r) => sum + r.duration_seconds, 0),
-        elevation: weekRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0),
-      });
-
-      if (weekStart.getTime() === currentWeekStart.getTime()) currentLabel = label;
-    }
-  } else if (granularity === "month") {
-    const monthCount = Math.ceil((now.getTime() - startDate.getTime()) / (30 * 24 * 60 * 60 * 1000)) || 1;
-    for (let i = monthCount - 1; i >= 0; i--) {
-      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = i === 0 ? now : new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
-
-      const monthRuns = filteredRuns.filter((run) => {
-        const actDate = new Date(runActivityDate(run));
-        return actDate >= monthStart && actDate < monthEnd;
-      });
-
-      const label = formatAxisDateLabel(monthStart, "month", period);
-      periods.push({
-        label,
-        start: new Date(monthStart),
-        distanceKm: monthRuns.reduce((sum, r) => sum + r.distance_km, 0),
-        durationSeconds: monthRuns.reduce((sum, r) => sum + r.duration_seconds, 0),
-        elevation: monthRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0),
-      });
-
-      if (i === 0) currentLabel = label;
-    }
-  } else {
-    const quarterCount = Math.ceil((now.getTime() - startDate.getTime()) / (91 * 24 * 60 * 60 * 1000)) || 1;
-    for (let i = quarterCount - 1; i >= 0; i--) {
-      const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3 - i * 3, 1);
-      const quarterEnd = i === 0 ? now : new Date(quarterStart.getFullYear(), quarterStart.getMonth() + 3, 1);
-
-      const quarterRuns = filteredRuns.filter((run) => {
-        const actDate = new Date(runActivityDate(run));
-        return actDate >= quarterStart && actDate < quarterEnd;
-      });
-
-      const label = formatAxisDateLabel(quarterStart, "quarter", period);
-      periods.push({
-        label,
-        start: new Date(quarterStart),
-        distanceKm: quarterRuns.reduce((sum, r) => sum + r.distance_km, 0),
-        durationSeconds: quarterRuns.reduce((sum, r) => sum + r.duration_seconds, 0),
-        elevation: quarterRuns.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0),
-      });
-
-      if (i === 0) currentLabel = label;
-    }
+    if (bucketStart.getTime() === alignedCurrentStart.getTime()) currentLabel = label;
   }
 
   if (periods.length === 0) {
@@ -504,13 +486,13 @@ export function buildMetricData(
               : p.elevation > 0
                 ? `${Math.round(p.elevation)} m`
                 : "";
-        return { week: p.label, value, barLabel };
+        return { week: p.label, value, barLabel, granularity: effectiveGranularity };
       }),
-      granularity,
+      effectiveGranularity,
       period,
     ),
     comment: generateComment(currentValue, previousValue, allValues),
-    granularity: granularity as "week" | "month" | "quarter",
+    granularity: effectiveGranularity,
     period,
   };
 }

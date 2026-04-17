@@ -13,6 +13,7 @@ import { SkeletonMetricCard } from "@/components/dashboard/SkeletonMetricCard";
 import {
   buildMetricData,
   buildGoalAwareWeeklyInsight,
+  getAggregationUnit,
   type MetricChartPeriod,
 } from "@/lib/dashboardHelpers";
 
@@ -182,7 +183,7 @@ const Dashboard = () => {
   const runningRuns = useMemo(() => recentRuns.filter(isRunRow), [recentRuns]);
 
   const metricCards = useMemo(() => {
-    const granularity = period === "3m" ? "week" : "month";
+    const granularity = getAggregationUnit(period);
     const titles =
       granularity === "week"
         ? {
@@ -190,11 +191,17 @@ const Dashboard = () => {
             duration: "Durée par semaine",
             elevation: "Dénivelé par semaine",
           }
-        : {
-            distance: "Distance par mois",
-            duration: "Durée par mois",
-            elevation: "Dénivelé par mois",
-          };
+        : granularity === "month"
+          ? {
+              distance: "Distance par mois",
+              duration: "Durée par mois",
+              elevation: "Dénivelé par mois",
+            }
+          : {
+              distance: "Distance par trimestre",
+              duration: "Durée par trimestre",
+              elevation: "Dénivelé par trimestre",
+            };
     return [
       buildMetricData(titles.distance, runningRuns, granularity, period, "distance"),
       buildMetricData(titles.duration, runningRuns, granularity, period, "duration"),

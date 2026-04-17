@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
@@ -138,8 +138,14 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick />} interval={0} />
+              <AreaChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                <defs>
+                  <linearGradient id="performancePaceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick granularity="week" />} interval={0} />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
@@ -148,17 +154,15 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
                     return [p?.paceLabel || "—", "Allure moy."];
                   }}
                 />
-                <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey="paceLabel"
-                    position="top"
-                    formatter={(value: string) => (value ? value.replace(" /km", "") : "")}
-                    fill="hsl(var(--foreground))"
-                    fontSize={10}
-                    fontWeight={700}
-                  />
-                </Bar>
-              </BarChart>
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="hsl(var(--accent))"
+                  strokeWidth={2}
+                  fill="url(#performancePaceGradient)"
+                  dot={false}
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -184,24 +188,28 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick />} interval={0} />
+              <AreaChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                <defs>
+                  <linearGradient id="performanceDistanceGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick granularity="week" />} interval={0} />
                 <YAxis hide />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} km`, "Distance"]}
                 />
-                <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
-                  <LabelList
-                    dataKey="distanceBarLabel"
-                    position="top"
-                    formatter={(value: string) => (value ? value.replace(" km", "") : "")}
-                    fill="hsl(var(--foreground))"
-                    fontSize={10}
-                    fontWeight={700}
-                  />
-                </Bar>
-              </BarChart>
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="hsl(var(--accent))"
+                  strokeWidth={2}
+                  fill="url(#performanceDistanceGradient)"
+                  dot={false}
+                />
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>

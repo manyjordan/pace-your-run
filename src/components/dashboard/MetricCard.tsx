@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import {
   type MetricChartPeriod,
   type MetricKind,
-  compactWeeklyBarTopLabel,
   formatDashboardTooltipForKind,
+  getAggregationUnit,
 } from "@/lib/dashboardHelpers";
 import type { RunRow } from "@/lib/database";
 
@@ -31,7 +31,7 @@ interface MetricCardProps {
   buildMetricData: (
     title: string,
     runs: RunRow[],
-    granularity: "week" | "month",
+    granularity: "week" | "month" | "quarter",
     period: MetricChartPeriod,
     metricKind?: MetricKind,
   ) => WeeklyMetricCard;
@@ -39,8 +39,11 @@ interface MetricCardProps {
 }
 
 export const MetricCard = ({ metric, index, activities, buildMetricData }: MetricCardProps) => {
-  const [granularity, setGranularity] = useState<"week" | "month">(metric.granularity as "week" | "month" || "week");
+  const [granularity, setGranularity] = useState<"week" | "month" | "quarter">(
+    (metric.granularity as "week" | "month" | "quarter") || "week",
+  );
   const chartPeriod = metric.period ?? "3m";
+  const effectiveGranularity = getAggregationUnit(chartPeriod);
 
   const updatedMetric = useMemo(
     () => buildMetricData(metric.title, activities, granularity, chartPeriod, metric.metricKind),
@@ -93,13 +96,19 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
 
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={updatedMetric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+            <AreaChart data={updatedMetric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+              <defs>
+                <linearGradient id={`metricCardGradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                </linearGradient>
+              </defs>
               <XAxis
                 dataKey="week"
                 axisLine={false}
                 tickLine={false}
                 height={56}
-                tick={<CompactWeekTick />}
+                tick={<CompactWeekTick granularity={effectiveGranularity} />}
                 interval={0}
               />
               <YAxis hide />
@@ -108,17 +117,15 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
                 labelStyle={{ color: "hsl(var(--foreground))" }}
                 formatter={(value) => formatDashboardTooltipForKind(updatedMetric.metricKind, Number(value))}
               />
-              <Bar dataKey="value" fill={updatedMetric.color} radius={[4, 4, 0, 0]}>
-                <LabelList
-                  dataKey="barLabel"
-                  position="top"
-                  formatter={(value: string) => compactWeeklyBarTopLabel(updatedMetric.metricKind, value)}
-                  fill="hsl(var(--foreground))"
-                  fontSize={10}
-                  fontWeight={700}
-                />
-              </Bar>
-            </BarChart>
+              <Area
+                type="monotone"
+                dataKey="value"
+                stroke="hsl(var(--accent))"
+                strokeWidth={2}
+                fill={`url(#metricCardGradient-${index})`}
+                dot={false}
+              />
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       </div>

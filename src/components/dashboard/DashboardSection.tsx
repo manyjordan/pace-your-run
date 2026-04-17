@@ -1,11 +1,11 @@
 import { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LabelList } from "recharts";
+import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import { Calendar, Route, Clock, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
-import { compactWeeklyBarTopLabel, formatDashboardTooltipForKind } from "@/lib/dashboardHelpers";
+import { formatDashboardTooltipForKind } from "@/lib/dashboardHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -55,7 +55,7 @@ function periodRangeLabel(p: DashboardPeriod): string {
 
 function metricSubtitle(kind: MetricKind, period: DashboardPeriod): string {
   const range = periodRangeLabel(period);
-  const bucket = period === "3m" ? "semaine" : "mois";
+  const bucket = period === "all" ? "trimestre" : period === "1y" ? "mois" : "semaine";
   if (kind === "distance") return `Kilomètres cumulés par ${bucket} sur ${range}.`;
   if (kind === "duration") return `Temps total d'activité par ${bucket} sur ${range}.`;
   return `Dénivelé positif cumulé par ${bucket} sur ${range}.`;
@@ -199,24 +199,35 @@ export const DashboardSection = ({
               </div>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
-                    <XAxis dataKey="week" axisLine={false} tickLine={false} height={64} tick={<CompactWeekTick />} interval={0} />
+                  <AreaChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                    <defs>
+                      <linearGradient id={`dashboardGradient-${metric.metricKind}-${index}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="hsl(var(--accent))" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="hsl(var(--accent))" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="week"
+                      axisLine={false}
+                      tickLine={false}
+                      height={64}
+                      tick={<CompactWeekTick granularity={metric.granularity ?? "week"} />}
+                      interval={0}
+                    />
                     <YAxis hide />
                     <Tooltip
                       contentStyle={chartTooltipStyle}
                       formatter={(value) => formatDashboardTooltipForKind(metric.metricKind, Number(value))}
                     />
-                    <Bar dataKey="value" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]}>
-                      <LabelList
-                        dataKey="barLabel"
-                        position="top"
-                        formatter={(value: string) => compactWeeklyBarTopLabel(metric.metricKind, value)}
-                        fill="hsl(var(--foreground))"
-                        fontSize={10}
-                        fontWeight={700}
-                      />
-                    </Bar>
-                  </BarChart>
+                    <Area
+                      type="monotone"
+                      dataKey="value"
+                      stroke="hsl(var(--accent))"
+                      strokeWidth={2}
+                      fill={`url(#dashboardGradient-${metric.metricKind}-${index})`}
+                      dot={false}
+                    />
+                  </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
