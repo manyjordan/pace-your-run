@@ -2,12 +2,11 @@ import { useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
-import { Calendar, Route, Clock, type LucideIcon } from "lucide-react";
+import { Calendar, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
 import { formatDashboardTooltipForKind } from "@/lib/dashboardHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 type ProfileGoalData = {
@@ -153,7 +152,6 @@ export const DashboardSection = ({
   };
 
   const daysLeft = upcomingRace ? calculateDaysLeft(upcomingRace.date) : 18;
-  const latestRuns = useMemo(() => recentRuns.slice(0, 3), [recentRuns]);
 
   return (
     <div className="space-y-6">
@@ -199,7 +197,7 @@ export const DashboardSection = ({
               </div>
               <div className="h-44">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+                  <BarChart data={metric.chartData} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
                     <XAxis
                       dataKey="week"
                       axisLine={false}
@@ -213,7 +211,17 @@ export const DashboardSection = ({
                       }
                       interval={0}
                     />
-                    <YAxis hide />
+                    <YAxis
+                      width={36}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                      tickFormatter={(value) => {
+                        if (metric.unit === "km") return `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`;
+                        if (metric.unit === "h") return `${Number(value).toFixed(1)}h`;
+                        return `${Math.round(Number(value))}`;
+                      }}
+                    />
                     <Tooltip
                       contentStyle={chartTooltipStyle}
                       formatter={(value) => formatDashboardTooltipForKind(metric.metricKind, Number(value))}
@@ -233,91 +241,33 @@ export const DashboardSection = ({
         );
       })}
 
-      <div className="grid gap-6 md:grid-cols-2">
+      {computedUpcomingSessions.length > 0 ? (
         <ScrollReveal>
-          <div className="overflow-hidden rounded-xl border-2 border-accent/60 bg-card shadow-[0_14px_34px_hsl(var(--accent)/0.12)]">
-            <div className="bg-accent/20 px-5 py-3">
-              <div className="flex items-center gap-2">
-                <Route className="h-4 w-4 text-accent" />
-                <span className="text-sm font-semibold">Vos dernières activités</span>
-              </div>
+          <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-sm font-semibold">Séances à venir</h2>
+              <Calendar className="h-4 w-4 text-muted-foreground" />
             </div>
-            <div className="p-5">
-              {latestRuns.length > 0 ? (
-                <div className="space-y-3">
-                  {latestRuns.map((run) => (
-                    <div key={run.id} className="rounded-lg border border-border p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-semibold">{run.title || "Course enregistrée"}</p>
-                          {run.run_type === "treadmill" && (
-                            <Badge variant="outline" className="mt-1 border-muted-foreground/30 text-xs text-muted-foreground">
-                              Tapis roulant
-                            </Badge>
-                          )}
-                          <p className="text-xs text-muted-foreground">
-                            {run.started_at
-                              ? new Date(run.started_at).toLocaleDateString("fr-FR", {
-                                  day: "numeric",
-                                  month: "long",
-                                  year: "numeric",
-                                })
-                              : "Date indisponible"}
-                          </p>
-                        </div>
-                        <span className="text-sm font-semibold tabular-nums">{run.distance_km.toFixed(1)} km</span>
-                      </div>
-                      <div className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3.5 w-3.5" />
-                        <span className="tabular-nums">
-                          {Math.floor(run.duration_seconds / 3600) > 0
-                            ? `${Math.floor(run.duration_seconds / 3600)}h ${String(Math.floor((run.duration_seconds % 3600) / 60)).padStart(2, "0")}min`
-                            : `${Math.round(run.duration_seconds / 60)} min`}
-                        </span>
-                        {run.average_pace && (
-                          <>
-                            <span className="text-border">·</span>
-                            <span className="tabular-nums">
-                              {Math.floor(run.average_pace)}:{String(Math.round((run.average_pace % 1) * 60)).padStart(2, "0")} /km
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+            <div className="space-y-3">
+              {computedUpcomingSessions.map((session) => (
+                <div
+                  key={`${session.day}-${session.type}`}
+                  className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+                >
+                  <div className="h-10 w-1 rounded-full" style={{ backgroundColor: session.color }} />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold">{session.type}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {session.distance} · {session.pace}
+                    </p>
+                  </div>
+                  <span className="text-xs text-muted-foreground">{session.day}</span>
                 </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Aucune activité enregistrée pour le moment. Importez votre historique ou lancez votre première course depuis l'app.
-                </p>
-              )}
+              ))}
             </div>
           </div>
         </ScrollReveal>
-
-        {computedUpcomingSessions.length > 0 ? (
-          <ScrollReveal>
-            <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-sm font-semibold">Séances à venir</h2>
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-              </div>
-              <div className="space-y-3">
-                {computedUpcomingSessions.map((session) => (
-                  <div key={`${session.day}-${session.type}`} className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50">
-                    <div className="h-10 w-1 rounded-full" style={{ backgroundColor: session.color }} />
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">{session.type}</p>
-                      <p className="text-xs text-muted-foreground">{session.distance} · {session.pace}</p>
-                    </div>
-                    <span className="text-xs text-muted-foreground">{session.day}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </ScrollReveal>
-        ) : null}
-      </div>
+      ) : null}
 
       {upcomingRace && (
         <ScrollReveal>

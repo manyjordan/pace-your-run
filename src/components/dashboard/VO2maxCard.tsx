@@ -80,8 +80,8 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
       <div className="rounded-xl border border-accent/20 bg-card/95 p-5">
         <h2 className="mb-2 text-sm font-semibold">VO2max — évolution</h2>
         <p className="text-sm text-muted-foreground">
-          Enregistrez des courses avec distance et durée sur les dernières semaines pour afficher l&apos;évolution estimée
-          de votre VO2max.
+          Enregistrez des courses avec distance et durée sur les dernières semaines pour afficher l&apos;évolution de votre
+          VO2max.
         </p>
         <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{EXPLAIN}</p>
       </div>
@@ -108,15 +108,26 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
 
       <div className="h-40 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={series} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
+          <ComposedChart data={series} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
             <defs>
               <linearGradient id="vo2maxAreaFill" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.28} />
                 <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <XAxis dataKey="week" hide />
-            <YAxis hide domain={["auto", "auto"]} />
+            <XAxis
+              dataKey="week"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+            />
+            <YAxis
+              width={32}
+              axisLine={false}
+              tickLine={false}
+              domain={["auto", "auto"]}
+              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
+            />
             <Tooltip
               contentStyle={chartTooltipStyle}
               formatter={(value) => [(value != null ? `${Number(value).toFixed(1)} ml/kg/min` : "—"), "VO2max moy."]}
@@ -144,10 +155,6 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
       </div>
 
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{EXPLAIN}</p>
-      <p className="mt-2 text-[10px] leading-relaxed text-muted-foreground/90">
-        Estimation indicative par sortie (formule simplifiée), puis moyenne hebdomadaire. Ce n&apos;est pas une mesure
-        clinique.
-      </p>
     </div>
   );
 }

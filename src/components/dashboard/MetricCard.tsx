@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { Route } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
 import {
@@ -96,7 +97,7 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
 
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={updatedMetric.chartData} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+            <BarChart data={updatedMetric.chartData} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
               <XAxis
                 dataKey="week"
                 axisLine={false}
@@ -107,7 +108,17 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
                 }
                 interval={0}
               />
-              <YAxis hide />
+              <YAxis
+                width={36}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                tickFormatter={(value) => {
+                  if (updatedMetric.unit === "km") return `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`;
+                  if (updatedMetric.unit === "h") return `${Number(value).toFixed(1)}h`;
+                  return `${Math.round(Number(value))}`;
+                }}
+              />
               <Tooltip
                 contentStyle={chartTooltipStyle}
                 labelStyle={{ color: "hsl(var(--foreground))" }}

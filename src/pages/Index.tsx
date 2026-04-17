@@ -4,7 +4,14 @@ import { Activity, List, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, getRuns, getRunWithGps, type RunGpsPoint, type RunRow } from "@/lib/database";
+import {
+  getProfile,
+  getRuns,
+  getAllRunsForStats,
+  getRunWithGps,
+  type RunGpsPoint,
+  type RunRow,
+} from "@/lib/database";
 import { logger } from "@/lib/logger";
 import { normalizeGoalData } from "@/lib/goalHelpers";
 import { ActivityDetail } from "@/components/ActivityDetail";
@@ -71,6 +78,7 @@ const Dashboard = () => {
   const [userGoal, setUserGoal] = useState<ProfileGoalData | null>(null);
   const [runCount, setRunCount] = useState(0);
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
+  const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
   const [period, setPeriod] = useState<DashboardPeriod>("3m");
@@ -90,6 +98,7 @@ const Dashboard = () => {
       setUserGoal(null);
       setRunCount(0);
       setRecentRuns([]);
+      setRunsForStats([]);
       setAthleteName("Coureur");
       setIsLoading(false);
       isLoadingRef.current = false;
@@ -118,6 +127,7 @@ const Dashboard = () => {
       setUserGoal(null);
       setRunCount(0);
       setRecentRuns([]);
+      setRunsForStats([]);
     } finally {
       setIsLoading(false);
       isLoadingRef.current = false;
@@ -319,7 +329,7 @@ const Dashboard = () => {
             <p className="text-sm text-muted-foreground">Chargement...</p>
           ) : (
             <Suspense fallback={<div className="h-32 animate-pulse rounded-xl bg-muted" />}>
-              <PerformanceSection runs={recentRuns} />
+              <PerformanceSection runs={recentRuns} runsForStats={runsForStats} />
             </Suspense>
           )}
         </TabsContent>

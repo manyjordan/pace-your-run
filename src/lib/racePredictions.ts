@@ -1,3 +1,4 @@
+import { subDays } from "date-fns";
 import type { RunRow } from "./database";
 
 export type PredictionResult = {
@@ -43,44 +44,55 @@ const EXTENDED_RIEGEL_EXP = 1.08;
 
 const MIN_DISTANCE_KM = 3;
 const MIN_RUNS = 2;
-const THREE_WEEKS_MS = 21 * 24 * 60 * 60 * 1000;
 
 function eligibleRuns(runs: RunRow[]): RunRow[] {
-  return runs.filter((r) => r.distance_km > MIN_DISTANCE_KM && r.duration_seconds > 0);
+  return runs.filter((r) => r.distance_km >= MIN_DISTANCE_KM && r.duration_seconds > 0);
 }
 
 function paceSecondsPerKm(r: RunRow): number {
   return r.duration_seconds / r.distance_km;
 }
 
-/** Runs whose activity date falls within the last 21 days (inclusive of today). */
-export function filterRunsLastThreeWeeks(runs: RunRow[]): RunRow[] {
-  const now = Date.now();
-  const cutoff = now - THREE_WEEKS_MS;
+/** Runs whose activity date falls within the last 90 days. */
+export function filterRunsLastNinetyDays(runs: RunRow[]): RunRow[] {
+  const ninetyDaysAgo = subDays(new Date(), 90);
   return runs.filter((r) => {
     const raw = r.started_at ?? r.created_at;
     if (!raw) return false;
-    const t = new Date(raw).getTime();
-    return Number.isFinite(t) && t >= cutoff;
+    const t = new Date(raw);
+    return Number.isFinite(t.getTime()) && t >= ninetyDaysAgo;
   });
 }
 
-/** Runs used for prediction eligibility (last 3 weeks, distance > 3 km, duration known). */
+/** Runs used for prediction eligibility (last 90 days, distance ≥ 3 km, duration known). */
 export function getPredictionEligibleRuns(runs: RunRow[]): RunRow[] {
-  return eligibleRuns(filterRunsLastThreeWeeks(runs));
+  return eligibleRuns(filterRunsLastNinetyDays(runs));
 }
 
 /**
- * Reference race for Riegel / Daniels: median run by pace among eligible runs in the last 3 weeks
- * (robust to one-off easy or very hard days).
+ * Reference race for Riegel / Daniels: best pace (lowest s/km) among eligible runs in the last 90 days.
  */
 export function getBestReferenceFromRecentRuns(runs: RunRow[]): RunRow | null {
-  const recent = filterRunsLastThreeWeeks(runs);
-  const recentEligible = eligibleRuns(recent);
-  if (recentEligible.length === 0) return null;
-  const byPace = [...recentEligible].sort((a, b) => paceSecondsPerKm(a) - paceSecondsPerKm(b));
-  const mid = Math.floor(byPace.length / 2);
-  return byPace[mid] ?? null;
+  const ninetyDaysAgo = subDays(new Date(), 90);
+  const recentRuns = runs.filter((r) => {
+    const raw = r.started_at ?? r.created_at;
+    if (!raw) return false;
+    const t = new Date(raw);
+    return (
+      Number.isFinite(t.getTime()) &&
+      t >= ninetyDaysAgo &&
+      r.distance_km >= MIN_DISTANCE_KM &&
+      r.duration_seconds > 0
+    );
+  });
+
+  if (recentRuns.length === 0) return null;
+
+  return recentRuns.reduce((best, run) => {
+    const pace = run.duration_seconds / run.distance_km;
+    const bestPace = best.duration_seconds / best.distance_km;
+    return pace < bestPace ? run : best;
+  });
 }
 
 export function formatPacePerKm(secondsPerKm: number): string {
@@ -104,7 +116,7 @@ function buildReferenceInfo(run: RunRow, targetDistanceKm: number): PredictionRe
   const label = `${title} · ${run.distance_km.toFixed(1)} km · ${formatPacePerKm(pace)} · ${formatReferenceDate(run.started_at)}`;
 
   const explanation =
-    `Référence : course médiane par allure parmi vos sorties des 3 dernières semaines (plus de ${MIN_DISTANCE_KM} km). ` +
+    `Référence : course à la meilleure allure parmi vos sorties des 90 derniers jours (au moins ${MIN_DISTANCE_KM} km). ` +
     `Cette base sert aux extrapolations Riegel et Jack Daniels pour viser environ ${targetDistanceKm.toFixed(1)} km. ` +
     "Le modèle Riegel étendu moyenne encore vos 3 meilleures allures sur cette même fenêtre.";
 
@@ -272,7 +284,7 @@ export function getRacePrediction(
   targetDistanceKm: number,
   targetLabel: string,
 ): RacePrediction | null {
-  const recentWindow = filterRunsLastThreeWeeks(runs);
+  const recentWindow = filterRunsLastNinetyDays(runs);
   const eligible = eligibleRuns(recentWindow);
   if (eligible.length < MIN_RUNS) return null;
 
@@ -308,7 +320,7 @@ export function getRacePrediction(
     },
     {
       model: "Riegel étendu",
-      description: "Moyenne des extrapolations (exposant 1,08) sur vos 3 meilleures allures des 3 dernières semaines.",
+      description: "Moyenne des extrapolations (exposant 1,08) sur vos 3 meilleures allures des 90 derniers jours.",
       predictedSeconds: extendedSec,
       confidence: extendedConf,
     },

@@ -71,11 +71,17 @@ function weekBuckets(runs: RunRow[]) {
 
 const PERFORMANCE_CHART_PERIOD: MetricChartPeriod = "3m";
 
-export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
+export const PerformanceSection = ({
+  runs,
+  runsForStats,
+}: {
+  runs: RunRow[];
+  runsForStats: RunRow[];
+}) => {
   const { paceSeries, distanceSeries } = useMemo(() => weekBuckets(runs), [runs]);
 
   const stats = useMemo(() => {
-    if (runs.length === 0) {
+    if (runsForStats.length === 0) {
       return {
         totalKm: 0,
         totalDuration: 0,
@@ -86,10 +92,10 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
       };
     }
 
-    const totalKm = runs.reduce((s, r) => s + r.distance_km, 0);
-    const totalDuration = runs.reduce((s, r) => s + r.duration_seconds, 0);
-    const longestKm = Math.max(...runs.map((r) => r.distance_km), 0);
-    const withPace = runs.filter((r) => r.distance_km > 0.05 && r.duration_seconds > 0);
+    const totalKm = runsForStats.reduce((s, r) => s + r.distance_km, 0);
+    const totalDuration = runsForStats.reduce((s, r) => s + r.duration_seconds, 0);
+    const longestKm = Math.max(...runsForStats.map((r) => r.distance_km), 0);
+    const withPace = runsForStats.filter((r) => r.distance_km > 0.05 && r.duration_seconds > 0);
     let bestPaceLabel = "—";
     let bestSecPerKm = Number.POSITIVE_INFINITY;
     for (const r of withPace) {
@@ -105,12 +111,12 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
     return {
       totalKm,
       totalDuration,
-      runCount: runs.length,
+      runCount: runsForStats.length,
       longestKm,
       bestPaceLabel,
       avgPaceLabel,
     };
-  }, [runs]);
+  }, [runsForStats]);
 
   const lastPace = [...paceSeries].reverse().find((p) => p.value > 0);
   const lastDistance = [...distanceSeries].reverse().find((d) => d.value > 0);
@@ -118,7 +124,7 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
   return (
     <div className="space-y-6">
       <div>
-        <VO2maxCard runs={runs} />
+        <VO2maxCard runs={runsForStats} />
       </div>
       <ScrollReveal>
         <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
@@ -140,7 +146,7 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={paceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+              <BarChart data={paceSeries} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
                 <XAxis
                   dataKey="week"
                   axisLine={false}
@@ -149,7 +155,15 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
                   tick={<CompactWeekTick granularity="week" period={PERFORMANCE_CHART_PERIOD} />}
                   interval={0}
                 />
-                <YAxis hide />
+                <YAxis
+                  width={40}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickFormatter={(value) =>
+                    Number(value) > 0 ? formatPace(1000, Number(value)) : ""
+                  }
+                />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   formatter={(_value, _name, props) => {
@@ -190,7 +204,7 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
           </div>
           <div className="h-44">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={distanceSeries} margin={{ top: 8, right: 4, left: 4, bottom: 16 }}>
+              <BarChart data={distanceSeries} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
                 <XAxis
                   dataKey="week"
                   axisLine={false}
@@ -199,7 +213,13 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
                   tick={<CompactWeekTick granularity="week" period={PERFORMANCE_CHART_PERIOD} />}
                   interval={0}
                 />
-                <YAxis hide />
+                <YAxis
+                  width={36}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  tickFormatter={(value) => `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`}
+                />
                 <Tooltip
                   contentStyle={chartTooltipStyle}
                   formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} km`, "Distance"]}
@@ -261,7 +281,7 @@ export const PerformanceSection = ({ runs }: { runs: RunRow[] }) => {
       </ScrollReveal>
 
       <ScrollReveal>
-        <RacePredictionsCard runs={runs} />
+        <RacePredictionsCard runs={runsForStats} />
       </ScrollReveal>
     </div>
   );

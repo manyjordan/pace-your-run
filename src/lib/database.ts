@@ -371,6 +371,22 @@ export async function getRuns(userId: string) {
   return (data ?? []) as RunRow[];
 }
 
+/** All runs for analytics (no gps_trace); avoids the getRuns 100-row cap. */
+export async function getAllRunsForStats(userId: string) {
+  await requireCurrentUserId(userId);
+
+  const { data, error } = await supabase
+    .from("runs")
+    .select(
+      "id, user_id, started_at, created_at, distance_km, duration_seconds, average_pace, average_heartrate, elevation_gain, run_type, moving_time_seconds, title",
+    )
+    .eq("user_id", userId)
+    .order("started_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as RunRow[];
+}
+
 export async function getRunWithGps(userId: string, runId: string) {
   await requireCurrentUserId(userId);
 
