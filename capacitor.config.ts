@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   ios: {
     backgroundColor: '#000000',
     allowsLinkPreview: false,
-    scrollEnabled: false,
+    // scrollEnabled: false disables all WebView scrolling on iOS — do not use
     limitsNavigationsToAppBoundDomains: true,
   },
 };
