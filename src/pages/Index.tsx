@@ -4,7 +4,8 @@ import { Activity, List, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, getRuns, type RunGpsPoint, type RunRow } from "@/lib/database";
+import { getProfile, getRuns, getRunWithGps, type RunGpsPoint, type RunRow } from "@/lib/database";
+import { logger } from "@/lib/logger";
 import { normalizeGoalData } from "@/lib/goalHelpers";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
@@ -182,6 +183,16 @@ const Dashboard = () => {
   const openRunDetail = (run: RunRow) => {
     setSelectedRunForDetail(run);
     setSelectedDetailTrace(parseGpsTraceForDetail(run.gps_trace));
+    const uid = session?.user?.id;
+    if (!uid) return;
+    void getRunWithGps(uid, run.id)
+      .then((fullRun) => {
+        setSelectedRunForDetail((prev) => (prev?.id === run.id ? { ...prev, ...fullRun } : prev));
+        setSelectedDetailTrace(parseGpsTraceForDetail(fullRun.gps_trace));
+      })
+      .catch((err) => {
+        logger.error("getRunWithGps failed", err, { runId: run.id });
+      });
   };
 
   const runningRuns = useMemo(() => recentRuns.filter(isRunRow), [recentRuns]);

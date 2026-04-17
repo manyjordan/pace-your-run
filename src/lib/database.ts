@@ -361,7 +361,7 @@ export async function getRuns(userId: string) {
   const { data, error } = await supabase
     .from("runs")
     .select(
-      "id, user_id, started_at, distance_km, duration_seconds, average_pace, average_heartrate, elevation_gain, run_type, title, moving_time_seconds, created_at, ran_with",
+      "id, user_id, started_at, distance_km, duration_seconds, average_pace, average_heartrate, elevation_gain, run_type, title, moving_time_seconds, created_at, ran_with, gps_trace",
     )
     .eq("user_id", userId)
     .order("started_at", { ascending: false })

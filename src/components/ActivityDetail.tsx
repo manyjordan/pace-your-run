@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { logger } from "@/lib/logger";
@@ -206,47 +206,41 @@ export function ActivityDetail({
 }: ActivityDetailProps) {
   const { session } = useAuth();
   const resolvedUserId = userIdProp ?? session?.user?.id;
-  const activityRef = useRef(activity);
-  activityRef.current = activity;
 
   const [fullRun, setFullRun] = useState<RunRow | null>(null);
-  const [isLoadingGpsTrace, setIsLoadingGpsTrace] = useState(false);
-  const [gpsLoadAttempted, setGpsLoadAttempted] = useState(false);
+  const [gpsLoading, setGpsLoading] = useState(true);
+  const traceLen = Array.isArray(activity?.gps_trace) ? activity.gps_trace.length : 0;
 
   useEffect(() => {
-    setFullRun(null);
-    setGpsLoadAttempted(false);
-  }, [activity.id]);
-
-  useEffect(() => {
-    const act = activityRef.current;
-    if (!act?.id || !resolvedUserId || gpsLoadAttempted) return;
-    if (Array.isArray(act.gps_trace) && act.gps_trace.length > 0) {
-      setFullRun(act);
-      setGpsLoadAttempted(true);
+    if (!activity?.id || !resolvedUserId) {
+      setFullRun(null);
+      setGpsLoading(false);
+      return;
+    }
+    if (traceLen > 0) {
+      setFullRun(activity);
+      setGpsLoading(false);
       return;
     }
 
-    let isCancelled = false;
-    setIsLoadingGpsTrace(true);
-    setGpsLoadAttempted(true);
-
-    void getRunWithGps(resolvedUserId, act.id)
+    setFullRun(null);
+    setGpsLoading(true);
+    let cancelled = false;
+    void getRunWithGps(resolvedUserId, activity.id)
       .then((run) => {
-        if (!isCancelled) setFullRun(run);
+        if (!cancelled) setFullRun(run);
       })
       .catch((err) => {
-        logger.error("getRunWithGps failed", err, { runId: act.id, userId: resolvedUserId });
-        if (!isCancelled) setFullRun(null);
+        logger.error("getRunWithGps failed", err, { runId: activity.id });
       })
       .finally(() => {
-        if (!isCancelled) setIsLoadingGpsTrace(false);
+        if (!cancelled) setGpsLoading(false);
       });
 
     return () => {
-      isCancelled = true;
+      cancelled = true;
     };
-  }, [activity.id, gpsLoadAttempted, resolvedUserId]);
+  }, [activity, activity.id, resolvedUserId, traceLen]);
 
   const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
   const normalizedAllActivities = useMemo(
@@ -505,18 +499,22 @@ export function ActivityDetail({
           </div>
         </div>
 
-        {(isLoadingGpsTrace || analysis.trace) && (
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
-            <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
-            {isLoadingGpsTrace ? (
-              <div className="h-[220px] rounded-lg bg-muted animate-pulse" />
-            ) : analysis.trace ? (
-              <Suspense fallback={<div className="h-[220px] rounded-lg bg-muted animate-pulse" />}>
-                <GPSMap trace={analysis.trace} />
-              </Suspense>
-            ) : null}
-          </div>
-        )}
+        <div className="rounded-lg border border-accent/20 bg-card p-3">
+          <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
+          {gpsLoading ? (
+            <div className="flex h-[200px] animate-pulse items-center justify-center rounded-xl bg-muted">
+              <p className="text-xs text-muted-foreground">Chargement de la carte...</p>
+            </div>
+          ) : fullRun?.gps_trace && fullRun.gps_trace.length > 0 ? (
+            <Suspense fallback={<div className="h-[200px] rounded-xl bg-muted animate-pulse" />}>
+              <GPSMap trace={fullRun.gps_trace as GPSTracePoint[]} />
+            </Suspense>
+          ) : (
+            <div className="flex h-[200px] items-center justify-center rounded-xl bg-muted">
+              <p className="text-xs text-muted-foreground">Pas de données GPS disponibles</p>
+            </div>
+          )}
+        </div>
 
         {analysis.hasDetailedSplits && (
           <div className="rounded-lg border border-accent/20 bg-card p-4 shadow-[0_12px_30px_hsl(var(--accent)/0.06)]">
