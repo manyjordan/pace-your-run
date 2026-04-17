@@ -13,16 +13,6 @@ const config: CapacitorConfig = {
     scrollEnabled: false,
     limitsNavigationsToAppBoundDomains: true,
   },
-  plugins: {
-    BackgroundRunner: {
-      label: 'com.pace.runapp.background',
-      src: 'background.js',
-      event: 'runLoop',
-      repeat: true,
-      interval: 1,
-      autoStart: false,
-    },
-  },
 };
 
 export default config;
