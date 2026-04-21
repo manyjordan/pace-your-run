@@ -1,55 +1,82 @@
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, type SetStateAction } from "react";
+import { Capacitor } from "@capacitor/core";
+import { logger } from "@/lib/logger";
 
 export function useRunTimer() {
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, internalSetElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const keepAliveAudioRef = useRef<AudioContext | null>(null);
-  const keepAliveOscRef = useRef<OscillatorNode | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const pausedElapsedRef = useRef<number>(0);
 
-  const startKeepAlive = useCallback(async () => {
-    if (keepAliveAudioRef.current) return;
+  const setElapsed = useCallback((value: SetStateAction<number>) => {
+    internalSetElapsed((previous) => {
+      const next = typeof value === "function" ? value(previous) : value;
+      pausedElapsedRef.current = next;
+      startTimeRef.current = null;
+      return next;
+    });
+  }, []);
+
+  const startKeepAlive = useCallback(() => {
+    if (!Capacitor.isNativePlatform() || audioContextRef.current) return;
     try {
       const ctx = new AudioContext();
-      keepAliveAudioRef.current = ctx;
       if (ctx.state === "suspended") {
-        await ctx.resume();
+        void ctx.resume();
       }
       const oscillator = ctx.createOscillator();
       const gainNode = ctx.createGain();
-      gainNode.gain.value = 0.001;
+      gainNode.gain.value = 0.00001;
       oscillator.connect(gainNode);
       gainNode.connect(ctx.destination);
+      oscillator.frequency.value = 1;
       oscillator.start();
-      keepAliveOscRef.current = oscillator;
-    } catch {
-      keepAliveAudioRef.current?.close().catch(() => {});
-      keepAliveAudioRef.current = null;
-      keepAliveOscRef.current = null;
+      audioContextRef.current = ctx;
+      oscillatorRef.current = oscillator;
+    } catch (e) {
+      logger.error("AudioContext keepalive failed", e);
+      void audioContextRef.current?.close().catch(() => {});
+      audioContextRef.current = null;
+      oscillatorRef.current = null;
     }
   }, []);
 
   const stopKeepAlive = useCallback(() => {
     try {
-      keepAliveOscRef.current?.stop();
+      oscillatorRef.current?.stop();
     } catch {
       /* already stopped */
     }
-    keepAliveOscRef.current = null;
-    keepAliveAudioRef.current?.close().catch(() => {});
-    keepAliveAudioRef.current = null;
+    void audioContextRef.current?.close().catch(() => {});
+    audioContextRef.current = null;
+    oscillatorRef.current = null;
   }, []);
 
   const tick = useCallback(() => {
-    setElapsed((e) => e + 1);
+    if (startTimeRef.current === null) return;
+    const elapsedSeconds =
+      pausedElapsedRef.current + Math.floor((Date.now() - startTimeRef.current) / 1000);
+    internalSetElapsed(elapsedSeconds);
   }, []);
 
   const startInterval = useCallback(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
-    void startKeepAlive();
+    if (startTimeRef.current === null) {
+      startTimeRef.current = Date.now();
+    }
+    startKeepAlive();
+    tick();
     intervalRef.current = setInterval(tick, 1000);
   }, [tick, startKeepAlive]);
 
   const stopInterval = useCallback(() => {
+    if (startTimeRef.current !== null) {
+      pausedElapsedRef.current += Math.floor((Date.now() - startTimeRef.current) / 1000);
+      startTimeRef.current = null;
+      internalSetElapsed(pausedElapsedRef.current);
+    }
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -61,6 +88,7 @@ export function useRunTimer() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
       stopKeepAlive();
+      startTimeRef.current = null;
     };
   }, [stopKeepAlive]);
 

@@ -411,7 +411,7 @@ export default function Run() {
           </Card>
         ) : null}
 
-        {!treadmill.isTreadmill && isRunActive && (
+        {!treadmill.isTreadmill && isRunActive && activeRoute && status === "running" && (
           <RunLiveMapBlock
             activeRoute={activeRoute}
             gpsTrace={gpsTrace}

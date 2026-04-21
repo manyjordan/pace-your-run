@@ -19,6 +19,19 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
   const lastGpsPointRef = useRef<RunGpsPoint | null>(null);
   const watchEpochRef = useRef(0);
 
+  const requestLocationPermission = useCallback(async () => {
+    if (!Capacitor.isNativePlatform()) return null;
+    try {
+      const { Geolocation } = await import("@capacitor/geolocation");
+      return await Geolocation.requestPermissions({
+        permissions: ["location", "coarseLocation"],
+      });
+    } catch (e) {
+      logger.error("Location permission request failed", e);
+      return null;
+    }
+  }, []);
+
   const applyPosition = useCallback(
     (latitude: number, longitude: number, accuracy: number, altitude: number | null | undefined, now: number) => {
       if (accuracy > 50) {
@@ -62,8 +75,8 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
     if (Capacitor.isNativePlatform()) {
       try {
         const { Geolocation } = await import("@capacitor/geolocation");
-        const perm = await Geolocation.requestPermissions({ permissions: ["location", "coarseLocation"] });
-        if (perm.location === "denied") {
+        const perm = await requestLocationPermission();
+        if (!perm || perm.location === "denied") {
           setGpsError("GPS non disponible. Activez la localisation pour enregistrer votre course.");
           onPermissionDenied?.();
           return false;
@@ -132,7 +145,7 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
     );
 
     return true;
-  }, [applyPosition, onPermissionDenied]);
+  }, [applyPosition, onPermissionDenied, requestLocationPermission]);
 
   const stopGpsTracking = useCallback(async () => {
     watchEpochRef.current += 1;
