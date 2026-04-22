@@ -17,6 +17,7 @@ const Auth = lazy(() => import("@/pages/Auth"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const Run = lazy(() => import("@/pages/Run"));
 const Social = lazy(() => import("@/pages/Social"));
+const ForumCategory = lazy(() => import("@/pages/ForumCategory"));
 const Plan = lazy(() => import("@/pages/Plan"));
 const RoutesPage = lazy(() => import("@/pages/Routes"));
 const Health = lazy(() => import("@/pages/Health"));
@@ -56,6 +57,7 @@ function AppRoutes() {
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/" element={<Index />} />
                   <Route path="/social" element={<Social />} />
+                  <Route path="/forum/:categoryId" element={<ForumCategory />} />
                   <Route path="/run" element={<Run />} />
                   <Route path="/plan" element={<Plan />} />
                   <Route path="/routes" element={<RoutesPage />} />
