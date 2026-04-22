@@ -85,6 +85,7 @@ export const PerformanceSection = ({
       return {
         totalKm: 0,
         totalDuration: 0,
+        totalElevation: 0,
         runCount: 0,
         longestKm: 0,
         bestPaceLabel: "—",
@@ -92,25 +93,28 @@ export const PerformanceSection = ({
       };
     }
 
-    const totalKm = runsForStats.reduce((s, r) => s + r.distance_km, 0);
-    const totalDuration = runsForStats.reduce((s, r) => s + r.duration_seconds, 0);
-    const longestKm = Math.max(...runsForStats.map((r) => r.distance_km), 0);
-    const withPace = runsForStats.filter((r) => r.distance_km > 0.05 && r.duration_seconds > 0);
+    // Use all runs (recorded + imported) without filtering by source/run_type.
+    const totalKm = runsForStats.reduce((sum, r) => sum + (r.distance_km ?? 0), 0);
+    const totalDuration = runsForStats.reduce((sum, r) => sum + (r.duration_seconds ?? 0), 0);
+    const totalElevation = runsForStats.reduce((sum, r) => sum + (r.elevation_gain ?? 0), 0);
+    const longestKm = Math.max(...runsForStats.map((r) => r.distance_km ?? 0), 0);
+    const withPace = runsForStats.filter((r) => (r.distance_km ?? 0) > 0.05 && (r.duration_seconds ?? 0) > 0);
     let bestPaceLabel = "—";
     let bestSecPerKm = Number.POSITIVE_INFINITY;
     for (const r of withPace) {
-      const sec = r.duration_seconds / r.distance_km;
+      const sec = (r.duration_seconds ?? 0) / (r.distance_km ?? 1);
       if (sec < bestSecPerKm) {
         bestSecPerKm = sec;
-        bestPaceLabel = formatPace(r.distance_km * 1000, r.duration_seconds);
+        bestPaceLabel = formatPace((r.distance_km ?? 0) * 1000, r.duration_seconds ?? 0);
       }
     }
-    const avgPaceLabel =
-      totalKm > 0.01 ? formatPace(totalKm * 1000, totalDuration) : "—";
+    const avgPace = totalKm > 0 ? totalDuration / totalKm : 0;
+    const avgPaceLabel = avgPace > 0 ? formatPace(totalKm * 1000, totalDuration) : "—";
 
     return {
       totalKm,
       totalDuration,
+      totalElevation,
       runCount: runsForStats.length,
       longestKm,
       bestPaceLabel,
@@ -247,7 +251,7 @@ export const PerformanceSection = ({
             <div className="rounded-lg border border-border p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <BarChart3 className="h-3.5 w-3.5" />
-                Sorties enregistrées
+                Sorties totales
               </div>
               <p className="mt-2 text-2xl font-bold tabular-nums">{stats.runCount}</p>
             </div>
