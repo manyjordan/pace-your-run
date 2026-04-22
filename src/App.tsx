@@ -11,16 +11,16 @@ import { SplashScreen } from "@/components/SplashScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DeepLinkAuthHandler } from "@/components/DeepLinkAuthHandler";
 import { useState, useEffect, lazy, Suspense, useCallback } from "react";
+import Index from "@/pages/Index";
+import Run from "@/pages/Run";
+import Social from "@/pages/Social";
+import Plan from "@/pages/Plan";
+import Health from "@/pages/Health";
 
-const Index = lazy(() => import("@/pages/Index"));
 const Auth = lazy(() => import("@/pages/Auth"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));
-const Run = lazy(() => import("@/pages/Run"));
-const Social = lazy(() => import("@/pages/Social"));
 const ForumCategory = lazy(() => import("@/pages/ForumCategory"));
-const Plan = lazy(() => import("@/pages/Plan"));
 const RoutesPage = lazy(() => import("@/pages/Routes"));
-const Health = lazy(() => import("@/pages/Health"));
 const Settings = lazy(() => import("@/pages/Settings"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Import = lazy(() => import("@/pages/Import"));
@@ -52,17 +52,20 @@ function AppRoutes() {
           path="*"
           element={
             <ProtectedRoute>
-              <AppShell>
+              <AppShell
+                mainTabs={{
+                  index: <Index />,
+                  social: <Social />,
+                  run: <Run />,
+                  plan: <Plan />,
+                  health: <Health />,
+                }}
+              >
                 <Routes>
                   <Route path="/onboarding" element={<Onboarding />} />
-                  <Route path="/" element={<Index />} />
-                  <Route path="/social" element={<Social />} />
                   <Route path="/forum/:categoryId" element={<ForumCategory />} />
-                  <Route path="/run" element={<Run />} />
-                  <Route path="/plan" element={<Plan />} />
                   <Route path="/routes" element={<RoutesPage />} />
                   <Route path="/profile" element={<Navigate to="/settings" replace />} />
-                  <Route path="/health" element={<Health />} />
                   <Route path="/health/issue/:issueKey" element={<Health />} />
                   <Route path="/import" element={<Import />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
@@ -92,6 +95,31 @@ const App = () => {
   const handleSplashComplete = useCallback(() => {
     sessionStorage.setItem("splashShown", "true");
     setShowSplash(false);
+  }, []);
+
+  useEffect(() => {
+    const preload = () => {
+      void import("@/pages/Settings");
+      void import("@/pages/Import");
+      void import("@/pages/Profile");
+      void import("@/pages/ForumCategory");
+      void import("@/pages/Routes");
+      void import("@/pages/HealthKitSync");
+    };
+
+    if (typeof window === "undefined") return;
+    if ("requestIdleCallback" in window) {
+      const handle = (window as Window & { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(
+        preload,
+      );
+      return () => {
+        if ("cancelIdleCallback" in window) {
+          (window as Window & { cancelIdleCallback: (id: number) => void }).cancelIdleCallback(handle);
+        }
+      };
+    }
+    const timeoutId = window.setTimeout(preload, 2000);
+    return () => window.clearTimeout(timeoutId);
   }, []);
 
   return (

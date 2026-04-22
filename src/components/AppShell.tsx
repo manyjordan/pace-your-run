@@ -53,7 +53,14 @@ const mobileNavItems = [
   { to: "/health", icon: Heart, label: "Santé" },
 ];
 
-export const AppShell = ({ children }: { children: React.ReactNode }) => {
+type MainTabKey = "index" | "social" | "run" | "plan" | "health";
+
+type AppShellProps = {
+  children: React.ReactNode;
+  mainTabs: Record<MainTabKey, React.ReactNode>;
+};
+
+export const AppShell = ({ children, mainTabs }: AppShellProps) => {
   const location = useLocation();
   const { user } = useAuth();
   const { toast } = useToast();
@@ -185,6 +192,20 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
     };
   }, [syncOfflineRuns]);
 
+  const currentPath = location.pathname;
+  const activeMainTab =
+    currentPath === "/"
+      ? "index"
+      : currentPath === "/social"
+        ? "social"
+        : currentPath === "/run"
+          ? "run"
+          : currentPath === "/plan"
+            ? "plan"
+            : currentPath === "/health"
+              ? "health"
+              : null;
+
   return (
     <div className="min-h-screen bg-background pt-safe">
       {/* Top header */}
@@ -240,7 +261,14 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
       ) : null}
 
       {/* Main */}
-      <main className="container py-6 pb-24 md:pb-6">{children}</main>
+      <main className="container py-6 pb-24 md:pb-6">
+        <div className={activeMainTab === "index" ? "block" : "hidden"}>{mainTabs.index}</div>
+        <div className={activeMainTab === "social" ? "block" : "hidden"}>{mainTabs.social}</div>
+        <div className={activeMainTab === "run" ? "block" : "hidden"}>{mainTabs.run}</div>
+        <div className={activeMainTab === "plan" ? "block" : "hidden"}>{mainTabs.plan}</div>
+        <div className={activeMainTab === "health" ? "block" : "hidden"}>{mainTabs.health}</div>
+        {activeMainTab === null ? children : null}
+      </main>
 
       {/* Mobile bottom nav — 5 tabs */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-accent/30 bg-background/90 backdrop-blur-xl md:hidden">

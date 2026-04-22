@@ -22,7 +22,7 @@ import {
   Check,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -200,6 +200,7 @@ export default function Social() {
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifications, setNotifications] = useState<NotificationWithActor[]>([]);
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const hasLoadedRef = useRef(false);
 
   const buildRunFromPost = (post: FeedPost): RunRow => {
     const parseDistance = Number.parseFloat(post.stats.distance.replace(",", "."));
@@ -393,6 +394,8 @@ export default function Social() {
   }, [user?.id, loadFeed]);
 
   useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
     void loadCommunityPosts();
     void refreshUnreadCount();
     const handleReload = () => {
