@@ -157,6 +157,8 @@ export function useRunSession({
     setGpsAccuracy,
     gpsError,
     setGpsError,
+    rollingPaceSecondsPerKm,
+    setRollingPaceSecondsPerKm,
     lastGpsPointRef,
     startGpsTracking,
     stopGpsTracking,
@@ -166,9 +168,10 @@ export function useRunSession({
     onDistanceDelta: bumpDistance,
   });
 
-  const { elapsed, setElapsed, startInterval, stopInterval, formatTime } = useRunTimer();
+  const { elapsed, setElapsed, startInterval, stopInterval, startKeepAlive, formatTime } = useRunTimer();
 
-  const pace = distance > 0 ? elapsed / 60 / distance : 0;
+  const averagePace = distance > 0 ? elapsed / 60 / distance : 0;
+  const pace = treadmill.isTreadmill ? averagePace : rollingPaceSecondsPerKm > 0 ? rollingPaceSecondsPerKm / 60 : averagePace;
 
   const calories: number | undefined = undefined;
 
@@ -242,6 +245,7 @@ export function useRunSession({
   }, []);
 
   const start = useCallback(() => {
+    startKeepAlive();
     if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
       treadmill.resetTreadmillForFreshRun();
     }
@@ -253,6 +257,7 @@ export function useRunSession({
     setShowCompletedActivityDetail(false);
     setSaveError("");
     setGpsTrace([]);
+    setRollingPaceSecondsPerKm(0);
     setDistance(0);
     setElapsed(0);
     setGpsAccuracy(null);
@@ -294,10 +299,15 @@ export function useRunSession({
     currentIntervalRepRef,
     routeArrivalAnnouncedRef,
     userPreferencesUserId,
+    startKeepAlive,
+    setRollingPaceSecondsPerKm,
   ]);
 
   const pause = useCallback(() => setStatus("paused"), []);
-  const resume = useCallback(() => setStatus("running"), []);
+  const resume = useCallback(() => {
+    startKeepAlive();
+    setStatus("running");
+  }, [startKeepAlive]);
 
   const stop = useCallback(async () => {
     const finalDistance =
@@ -415,6 +425,7 @@ export function useRunSession({
     setElapsed(0);
     setDistance(0);
     setGpsTrace([]);
+    setRollingPaceSecondsPerKm(0);
     lastGpsPointRef.current = null;
     runStartedAtRef.current = null;
     bluetooth.heartRateSamplesRef.current = [];
@@ -463,6 +474,7 @@ export function useRunSession({
     resetKilometreAnnouncementRefRef,
     resetProgramProgressRef,
     routeArrivalAnnouncedRef,
+    setRollingPaceSecondsPerKm,
   ]);
 
   return {

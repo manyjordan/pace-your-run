@@ -15,9 +15,28 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
   const [gpsTrace, setGpsTrace] = useState<RunGpsPoint[]>([]);
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsError, setGpsError] = useState("");
+  const [rollingPaceSecondsPerKm, setRollingPaceSecondsPerKm] = useState(0);
   const watchIdRef = useRef<WatchId | null>(null);
   const lastGpsPointRef = useRef<RunGpsPoint | null>(null);
   const watchEpochRef = useRef(0);
+
+  const calculateRollingPace = useCallback((points: RunGpsPoint[]): number => {
+    if (points.length < 2) return 0;
+    const windowMs = 15_000;
+    const now = points[points.length - 1].time;
+    const windowPoints = points.filter((p) => now - p.time <= windowMs);
+    if (windowPoints.length < 2) return 0;
+
+    const first = windowPoints[0];
+    const last = windowPoints[windowPoints.length - 1];
+    const distKm = haversineDistanceKm(
+      { lat: first.lat, lng: first.lng },
+      { lat: last.lat, lng: last.lng },
+    );
+    const timeSec = (last.time - first.time) / 1000;
+    if (distKm < 0.001 || timeSec <= 0) return 0;
+    return timeSec / distKm;
+  }, []);
 
   const requestLocationPermission = useCallback(async () => {
     if (!Capacitor.isNativePlatform()) return null;
@@ -58,15 +77,20 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
 
         if (dist >= 0.005) {
           onDistanceDelta(dist);
-          setGpsTrace((t) => [...t, newPoint]);
+          setGpsTrace((t) => {
+            const nextTrace = [...t, newPoint];
+            setRollingPaceSecondsPerKm(calculateRollingPace(nextTrace));
+            return nextTrace;
+          });
           lastGpsPointRef.current = newPoint;
         }
       } else {
         setGpsTrace([newPoint]);
+        setRollingPaceSecondsPerKm(0);
         lastGpsPointRef.current = newPoint;
       }
     },
-    [onDistanceDelta],
+    [calculateRollingPace, onDistanceDelta],
   );
 
   const startGpsTracking = useCallback(async (): Promise<boolean> => {
@@ -181,6 +205,8 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
     setGpsAccuracy,
     gpsError,
     setGpsError,
+    rollingPaceSecondsPerKm,
+    setRollingPaceSecondsPerKm,
     lastGpsPointRef,
     startGpsTracking,
     stopGpsTracking,

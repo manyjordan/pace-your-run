@@ -270,6 +270,15 @@ export default function Run() {
         </div>
       </ScrollReveal>
 
+      {status === "running" && (
+        <ScrollReveal>
+          <div className="flex items-center gap-2 px-4 py-2 bg-accent/20 rounded-full w-fit">
+            <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
+            <span className="text-xs font-semibold text-accent">Course en cours</span>
+          </div>
+        </ScrollReveal>
+      )}
+
       {gpsError && (
         <ScrollReveal>
           <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">

@@ -20,7 +20,13 @@ export function useRunTimer() {
   }, []);
 
   const startKeepAlive = useCallback(() => {
-    if (!Capacitor.isNativePlatform() || audioContextRef.current) return;
+    if (!Capacitor.isNativePlatform()) return;
+    if (audioContextRef.current) {
+      if (audioContextRef.current.state === "suspended") {
+        void audioContextRef.current.resume().catch(() => {});
+      }
+      return;
+    }
     try {
       const ctx = new AudioContext();
       if (ctx.state === "suspended") {
@@ -66,10 +72,9 @@ export function useRunTimer() {
     if (startTimeRef.current === null) {
       startTimeRef.current = Date.now();
     }
-    startKeepAlive();
     tick();
     intervalRef.current = setInterval(tick, 1000);
-  }, [tick, startKeepAlive]);
+  }, [tick]);
 
   const stopInterval = useCallback(() => {
     if (startTimeRef.current !== null) {
@@ -83,6 +88,16 @@ export function useRunTimer() {
     }
     stopKeepAlive();
   }, [stopKeepAlive]);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && audioContextRef.current?.state === "suspended") {
+        void audioContextRef.current.resume().catch(() => {});
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => document.removeEventListener("visibilitychange", handleVisibility);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -108,6 +123,7 @@ export function useRunTimer() {
     tick,
     startInterval,
     stopInterval,
+    startKeepAlive,
     formatTime,
   };
 }

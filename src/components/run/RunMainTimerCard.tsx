@@ -142,14 +142,26 @@ export function RunMainTimerCard({
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <div
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                status === "running"
+                  ? "bg-accent/20 text-accent"
+                  : status === "paused"
+                    ? "bg-yellow-500/20 text-yellow-600"
+                    : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {status === "running" ? "Course en cours" : status === "paused" ? "Course en pause" : "Prêt à démarrer"}
+            </div>
             {status === "idle" && (
               <Button
                 size="lg"
                 onClick={start}
                 disabled={isProgrammedMode && !isProgramActive}
-                className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"
+                className="h-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25 px-6"
               >
                 <Play className="h-7 w-7 ml-0.5" />
+                <span className="ml-1 text-sm font-semibold">Start</span>
               </Button>
             )}
             {status === "running" && (
@@ -165,9 +177,10 @@ export function RunMainTimerCard({
                 <Button
                   size="lg"
                   onClick={pause}
-                  className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"
+                  className="h-16 rounded-full bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-600/25 px-6"
                 >
                   <Pause className="h-7 w-7" />
+                  <span className="ml-1 text-sm font-semibold">Pause</span>
                 </Button>
               </>
             )}
@@ -184,9 +197,10 @@ export function RunMainTimerCard({
                 <Button
                   size="lg"
                   onClick={resume}
-                  className="h-16 w-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25"
+                  className="h-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25 px-6"
                 >
                   <Play className="h-7 w-7 ml-0.5" />
+                  <span className="ml-1 text-sm font-semibold">Reprendre</span>
                 </Button>
               </>
             )}

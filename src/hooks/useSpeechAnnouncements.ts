@@ -82,6 +82,31 @@ export function useSpeechAnnouncements({
 }: UseSpeechAnnouncementsParams) {
   const lastAnnouncedKmRef = useRef(0);
   const lastPaceAlertRef = useRef(0);
+  const prevStatusRef = useRef<RunStatus>(status);
+
+  const speak = useCallback((message: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = "fr-FR";
+    utterance.rate = 1.0;
+    utterance.volume = 1.0;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    if (status === "running" && prev === "idle") {
+      speak("Course démarrée. Bonne course !");
+    } else if (status === "paused" && prev === "running") {
+      speak("Course en pause");
+    } else if (status === "running" && prev === "paused") {
+      speak("Course reprise");
+    } else if (status === "idle" && (prev === "running" || prev === "paused")) {
+      speak("Course terminée. Bien joué !");
+    }
+    prevStatusRef.current = status;
+  }, [speak, status]);
 
   useEffect(() => {
     if (!isProgrammedSessionActive || status !== "running") return;
