@@ -120,6 +120,7 @@ export function useBluetoothHR({ statusRef }: UseBluetoothHROptions) {
       : bluetoothDevice;
 
   const isConnected = bluetoothDevice !== null;
+  const isBluetoothConnected = isConnected;
 
   return {
     bluetoothDevice,
@@ -130,6 +131,7 @@ export function useBluetoothHR({ statusRef }: UseBluetoothHROptions) {
     heartRateSamplesRef,
     truncatedDeviceName,
     isConnected,
+    isBluetoothConnected,
     connectBluetooth,
     disconnectBluetooth,
     disconnectHardware,

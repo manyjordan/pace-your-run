@@ -441,7 +441,7 @@ export default function Run() {
           formatPace={formatPace}
           treadmill={treadmill}
           bluetooth={{
-            bluetoothDevice: bluetooth.bluetoothDevice,
+            isBluetoothConnected: bluetooth.isBluetoothConnected,
             heartRate: bluetooth.heartRate,
           }}
           gpsAccuracy={gpsAccuracy}

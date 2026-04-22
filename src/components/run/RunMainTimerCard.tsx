@@ -4,14 +4,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Play, Pause, Square, MapPin, Zap, Heart, Volume2 } from "lucide-react";
-import { Link } from "react-router-dom";
 import type { RunPreferences } from "@/lib/runPreferences";
 import type { TreadmillRunControls } from "@/hooks/useTreadmill";
 
 type RunStatus = "idle" | "running" | "paused";
 
 type BluetoothState = {
-  bluetoothDevice: string | null;
+  isBluetoothConnected: boolean;
   heartRate: number | null;
 };
 
@@ -58,6 +57,9 @@ export function RunMainTimerCard({
   isProgrammedMode,
   isProgramActive,
 }: Props) {
+  const isBluetoothConnected = bluetooth.isBluetoothConnected;
+  const heartRate = bluetooth.heartRate ?? 0;
+
   return (
     <ScrollReveal>
       <Card className="border-accent/30">
@@ -115,30 +117,25 @@ export function RunMainTimerCard({
               <div className="text-[10px] text-muted-foreground">/{distanceUnitShortLabel}</div>
             </div>
             <div className="text-center space-y-1">
-              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                <Heart className="h-3 w-3" /> Fréquence
-              </div>
-              {bluetooth.bluetoothDevice ? (
+              {isBluetoothConnected ? (
                 <>
-                  <div className="text-xl font-bold tabular-nums">{bluetooth.heartRate ?? "--"}</div>
-                  <div className="text-[10px] text-muted-foreground">bpm</div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-1">
-                  <div className="text-xs font-medium text-muted-foreground text-center">
-                    Pas d&apos;information disponible
+                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                    <Heart className="h-3 w-3" /> Fréquence
                   </div>
-                  <Link
-                    to="/plan?tab=equipment&section=gear"
-                    className="text-[10px] text-accent underline underline-offset-2"
-                  >
-                    Équipement requis pour mesurer la fréquence cardiquage
-                  </Link>
-                  <p className="mt-1 text-center text-xs text-muted-foreground">
-                    Compatible ceintures cardiaques Bluetooth et montres Suunto, Garmin, Polar
-                  </p>
-                </div>
-              )}
+                  {heartRate > 0 ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <Heart className="h-4 w-4 text-red-400 animate-pulse" />
+                      <span className="text-2xl font-bold tabular-nums">{heartRate}</span>
+                      <span className="text-xs text-muted-foreground">bpm</span>
+                    </div>
+                  ) : status === "idle" ? (
+                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
+                      <Heart className="h-4 w-4" />
+                      <span className="text-sm">En attente FC...</span>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center gap-4">
