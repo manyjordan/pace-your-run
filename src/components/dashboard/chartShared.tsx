@@ -12,19 +12,15 @@ export function CompactWeekTick({
   x,
   y,
   payload,
-  granularity = "week",
   period = "3m",
 }: {
   x?: number;
   y?: number;
   payload?: { value: string; payload?: { showTick?: boolean } };
-  granularity?: "week" | "month" | "quarter";
   period?: MetricChartPeriod;
 }) {
   if (typeof x !== "number" || typeof y !== "number" || !payload) return null;
   if (payload.payload?.showTick === false) return null;
-  const rotate = granularity === "week";
-
   const display = formatXLabel(String(payload.value ?? ""), period);
 
   return (
@@ -32,12 +28,12 @@ export function CompactWeekTick({
       <text
         x={0}
         y={0}
-        dy={rotate ? 12 : 10}
-        textAnchor={rotate ? "end" : "middle"}
-        fill="hsl(var(--foreground))"
-        fontSize={11}
+        dy={4}
+        textAnchor="end"
+        fill="hsl(var(--muted-foreground))"
+        fontSize={10}
         fontWeight={500}
-        transform={rotate ? "rotate(-35)" : undefined}
+        transform="rotate(-90)"
       >
         {display}
       </text>

@@ -202,13 +202,8 @@ export const DashboardSection = ({
                       dataKey="week"
                       axisLine={false}
                       tickLine={false}
-                      height={64}
-                      tick={
-                        <CompactWeekTick
-                          granularity={metric.granularity ?? "week"}
-                          period={metric.period ?? period}
-                        />
-                      }
+                      height={70}
+                      tick={<CompactWeekTick period={metric.period ?? period} />}
                       interval={0}
                     />
                     <YAxis

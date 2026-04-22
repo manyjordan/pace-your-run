@@ -151,8 +151,8 @@ export const PerformanceSection = ({
                   dataKey="week"
                   axisLine={false}
                   tickLine={false}
-                  height={64}
-                  tick={<CompactWeekTick granularity="week" period={PERFORMANCE_CHART_PERIOD} />}
+                  height={70}
+                  tick={<CompactWeekTick period={PERFORMANCE_CHART_PERIOD} />}
                   interval={0}
                 />
                 <YAxis
@@ -209,8 +209,8 @@ export const PerformanceSection = ({
                   dataKey="week"
                   axisLine={false}
                   tickLine={false}
-                  height={64}
-                  tick={<CompactWeekTick granularity="week" period={PERFORMANCE_CHART_PERIOD} />}
+                  height={70}
+                  tick={<CompactWeekTick period={PERFORMANCE_CHART_PERIOD} />}
                   interval={0}
                 />
                 <YAxis

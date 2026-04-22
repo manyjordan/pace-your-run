@@ -7,7 +7,6 @@ import {
   type MetricChartPeriod,
   type MetricKind,
   formatDashboardTooltipForKind,
-  getAggregationUnit,
 } from "@/lib/dashboardHelpers";
 import type { RunRow } from "@/lib/database";
 
@@ -44,7 +43,6 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
     (metric.granularity as "week" | "month" | "quarter") || "week",
   );
   const chartPeriod = metric.period ?? "3m";
-  const effectiveGranularity = getAggregationUnit(chartPeriod);
 
   const updatedMetric = useMemo(
     () => buildMetricData(metric.title, activities, granularity, chartPeriod, metric.metricKind),
@@ -102,10 +100,8 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
                 dataKey="week"
                 axisLine={false}
                 tickLine={false}
-                height={56}
-                tick={
-                  <CompactWeekTick granularity={effectiveGranularity} period={chartPeriod} />
-                }
+                height={70}
+                tick={<CompactWeekTick period={chartPeriod} />}
                 interval={0}
               />
               <YAxis

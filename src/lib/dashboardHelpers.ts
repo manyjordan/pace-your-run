@@ -1,6 +1,6 @@
 import type { RunRow } from "@/lib/database";
 import { Route, Clock, Mountain } from "lucide-react";
-import { format, getMonth, getYear } from "date-fns";
+import { format, getMonth } from "date-fns";
 import { fr } from "date-fns/locale";
 
 export type MetricKind = "distance" | "duration" | "elevation";
@@ -200,13 +200,12 @@ export function formatAxisDateLabel(
   _period: MetricChartPeriod,
 ) {
   if (granularity === "month") {
-    return format(start, "MMM yy", { locale: fr })
-      .replace(".", "")
-      .replace(/^./, (c) => c.toUpperCase());
+    const monthLabels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
+    return monthLabels[getMonth(start)] ?? format(start, "MMM", { locale: fr }).replace(".", "");
   }
   if (granularity === "quarter") {
     const quarter = Math.floor(getMonth(start) / 3) + 1;
-    return `T${quarter} ${getYear(start)}`;
+    return `T${quarter} ${format(start, "yy")}`;
   }
   const month = format(start, "MMM", { locale: fr }).replace(".", "");
   return `${start.getDate()} ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
