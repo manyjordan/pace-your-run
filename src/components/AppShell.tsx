@@ -206,6 +206,18 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
               ? "health"
               : null;
 
+  const [mountedTabs, setMountedTabs] = useState<Set<MainTabKey>>(
+    new Set([activeMainTab ?? "index"]),
+  );
+
+  useEffect(() => {
+    if (!activeMainTab) return;
+    setMountedTabs((previous) => {
+      if (previous.has(activeMainTab)) return previous;
+      return new Set([...previous, activeMainTab]);
+    });
+  }, [activeMainTab]);
+
   return (
     <div className="min-h-screen bg-background pt-safe">
       {/* Top header */}
@@ -262,11 +274,21 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
 
       {/* Main */}
       <main className="container py-6 pb-24 md:pb-6">
-        <div className={activeMainTab === "index" ? "block" : "hidden"}>{mainTabs.index}</div>
-        <div className={activeMainTab === "social" ? "block" : "hidden"}>{mainTabs.social}</div>
-        <div className={activeMainTab === "run" ? "block" : "hidden"}>{mainTabs.run}</div>
-        <div className={activeMainTab === "plan" ? "block" : "hidden"}>{mainTabs.plan}</div>
-        <div className={activeMainTab === "health" ? "block" : "hidden"}>{mainTabs.health}</div>
+        <div className={activeMainTab === "index" ? "block" : "hidden"}>
+          {mountedTabs.has("index") ? mainTabs.index : null}
+        </div>
+        <div className={activeMainTab === "social" ? "block" : "hidden"}>
+          {mountedTabs.has("social") ? mainTabs.social : null}
+        </div>
+        <div className={activeMainTab === "run" ? "block" : "hidden"}>
+          {mountedTabs.has("run") ? mainTabs.run : null}
+        </div>
+        <div className={activeMainTab === "plan" ? "block" : "hidden"}>
+          {mountedTabs.has("plan") ? mainTabs.plan : null}
+        </div>
+        <div className={activeMainTab === "health" ? "block" : "hidden"}>
+          {mountedTabs.has("health") ? mainTabs.health : null}
+        </div>
         {activeMainTab === null ? children : null}
       </main>
 

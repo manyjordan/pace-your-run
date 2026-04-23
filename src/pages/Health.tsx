@@ -1,6 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -708,6 +708,12 @@ const Health = () => {
   const resolvedIssueKey = useMemo(() => resolveIssueKeyFromUrl(issueKey), [issueKey]);
   const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
+  const hasLoadedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+  }, []);
 
   useEffect(() => {
     if (issueKey && !issueDetails) {

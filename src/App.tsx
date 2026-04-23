@@ -11,11 +11,11 @@ import { SplashScreen } from "@/components/SplashScreen";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { DeepLinkAuthHandler } from "@/components/DeepLinkAuthHandler";
 import { useState, useEffect, lazy, Suspense, useCallback } from "react";
-import Index from "@/pages/Index";
-import Run from "@/pages/Run";
-import Social from "@/pages/Social";
-import Plan from "@/pages/Plan";
-import Health from "@/pages/Health";
+const Index = lazy(() => import("@/pages/Index"));
+const Run = lazy(() => import("@/pages/Run"));
+const Social = lazy(() => import("@/pages/Social"));
+const Plan = lazy(() => import("@/pages/Plan"));
+const Health = lazy(() => import("@/pages/Health"));
 
 const Auth = lazy(() => import("@/pages/Auth"));
 const Onboarding = lazy(() => import("@/pages/Onboarding"));

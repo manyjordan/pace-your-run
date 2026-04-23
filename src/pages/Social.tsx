@@ -57,6 +57,7 @@ import {
   type CommunityPost,
 } from "@/lib/runFormatters";
 import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
+import { isNative } from "@/lib/platform";
 
 const ForumSection = lazy(() =>
   import("@/components/social/ForumSection").then((module) => ({ default: module.ForumSection })),
@@ -789,47 +790,62 @@ export default function Social() {
                           }}
                         >
                           <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
-                            <AnimatePresence>
-                              {likeBurstId === (post.dbId ?? `activity-${post.activityId}`) ? (
-                                <>
-                                  {[0, 1, 2, 3].map((i) => (
-                                    <motion.div
-                                      key={i}
-                                      className="absolute inset-0 rounded-full border border-red-400"
-                                      initial={{ scale: 0.5, opacity: 0.8 }}
-                                      animate={{ scale: 2.5, opacity: 0 }}
-                                      exit={{ opacity: 0 }}
-                                      transition={{
-                                        duration: 0.5,
-                                        delay: i * 0.05,
-                                        ease: "easeOut",
-                                      }}
-                                    />
-                                  ))}
-                                </>
-                              ) : null}
-                            </AnimatePresence>
-                            <motion.div
-                              className="relative z-[1]"
-                              animate={
-                                likeAnimatingId === (post.dbId ?? `activity-${post.activityId}`)
-                                  ? {
-                                      scale: [1, 1.4, 0.9, 1.1, 1],
-                                      rotate: [0, -10, 10, -5, 0],
-                                    }
-                                  : { scale: 1, rotate: 0 }
-                              }
-                              transition={{ duration: 0.5, ease: "easeInOut" }}
-                            >
-                              <Heart
-                                className={cn(
-                                  "h-4 w-4 transition-colors duration-200",
-                                  post.liked
-                                    ? "fill-red-500 text-red-500"
-                                    : "text-muted-foreground hover:text-red-400",
-                                )}
-                              />
-                            </motion.div>
+                            {isNative ? null : (
+                              <AnimatePresence>
+                                {likeBurstId === (post.dbId ?? `activity-${post.activityId}`) ? (
+                                  <>
+                                    {[0, 1, 2, 3].map((i) => (
+                                      <motion.div
+                                        key={i}
+                                        className="absolute inset-0 rounded-full border border-red-400"
+                                        initial={{ scale: 0.5, opacity: 0.8 }}
+                                        animate={{ scale: 2.5, opacity: 0 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{
+                                          duration: 0.5,
+                                          delay: i * 0.05,
+                                          ease: "easeOut",
+                                        }}
+                                      />
+                                    ))}
+                                  </>
+                                ) : null}
+                              </AnimatePresence>
+                            )}
+                            {isNative ? (
+                              <div className="relative z-[1]">
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4 transition-colors duration-200",
+                                    post.liked
+                                      ? "fill-red-500 text-red-500"
+                                      : "text-muted-foreground hover:text-red-400",
+                                  )}
+                                />
+                              </div>
+                            ) : (
+                              <motion.div
+                                className="relative z-[1]"
+                                animate={
+                                  likeAnimatingId === (post.dbId ?? `activity-${post.activityId}`)
+                                    ? {
+                                        scale: [1, 1.4, 0.9, 1.1, 1],
+                                        rotate: [0, -10, 10, -5, 0],
+                                      }
+                                    : { scale: 1, rotate: 0 }
+                                }
+                                transition={{ duration: 0.5, ease: "easeInOut" }}
+                              >
+                                <Heart
+                                  className={cn(
+                                    "h-4 w-4 transition-colors duration-200",
+                                    post.liked
+                                      ? "fill-red-500 text-red-500"
+                                      : "text-muted-foreground hover:text-red-400",
+                                  )}
+                                />
+                              </motion.div>
+                            )}
                           </div>
                           <span
                             className={cn(
