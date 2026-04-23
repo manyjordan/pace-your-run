@@ -25,6 +25,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react"
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { useProgressiveList } from "@/hooks/useProgressiveList";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   followUser,
@@ -179,6 +180,7 @@ export default function Social() {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [posts, setPosts] = useState<FeedPost[]>([]);
+  const { visibleItems, loaderRef } = useProgressiveList(posts, 8, 8);
   const [activities, setActivities] = useState<RunRow[]>([]);
   const [showFriendSearch, setShowFriendSearch] = useState(false);
   const [friendQuery, setFriendQuery] = useState("");
@@ -685,144 +687,149 @@ export default function Social() {
                     </CardContent>
                   </AppCard>
                 </ScrollReveal>
-              ) : posts.map((post, i) => {
-                const ranWithLine = ranWithBadgeText(post.description ?? "");
-                return (
-                <ScrollReveal key={post.dbId ?? post.activityId}>
-                  <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
-                    <CardContent className="space-y-3 p-4">
-                      {post.feedReason === "friend_liked" && post.friendWhoLiked ? (
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Heart className="h-3 w-3 shrink-0" />
-                          <span>
-                            👍 {post.friendWhoLiked.name} a aimé cette publication
-                          </span>
-                        </div>
-                      ) : null}
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
-                            {post.initials}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-semibold">{post.user}</span>
-                            {post.type === "race" && (
-                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                                <Trophy className="mr-0.5 h-3 w-3" /> Course
-                              </Badge>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground">{post.time}</span>
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="text-sm font-semibold">{post.title}</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">{post.description}</p>
-                      </div>
-
-                      <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                            <MapPin className="h-3 w-3" /> Dist.
-                          </div>
-                          <div className="mt-0.5 text-sm font-bold">{post.stats.distance}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                            <Zap className="h-3 w-3" /> Allure
-                          </div>
-                          <div className="mt-0.5 text-sm font-bold">{post.stats.pace}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" /> Durée
-                          </div>
-                          <div className="mt-0.5 text-sm font-bold">{post.stats.duration}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-xs text-muted-foreground">D+</div>
-                          <div className="mt-0.5 text-sm font-bold">{post.stats.elevation}</div>
-                        </div>
-                      </div>
-
-                      {ranWithLine ? (
-                        <div className="flex items-center gap-1.5 text-xs font-medium text-accent">
-                          <Users className="h-3.5 w-3.5 shrink-0" />
-                          <span>{ranWithLine}</span>
-                        </div>
-                      ) : null}
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          handleOpenActivity(post);
-                        }}
-                      >
-                        Voir les détails de l&apos;activité
-                      </Button>
-
-                      <div className="flex items-center gap-1 border-t border-border pt-1">
-                        <button
-                          type="button"
-                          disabled={likeBusyId === post.dbId}
-                          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleToggleLike(post);
-                          }}
-                        >
-                          <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
-                            <div className="relative z-[1]">
-                              <Heart
-                                className={cn(
-                                  "h-4 w-4 transition-all duration-200",
-                                  post.liked
-                                    ? "fill-red-500 text-red-500 scale-110"
-                                    : "text-muted-foreground hover:text-red-400 hover:scale-105",
-                                )}
-                              />
+              ) : (
+                <>
+                  {visibleItems.map((post) => {
+                    const ranWithLine = ranWithBadgeText(post.description ?? "");
+                    return (
+                      <ScrollReveal key={post.dbId ?? post.activityId}>
+                        <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
+                          <CardContent className="space-y-3 p-4">
+                            {post.feedReason === "friend_liked" && post.friendWhoLiked ? (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                <Heart className="h-3 w-3 shrink-0" />
+                                <span>
+                                  👍 {post.friendWhoLiked.name} a aimé cette publication
+                                </span>
+                              </div>
+                            ) : null}
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
+                                  {post.initials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-semibold">{post.user}</span>
+                                  {post.type === "race" && (
+                                    <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                                      <Trophy className="mr-0.5 h-3 w-3" /> Course
+                                    </Badge>
+                                  )}
+                                </div>
+                                <span className="text-xs text-muted-foreground">{post.time}</span>
+                              </div>
                             </div>
-                          </div>
-                          <span
-                            className={cn(
-                              "tabular-nums transition-colors duration-200",
-                              post.liked ? "text-red-500" : "text-muted-foreground",
-                            )}
-                          >
-                            {post.likes}
-                          </span>
-                        </button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-muted-foreground"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <MessageCircle className="mr-1 h-4 w-4" /> {post.comments}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="ml-auto text-muted-foreground"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleShare(post);
-                          }}
-                        >
-                          <Share2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </ScrollReveal>
-              );
-              })}
+
+                            <div>
+                              <h3 className="text-sm font-semibold">{post.title}</h3>
+                              <p className="mt-1 text-sm text-muted-foreground">{post.description}</p>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
+                              <div className="text-center">
+                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                  <MapPin className="h-3 w-3" /> Dist.
+                                </div>
+                                <div className="mt-0.5 text-sm font-bold">{post.stats.distance}</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                  <Zap className="h-3 w-3" /> Allure
+                                </div>
+                                <div className="mt-0.5 text-sm font-bold">{post.stats.pace}</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" /> Durée
+                                </div>
+                                <div className="mt-0.5 text-sm font-bold">{post.stats.duration}</div>
+                              </div>
+                              <div className="text-center">
+                                <div className="text-xs text-muted-foreground">D+</div>
+                                <div className="mt-0.5 text-sm font-bold">{post.stats.elevation}</div>
+                              </div>
+                            </div>
+
+                            {ranWithLine ? (
+                              <div className="flex items-center gap-1.5 text-xs font-medium text-accent">
+                                <Users className="h-3.5 w-3.5 shrink-0" />
+                                <span>{ranWithLine}</span>
+                              </div>
+                            ) : null}
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleOpenActivity(post);
+                              }}
+                            >
+                              Voir les détails de l&apos;activité
+                            </Button>
+
+                            <div className="flex items-center gap-1 border-t border-border pt-1">
+                              <button
+                                type="button"
+                                disabled={likeBusyId === post.dbId}
+                                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleToggleLike(post);
+                                }}
+                              >
+                                <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+                                  <div className="relative z-[1]">
+                                    <Heart
+                                      className={cn(
+                                        "h-4 w-4 transition-all duration-200",
+                                        post.liked
+                                          ? "fill-red-500 text-red-500 scale-110"
+                                          : "text-muted-foreground hover:text-red-400 hover:scale-105",
+                                      )}
+                                    />
+                                  </div>
+                                </div>
+                                <span
+                                  className={cn(
+                                    "tabular-nums transition-colors duration-200",
+                                    post.liked ? "text-red-500" : "text-muted-foreground",
+                                  )}
+                                >
+                                  {post.likes}
+                                </span>
+                              </button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-muted-foreground"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <MessageCircle className="mr-1 h-4 w-4" /> {post.comments}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="ml-auto text-muted-foreground"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleShare(post);
+                                }}
+                              >
+                                <Share2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </ScrollReveal>
+                    );
+                  })}
+                  <div ref={loaderRef} className="h-4" />
+                </>
+              )}
 
               {hasMore && !isLoadingMore && posts.length > 0 && (
                 <button

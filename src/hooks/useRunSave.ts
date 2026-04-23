@@ -13,6 +13,7 @@ import {
 import { clearActiveSession, type ActiveSession } from "@/lib/activeSession";
 import type { CommunityPost } from "@/lib/runFormatters";
 import { cache } from "@/lib/cache";
+import { simplifyGpsTrace } from "@/lib/gpsSimplify";
 
 const OFFLINE_RUNS_KEY = "pace-offline-runs";
 
@@ -76,6 +77,7 @@ export function useRunSave() {
 
       const activityTitle = title.trim() || generateDefaultTitle();
       const description = `Je viens de terminer ${runSummary.distance.toFixed(2)} km en ${formatTime(runSummary.duration)}.`;
+      const simplifiedTrace = isTreadmill ? [] : simplifyGpsTrace(runSummary.gpsTrace, 0.00005);
       const runData = {
         distance_km: runSummary.distance,
         duration_seconds: runSummary.duration,
@@ -87,7 +89,7 @@ export function useRunSave() {
         average_pace: runSummary.avgPace,
         average_heartrate: runSummary.averageHeartRate ?? null,
         elevation_gain: isTreadmill ? 0 : runSummary.elevation,
-        gps_trace: isTreadmill ? [] : runSummary.gpsTrace,
+        gps_trace: simplifiedTrace,
         run_type: (isTreadmill ? "treadmill" : "run") as const,
         started_at: runSummary.startedAt,
         title: activityTitle,

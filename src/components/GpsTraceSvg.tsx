@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { simplifyGpsTrace } from "@/lib/gpsSimplify";
 
 type Point = { lat: number; lng: number };
 
@@ -10,11 +11,16 @@ interface GpsTraceSvgProps {
 }
 
 export function GpsTraceSvg({ trace, width = 400, height = 200, className }: GpsTraceSvgProps) {
-  const path = useMemo(() => {
-    if (!trace || trace.length < 2) return null;
+  const displayTrace = useMemo(
+    () => (trace.length > 200 ? simplifyGpsTrace(trace, 0.00003) : trace),
+    [trace],
+  );
 
-    const lats = trace.map((p) => p.lat);
-    const lngs = trace.map((p) => p.lng);
+  const path = useMemo(() => {
+    if (!displayTrace || displayTrace.length < 2) return null;
+
+    const lats = displayTrace.map((p) => p.lat);
+    const lngs = displayTrace.map((p) => p.lng);
     const minLat = Math.min(...lats);
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
@@ -27,14 +33,14 @@ export function GpsTraceSvg({ trace, width = 400, height = 200, className }: Gps
     const w = width - padding * 2;
     const h = height - padding * 2;
 
-    const points = trace.map((p) => {
+    const points = displayTrace.map((p) => {
       const x = padding + ((p.lng - minLng) / lngRange) * w;
       const y = padding + ((maxLat - p.lat) / latRange) * h;
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
 
     return points.join(" ");
-  }, [trace, width, height]);
+  }, [displayTrace, width, height]);
 
   if (!path) return null;
 

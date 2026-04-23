@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useProgressiveList } from "@/hooks/useProgressiveList";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -32,6 +33,8 @@ import { ForumThreadDetail } from "@/components/social/ForumThreadDetail";
 
 type Props = {
   categoryId?: string;
+  progressiveInitialCount?: number;
+  progressiveIncrement?: number;
 };
 
 const THREADS_PAGE_SIZE = 15;
@@ -44,10 +47,15 @@ function excerpt(content: string, maxLength = 160) {
   return content.length > maxLength ? `${content.slice(0, maxLength).trim()}...` : content;
 }
 
-export function ForumThreadList({ categoryId }: Props) {
+export function ForumThreadList({
+  categoryId,
+  progressiveInitialCount = 10,
+  progressiveIncrement = 10,
+}: Props) {
   const { user } = useAuth();
   const [categories, setCategories] = useState<ForumCategoryRecord[]>([]);
   const [threads, setThreads] = useState<ForumThreadRecord[]>([]);
+  const { visibleItems, loaderRef } = useProgressiveList(threads, progressiveInitialCount, progressiveIncrement);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +304,7 @@ export function ForumThreadList({ categoryId }: Props) {
             </Card>
           ) : (
             <>
-              {threads.map((thread) => {
+              {visibleItems.map((thread) => {
                 const author = formatAuthorName(thread.profile?.full_name, thread.profile?.username);
                 const initials = getInitials(author);
                 return (
@@ -341,6 +349,8 @@ export function ForumThreadList({ categoryId }: Props) {
                   </ScrollReveal>
                 );
               })}
+
+              <div ref={loaderRef} className="h-4" />
 
               {hasMoreThreads && !isLoadingMore && threads.length > 0 ? (
                 <button
