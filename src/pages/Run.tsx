@@ -31,6 +31,7 @@ import {
   type RunPreferences,
 } from "@/lib/runPreferences";
 import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib/activeSession";
+import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -253,7 +254,7 @@ export default function Run() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       {completedActivity && showCompletedActivityDetail && (
         <ActivityDetail
           activity={completedActivity}
@@ -264,10 +265,7 @@ export default function Run() {
       )}
 
       <ScrollReveal>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Course</h1>
-          <p className="text-sm text-muted-foreground">Enregistrez votre course en temps réel</p>
-        </div>
+        <PageHeader title="Course" subtitle="Enregistrez votre course en temps réel" />
       </ScrollReveal>
 
       {status === "running" && (
@@ -281,7 +279,7 @@ export default function Run() {
 
       {gpsError && (
         <ScrollReveal>
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
+          <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <p className="text-sm text-destructive">{gpsError}</p>
           </div>
@@ -290,7 +288,7 @@ export default function Run() {
 
       {saveError && (
         <ScrollReveal>
-          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
+          <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
             <p className="text-sm text-destructive">{saveError}</p>
           </div>
@@ -299,7 +297,7 @@ export default function Run() {
 
       <div className="space-y-6">
         {activeSession && status === "idle" && (
-          <div className="space-y-2 rounded-lg border border-accent/30 bg-accent/5 p-4">
+          <AppCard className="space-y-2 border-accent/30 bg-accent/5 p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">
@@ -334,11 +332,11 @@ export default function Run() {
                 </>
               )}
             </div>
-          </div>
+          </AppCard>
         )}
 
         {activeRoute && status === "idle" && (
-          <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 px-4 py-3">
+          <AppCard className="flex items-center justify-between border-accent/30 bg-accent/5 px-4 py-3">
             <div>
               <p className="text-sm font-semibold">{activeRoute.name}</p>
               <p className="text-xs text-muted-foreground">
@@ -355,7 +353,7 @@ export default function Run() {
             >
               Retirer
             </button>
-          </div>
+          </AppCard>
         )}
 
         {status === "idle" && (
@@ -525,6 +523,6 @@ export default function Run() {
           formatPace={formatPace}
         />
       </div>
-    </div>
+    </PageContainer>
   );
 }

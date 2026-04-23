@@ -22,7 +22,7 @@ export type GPSMapProps = {
   showFullTrace?: boolean;
 };
 
-const LIME = "#84cc16";
+const LIME = "#B4DC5A";
 
 function cartoTileUrl(isDark: boolean): string {
   return isDark
@@ -147,7 +147,7 @@ export default function GPSMap({
     }
 
     currentMarkerRef.current = L.marker([initialPoint.lat, initialPoint.lng], {
-      icon: isLive ? createLiveMarkerIcon() : createSummaryMarkerIcon("#65a30d"),
+      icon: isLive ? createLiveMarkerIcon() : createSummaryMarkerIcon("#9fcf42"),
       interactive: false,
       zIndexOffset: 1000,
     }).addTo(map);
@@ -211,7 +211,7 @@ export default function GPSMap({
   if (!trace.length) return null;
 
   return (
-    <div className="relative overflow-hidden rounded-lg border border-accent/20 bg-card">
+    <div className="relative overflow-hidden rounded-xl border border-accent/20 bg-card">
       <style>{`
         .pace-live-marker {
           position: relative;
@@ -225,7 +225,7 @@ export default function GPSMap({
           position: absolute;
           inset: 2px;
           border-radius: 9999px;
-          background: rgba(132, 204, 22, 0.28);
+          background: rgba(180, 220, 90, 0.28);
           animation: pace-gps-pulse 1.8s ease-out infinite;
         }
         .pace-live-marker__dot {
@@ -235,7 +235,7 @@ export default function GPSMap({
           border-radius: 9999px;
           background: ${LIME};
           border: 2px solid white;
-          box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.25);
+          box-shadow: 0 0 0 2px rgba(180, 220, 90, 0.25);
         }
         .pace-static-marker {
           display: block;
@@ -243,7 +243,7 @@ export default function GPSMap({
           height: 12px;
           border-radius: 9999px;
           border: 2px solid white;
-          box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.25);
+          box-shadow: 0 0 0 2px rgba(180, 220, 90, 0.25);
         }
         @keyframes pace-gps-pulse {
           0% {

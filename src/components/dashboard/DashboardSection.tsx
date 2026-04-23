@@ -247,7 +247,7 @@ export const DashboardSection = ({
               {computedUpcomingSessions.map((session) => (
                 <div
                   key={`${session.day}-${session.type}`}
-                  className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50"
+                  className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50"
                 >
                   <div className="h-10 w-1 rounded-full" style={{ backgroundColor: session.color }} />
                   <div className="flex-1">

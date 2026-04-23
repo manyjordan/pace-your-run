@@ -248,21 +248,21 @@ export const PerformanceSection = ({
             <h2 className="text-sm font-semibold">Synthèse sur vos courses</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <BarChart3 className="h-3.5 w-3.5" />
                 Sorties totales
               </div>
               <p className="mt-2 text-2xl font-bold tabular-nums">{stats.runCount}</p>
             </div>
-            <div className="rounded-lg border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Route className="h-3.5 w-3.5" />
                 Distance cumulée
               </div>
               <p className="mt-2 text-2xl font-bold tabular-nums">{formatDistance(stats.totalKm * 1000)}</p>
             </div>
-            <div className="rounded-lg border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <TrendingUp className="h-3.5 w-3.5" />
                 Plus longue sortie
@@ -271,7 +271,7 @@ export const PerformanceSection = ({
                 {stats.longestKm > 0 ? `${stats.longestKm.toFixed(1)} km` : "—"}
               </p>
             </div>
-            <div className="rounded-lg border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Award className="h-3.5 w-3.5" />
                 Meilleure allure moyenne

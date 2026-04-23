@@ -56,6 +56,7 @@ import {
   getInitials,
   type CommunityPost,
 } from "@/lib/runFormatters";
+import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
 
 const ForumSection = lazy(() =>
   import("@/components/social/ForumSection").then((module) => ({ default: module.ForumSection })),
@@ -457,7 +458,7 @@ export default function Social() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       {selectedActivity && (
         <ActivityDetail
           activity={selectedActivity}
@@ -471,11 +472,10 @@ export default function Social() {
       )}
 
       <ScrollReveal>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Communauté</h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
+        <PageHeader
+          title="Communauté"
+          action={
+            <div className="flex shrink-0 items-center gap-1">
             <Sheet open={notifOpen} onOpenChange={(o) => void handleNotifOpenChange(o)}>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="relative" aria-label="Notifications">
@@ -541,8 +541,9 @@ export default function Social() {
             >
               <Search className="h-4 w-4" />
             </Button>
-          </div>
-        </div>
+            </div>
+          }
+        />
       </ScrollReveal>
 
       <Tabs defaultValue="activity" className="space-y-6">
@@ -560,7 +561,7 @@ export default function Social() {
         <TabsContent value="activity" className="space-y-4">
           {showFriendSearch && (
             <ScrollReveal>
-              <Card>
+              <AppCard className="p-0">
                 <CardContent className="space-y-3 p-4">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -619,7 +620,7 @@ export default function Social() {
                     )}
                   </div>
                 </CardContent>
-              </Card>
+              </AppCard>
             </ScrollReveal>
           )}
 
@@ -653,7 +654,7 @@ export default function Social() {
               ))
             : postsError ? (
                 <ScrollReveal>
-                  <Card className="border-destructive/30 bg-destructive/5">
+                  <AppCard className="border-destructive/30 bg-destructive/5">
                     <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
                         <AlertTriangle className="h-6 w-6" />
@@ -669,11 +670,11 @@ export default function Social() {
                         Réessayer
                       </Button>
                     </CardContent>
-                  </Card>
+                  </AppCard>
                 </ScrollReveal>
               ) : posts.length === 0 ? (
                 <ScrollReveal>
-                  <Card className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
+                  <AppCard className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
                     <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
                       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]">
                         <Users className="h-7 w-7" />
@@ -693,7 +694,7 @@ export default function Social() {
                         Enregistrer une course
                       </Button>
                     </CardContent>
-                  </Card>
+                  </AppCard>
                 </ScrollReveal>
               ) : posts.map((post, i) => {
                 const ranWithLine = ranWithBadgeText(post.description ?? "");
@@ -900,6 +901,6 @@ export default function Social() {
           </Suspense>
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 }

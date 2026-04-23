@@ -18,6 +18,7 @@ import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
 import { SkeletonHeroBanner } from "@/components/dashboard/SkeletonHeroBanner";
 import { SkeletonMetricCard } from "@/components/dashboard/SkeletonMetricCard";
+import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import {
   buildMetricData,
   buildGoalAwareWeeklyInsight,
@@ -242,7 +243,7 @@ const Dashboard = () => {
   );
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       {selectedRunForDetail && session?.user?.id ? (
         <ActivityDetail
           activity={selectedRunForDetail}
@@ -257,20 +258,20 @@ const Dashboard = () => {
         {isLoading ? (
           <SkeletonHeroBanner />
         ) : (
-          <div className="rounded-2xl border border-accent/20 bg-gradient-to-br from-accent/20 via-background to-background px-5 py-5 text-foreground shadow-[0_12px_30px_hsl(var(--foreground)/0.06)]">
+          <AppCard className="rounded-xl bg-gradient-to-br from-accent/20 via-background to-background text-foreground shadow-[0_12px_30px_hsl(var(--foreground)/0.06)]">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+              <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
                 Bonjour <span className="text-foreground">{athleteName}</span>
-              </h1>
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">{weeklyInsight}</p>
             </div>
-          </div>
+          </AppCard>
         )}
       </ScrollReveal>
 
       {!isLoading && runCount < 3 && (
         <ScrollReveal>
-          <div className="rounded-2xl border border-accent/30 bg-card px-5 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+          <AppCard className="border-accent/30 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-semibold">Importez votre historique de courses pour voir vos statistiques</p>
@@ -286,7 +287,7 @@ const Dashboard = () => {
                 Importer mon historique
               </Link>
             </div>
-          </div>
+          </AppCard>
         </ScrollReveal>
       )}
 
@@ -343,7 +344,7 @@ const Dashboard = () => {
           )}
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 };
 

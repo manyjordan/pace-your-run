@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
 
 type Issue = {
   name: string;
@@ -778,27 +779,27 @@ const Health = () => {
         </div>
 
         <div className="space-y-3 text-sm">
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <p className="mb-2 text-xs font-semibold text-foreground">Symptômes ressentis</p>
             {issueDetailBulletList(issueDetails.symptomesRessentis)}
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <p className="mb-2 text-xs font-semibold text-foreground">Causes probables</p>
             {issueDetailBulletList(issueDetails.causesProbables)}
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <p className="mb-2 text-xs font-semibold text-foreground">Soulager en priorité</p>
             {issueDetailBulletList(issueDetails.meilleurMoyenSoulager)}
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <p className="mb-2 text-xs font-semibold text-foreground">Risques si vous continuez</p>
             {issueDetailBulletList(issueDetails.risques)}
           </div>
 
-          <div className="rounded-lg border border-border bg-muted/20 p-3">
+          <div className="rounded-xl border border-border bg-muted/20 p-3">
             <p className="mb-2 text-xs font-semibold text-foreground">Conseils pratiques</p>
             {issueDetailBulletList(issueDetails.conseils)}
           </div>
@@ -807,10 +808,9 @@ const Health = () => {
     ) : null;
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <ScrollReveal>
-        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Santé et blessures</h1>
-        <p className="text-sm text-muted-foreground">Suivez votre récupération et gérez les blessures</p>
+        <PageHeader title="Santé et blessures" subtitle="Suivez votre récupération et gérez les blessures" />
       </ScrollReveal>
 
       <ScrollReveal>
@@ -823,13 +823,13 @@ const Health = () => {
 
       {issueKey && issueDetailPanel ? (
         <ScrollReveal>
-          <div className="rounded-xl border border-border bg-card p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+          <AppCard className="border-border shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             {issueDetailPanel}
-          </div>
+          </AppCard>
         </ScrollReveal>
       ) : (
         <ScrollReveal>
-          <div className="rounded-xl border border-border bg-card p-5">
+          <AppCard className="border-border">
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <h2 className="mb-2 text-sm font-semibold">Explorer les symptômes</h2>
@@ -888,7 +888,7 @@ const Health = () => {
                                 to={to}
                                 onClick={(e) => e.stopPropagation()}
                                 onPointerDown={(e) => e.stopPropagation()}
-                                className="block w-full rounded-lg border border-border bg-card p-3 text-left transition-colors hover:bg-muted/30"
+                                className="block w-full rounded-xl border border-border bg-card p-3 text-left transition-colors hover:bg-muted/30"
                               >
                                 <div className="flex items-center justify-between gap-3">
                                   <p className="text-sm font-medium">{issue}</p>
@@ -912,10 +912,10 @@ const Health = () => {
                 )}
               </CardContent>
             </Card>
-          </div>
+          </AppCard>
         </ScrollReveal>
       )}
-    </div>
+    </PageContainer>
   );
 };
 

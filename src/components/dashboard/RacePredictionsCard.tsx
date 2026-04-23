@@ -82,16 +82,16 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
       </div>
 
       {qualifyingCount < 2 ? (
-        <p className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
           Enregistrez au moins 2 courses de plus de 3 km sur les 3 dernières semaines pour voir vos prévisions.
         </p>
       ) : !prediction ? (
-        <p className="rounded-lg border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
           Données insuffisantes pour estimer cette distance.
         </p>
       ) : (
         <div className="space-y-5">
-          <div className="rounded-lg border border-border bg-muted/20 px-4 py-3">
+          <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
             <p className="text-xs font-medium text-muted-foreground">Course de référence (Riegel, Jack Daniels)</p>
             <p className="mt-1 text-sm font-medium text-foreground leading-snug">{prediction.reference.label}</p>
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{prediction.reference.explanation}</p>
@@ -150,7 +150,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
               {prediction.predictions.map((p) => (
                 <div
                   key={p.model}
-                  className="flex flex-col gap-2 rounded-lg border border-border bg-card/80 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 rounded-xl border border-border bg-card/80 p-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold">{p.model}</p>
