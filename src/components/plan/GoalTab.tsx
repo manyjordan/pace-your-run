@@ -167,7 +167,14 @@ export default function GoalTab() {
         ]);
 
         const profileGoalType = typeof profile?.goal_type === "string" ? profile.goal_type : null;
-        if (!profileGoalType || profileGoalType === "none") {
+        const profileGoalData =
+          profile?.goal_data && typeof profile.goal_data === "object" && !Array.isArray(profile.goal_data)
+            ? (profile.goal_data as Record<string, unknown>)
+            : null;
+        const hasNoGoal =
+          (!profileGoalType || profileGoalType === "none") &&
+          (!profileGoalData || Object.keys(profileGoalData).length === 0);
+        if (hasNoGoal) {
           const autoDetectedLevel = detectLevel(runs);
           setDetectedLevel(autoDetectedLevel);
           setFormData({ ...defaultData, level: autoDetectedLevel });
@@ -488,6 +495,7 @@ export default function GoalTab() {
       // Add goalSavedAt timestamp when saving
       const dataToSave = {
         ...formData,
+        goal_type: formData.goalType,
         level: formData.level,
         fitnessLevel: formData.level,
         daysPerWeek: formData.availableDays.length,
@@ -509,6 +517,11 @@ export default function GoalTab() {
   if (isLoading) {
     return <div className="space-y-4" />;
   }
+
+  const handleChangeGoal = () => {
+    setIsChanging(true);
+    setIsDefining(false);
+  };
 
   return (
     <div className="space-y-4">
@@ -585,7 +598,7 @@ export default function GoalTab() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => setIsChanging(true)}
+                onClick={handleChangeGoal}
               >
                 Changer d'objectif
               </Button>
