@@ -9,11 +9,13 @@ import {
   getRuns,
   getAllRunsForStats,
   getRunWithGps,
+  type ProfileRow,
   type RunGpsPoint,
   type RunRow,
 } from "@/lib/database";
 import { logger } from "@/lib/logger";
 import { normalizeGoalData } from "@/lib/goalHelpers";
+import { cache } from "@/lib/cache";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
 import { SkeletonHeroBanner } from "@/components/dashboard/SkeletonHeroBanner";
@@ -89,12 +91,6 @@ const Dashboard = () => {
   const loadUserDataRef = useRef<() => Promise<void>>(async () => {});
 
   const loadUserData = useCallback(async () => {
-    const now = Date.now();
-    if (isLoadingRef.current) return;
-    if (now - lastFetchRef.current < 30_000) return;
-    lastFetchRef.current = now;
-    isLoadingRef.current = true;
-
     if (!session?.user.id) {
       setUserGoal(null);
       setRunCount(0);
@@ -102,16 +98,59 @@ const Dashboard = () => {
       setRunsForStats([]);
       setAthleteName("Coureur");
       setIsLoading(false);
-      isLoadingRef.current = false;
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const [profile, runs] = await Promise.all([getProfile(session.user.id), getRuns(session.user.id)]);
+    const userId = session.user.id;
 
-      setRunCount(runs.length);
-      setRecentRuns(runs);
+    // Show stale-while-revalidate cache first for instant startup.
+    const cachedRuns = cache.get<RunRow[]>(`runs_${userId}`);
+    const cachedRunsStats = cache.get<RunRow[]>(`runsStats_${userId}`);
+    const cachedProfile = cache.get<ProfileRow>(`profile_${userId}`);
+
+    if (cachedRuns) {
+      setRecentRuns(cachedRuns);
+      setRunCount(cachedRuns.length);
+      setIsLoading(false);
+    }
+    if (cachedRunsStats) {
+      setRunsForStats(cachedRunsStats);
+      setIsLoading(false);
+    }
+    if (cachedProfile) {
+      setAthleteName(cachedProfile.first_name?.trim() || "Coureur");
+      if (cachedProfile.goal_data && typeof cachedProfile.goal_data === "object" && !Array.isArray(cachedProfile.goal_data)) {
+        setUserGoal(normalizeGoalData(cachedProfile.goal_data as ProfileGoalData) as ProfileGoalData);
+      } else {
+        setUserGoal(null);
+      }
+    }
+
+    // Guard concurrent and too-frequent refetches.
+    if (isLoadingRef.current) return;
+    const now = Date.now();
+    if (now - lastFetchRef.current < 30_000) return;
+    isLoadingRef.current = true;
+    lastFetchRef.current = now;
+
+    if (!cachedRuns && !cachedRunsStats && !cachedProfile) {
+      setIsLoading(true);
+    }
+
+    try {
+      const [profile, runs, runsStats] = await Promise.all([
+        getProfile(userId),
+        getRuns(userId),
+        getAllRunsForStats(userId),
+      ]);
+
+      if (runs) cache.set(`runs_${userId}`, runs);
+      if (runsStats) cache.set(`runsStats_${userId}`, runsStats);
+      if (profile) cache.set(`profile_${userId}`, profile);
+
+      setRunCount(runs?.length ?? 0);
+      setRecentRuns(runs ?? []);
+      setRunsForStats(runsStats ?? []);
 
       if (profile?.first_name?.trim()) {
         setAthleteName(profile.first_name.trim());

@@ -12,6 +12,7 @@ import {
 } from "@/lib/database";
 import { clearActiveSession, type ActiveSession } from "@/lib/activeSession";
 import type { CommunityPost } from "@/lib/runFormatters";
+import { cache } from "@/lib/cache";
 
 const OFFLINE_RUNS_KEY = "pace-offline-runs";
 
@@ -100,6 +101,8 @@ export function useRunSave() {
 
         const createdPost = await createPost(user.id, savedRun.id, activityTitle, description, postAudienceRef.current);
         setCompletedPostId(createdPost.id);
+        cache.invalidate(`runs_${user.id}`);
+        cache.invalidate(`runsStats_${user.id}`);
         window.dispatchEvent(new Event("pace-community-updated"));
         localStorage.removeItem(selectRouteKey);
         setActiveRoute(null);

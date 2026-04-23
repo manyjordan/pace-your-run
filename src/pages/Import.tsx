@@ -14,6 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { sourceConfig, type ImportSource } from "@/lib/importInstructions";
+import { cache } from "@/lib/cache";
 
 function normalizeStartedAt(value: string) {
   const normalized = new Date(value);
@@ -156,6 +157,8 @@ export default function ImportPage() {
 
     setImportResult({ imported, skipped, errors });
     if (imported > 0) {
+      cache.invalidate(`runs_${user.id}`);
+      cache.invalidate(`runsStats_${user.id}`);
       sessionStorage.setItem("pace-runs-last-import-at", String(Date.now()));
       window.dispatchEvent(new Event("pace-runs-updated"));
       window.dispatchEvent(new Event("pace-community-updated"));

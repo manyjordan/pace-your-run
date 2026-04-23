@@ -3,6 +3,7 @@ import * as Sentry from "@sentry/react";
 import { User, Session } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
+import { cache } from "@/lib/cache";
 
 interface AuthContextType {
   user: User | null;
@@ -44,6 +45,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setUser(session?.user ?? null);
       setLoading(false);
       if (event === "SIGNED_OUT") {
+        cache.invalidateAll();
         Sentry.setUser(null);
       }
       if (event === "SIGNED_IN" && session?.user) {
@@ -57,6 +59,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = useCallback(async () => {
     try {
       await supabase.auth.signOut();
+      cache.invalidateAll();
       setUser(null);
       setSession(null);
     } catch (error) {
