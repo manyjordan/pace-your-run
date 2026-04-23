@@ -180,18 +180,7 @@ export function useRunSession({
   }, [status, statusRef]);
 
   useEffect(() => {
-    if (status === "running") {
-      if (treadmill.isTreadmill) {
-        startInterval();
-      } else {
-        void (async () => {
-          const startOk = await startGpsTracking();
-          if (startOk) {
-            startInterval();
-          }
-        })();
-      }
-    } else if (status === "paused") {
+    if (status === "paused") {
       void stopGpsTracking();
       stopInterval();
     } else if (status === "idle") {
@@ -245,7 +234,13 @@ export function useRunSession({
   }, []);
 
   const start = useCallback(() => {
+    startInterval();
     startKeepAlive();
+    setStatus("running");
+    if (!treadmill.isTreadmill) {
+      void startGpsTracking();
+    }
+
     if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
       treadmill.resetTreadmillForFreshRun();
     }
@@ -273,8 +268,8 @@ export function useRunSession({
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
-    setStatus("running");
   }, [
+    startInterval,
     runSummary,
     showTreadmillCorrection,
     completedActivity,
@@ -301,13 +296,19 @@ export function useRunSession({
     userPreferencesUserId,
     startKeepAlive,
     setRollingPaceSecondsPerKm,
+    treadmill.isTreadmill,
+    startGpsTracking,
   ]);
 
   const pause = useCallback(() => setStatus("paused"), []);
   const resume = useCallback(() => {
+    startInterval();
     startKeepAlive();
+    if (!treadmill.isTreadmill) {
+      void startGpsTracking();
+    }
     setStatus("running");
-  }, [startKeepAlive]);
+  }, [startInterval, startKeepAlive, treadmill.isTreadmill, startGpsTracking]);
 
   const stop = useCallback(async () => {
     const finalDistance =

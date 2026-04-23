@@ -68,10 +68,8 @@ export function useRunTimer() {
   }, []);
 
   const startInterval = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
-    if (startTimeRef.current === null) {
-      startTimeRef.current = Date.now();
-    }
+    if (intervalRef.current) return;
+    startTimeRef.current = Date.now();
     tick();
     intervalRef.current = setInterval(tick, 1000);
   }, [tick]);
