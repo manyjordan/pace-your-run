@@ -14,7 +14,6 @@ export function useRunTimer() {
     internalSetElapsed((previous) => {
       const next = typeof value === "function" ? value(previous) : value;
       pausedElapsedRef.current = next;
-      startTimeRef.current = null;
       return next;
     });
   }, []);

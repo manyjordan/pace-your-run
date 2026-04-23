@@ -234,6 +234,23 @@ export function useRunSession({
   }, []);
 
   const start = useCallback(() => {
+    // Reset state before starting interval so timer refs are not reset after start.
+    if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
+      treadmill.resetTreadmillForFreshRun();
+    }
+    setElapsed(0);
+    setDistance(0);
+    setGpsTrace([]);
+    setRollingPaceSecondsPerKm(0);
+    setGpsAccuracy(null);
+    setRunSummary(null);
+    setCompletedActivity(null);
+    setCompletedPost(null);
+    setCompletedPostId(null);
+    setShowCompletedActivityDetail(false);
+    setSaveError("");
+
+    // Start timer/keepalive only after state reset.
     startInterval();
     startKeepAlive();
     setStatus("running");
@@ -241,21 +258,7 @@ export function useRunSession({
       void startGpsTracking();
     }
 
-    if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
-      treadmill.resetTreadmillForFreshRun();
-    }
     setTitle(activeSession?.session.type ?? "");
-    setRunSummary(null);
-    setCompletedActivity(null);
-    setCompletedPost(null);
-    setCompletedPostId(null);
-    setShowCompletedActivityDetail(false);
-    setSaveError("");
-    setGpsTrace([]);
-    setRollingPaceSecondsPerKm(0);
-    setDistance(0);
-    setElapsed(0);
-    setGpsAccuracy(null);
     bluetooth.clearErrorAndSamplesForRunStart();
     lastGpsPointRef.current = null;
     runStartedAtRef.current = new Date().toISOString();
