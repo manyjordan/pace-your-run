@@ -1,12 +1,11 @@
 import { useState, useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { Route } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
+import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import {
   type MetricChartPeriod,
   type MetricKind,
-  formatDashboardTooltipForKind,
+  formatXLabel,
 } from "@/lib/dashboardHelpers";
 import type { RunRow } from "@/lib/database";
 
@@ -94,41 +93,20 @@ export const MetricCard = ({ metric, index, activities, buildMetricData }: Metri
         </div>
 
         <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={updatedMetric.chartData} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
-              <XAxis
-                dataKey="week"
-                axisLine={false}
-                tickLine={false}
-                height={70}
-                tick={<CompactWeekTick period={chartPeriod} />}
-                interval={0}
-              />
-              <YAxis
-                width={36}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(value) => {
-                  if (updatedMetric.unit === "km") return `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`;
-                  if (updatedMetric.unit === "h") return `${Number(value).toFixed(1)}h`;
-                  return `${Math.round(Number(value))}`;
-                }}
-              />
-              <Tooltip
-                contentStyle={chartTooltipStyle}
-                labelStyle={{ color: "hsl(var(--foreground))" }}
-                formatter={(value) => formatDashboardTooltipForKind(updatedMetric.metricKind, Number(value))}
-              />
-              <Bar
-                dataKey="value"
-                fill="hsl(var(--accent))"
-                fillOpacity={0.85}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={48}
-              />
-            </BarChart>
-          </ResponsiveContainer>
+          <BarChartSvg
+            data={updatedMetric.chartData.map((point) => ({
+              label: point.week,
+              value: point.value,
+              showTick: point.showTick,
+            }))}
+            height={176}
+            formatValue={(value) => {
+              if (updatedMetric.unit === "km") return `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`;
+              if (updatedMetric.unit === "h") return `${Number(value).toFixed(1)}h`;
+              return `${Math.round(Number(value))}`;
+            }}
+            formatLabel={(label) => formatXLabel(label, chartPeriod)}
+          />
         </div>
       </div>
     </ScrollReveal>

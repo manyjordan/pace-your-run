@@ -1,11 +1,10 @@
 import { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
+import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { Calendar, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
-import { formatDashboardTooltipForKind } from "@/lib/dashboardHelpers";
+import { formatXLabel } from "@/lib/dashboardHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
 import { cn } from "@/lib/utils";
 
@@ -196,40 +195,20 @@ export const DashboardSection = ({
                 <p className="mt-1 text-xs text-muted-foreground">{metric.change}</p>
               </div>
               <div className="h-44">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metric.chartData} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
-                    <XAxis
-                      dataKey="week"
-                      axisLine={false}
-                      tickLine={false}
-                      height={70}
-                      tick={<CompactWeekTick period={metric.period ?? period} />}
-                      interval={0}
-                    />
-                    <YAxis
-                      width={36}
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                      tickFormatter={(value) => {
-                        if (metric.unit === "km") return `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`;
-                        if (metric.unit === "h") return `${Number(value).toFixed(1)}h`;
-                        return `${Math.round(Number(value))}`;
-                      }}
-                    />
-                    <Tooltip
-                      contentStyle={chartTooltipStyle}
-                      formatter={(value) => formatDashboardTooltipForKind(metric.metricKind, Number(value))}
-                    />
-                    <Bar
-                      dataKey="value"
-                      fill="hsl(var(--accent))"
-                      fillOpacity={0.85}
-                      radius={[4, 4, 0, 0]}
-                      maxBarSize={48}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
+                <BarChartSvg
+                  data={metric.chartData.map((point) => ({
+                    label: point.week,
+                    value: point.value,
+                    showTick: point.showTick,
+                  }))}
+                  height={176}
+                  formatValue={(value) => {
+                    if (metric.unit === "km") return `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`;
+                    if (metric.unit === "h") return `${Number(value).toFixed(1)}h`;
+                    return `${Math.round(Number(value))}`;
+                  }}
+                  formatLabel={(label) => formatXLabel(label, metric.period ?? period)}
+                />
               </div>
             </div>
           </ScrollReveal>

@@ -104,7 +104,6 @@ export default defineConfig(({ mode }) => ({
             "@radix-ui/react-tabs",
             "@radix-ui/react-select",
           ],
-          "vendor-charts": ["recharts"],
           "vendor-leaflet": ["leaflet"],
           "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-dates": ["date-fns"],

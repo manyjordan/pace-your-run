@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
-import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { logger } from "@/lib/logger";
 import { getRunWithGps, type RunRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
 import { GpsTraceSvg } from "@/components/GpsTraceSvg";
+import { LineChartSvg } from "@/components/charts/LineChartSvg";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -557,42 +557,17 @@ export function ActivityDetail({
               <h3 className="text-sm font-semibold">Évolution de la fréquence cardiaque</h3>
             </div>
             <div className="h-52">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={analysis.heartRateSeries}>
-                  {analysis.zones.map((zone, index) => {
-                    const [minLabel, maxLabel] = zone.range.replace("%", "").split("-");
-                    const zoneBounds = [
-                      [0, 120],
-                      [120, 140],
-                      [140, 160],
-                      [160, 175],
-                      [175, 205],
-                    ][index];
-
-                    return (
-                      <ReferenceArea
-                        key={zone.label}
-                        y1={zoneBounds[0]}
-                        y2={zoneBounds[1]}
-                        fill={zone.color}
-                        fillOpacity={0.08}
-                      />
-                    );
-                  })}
-                  <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-                  <Tooltip
-                    formatter={(value) => [`${Math.round(Number(value))} bpm`, "FC:"]}
-                    contentStyle={{
-                      background: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: 10,
-                      fontSize: 12,
-                    }}
-                  />
-                  <Line type="monotone" dataKey="value" stroke="hsl(0, 72%, 51%)" strokeWidth={2.5} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <LineChartSvg
+                data={analysis.heartRateSeries.map((point) => ({
+                  label: point.label,
+                  value: point.value,
+                }))}
+                height={208}
+                color="hsl(0, 72%, 51%)"
+                showArea
+                showDots={false}
+                formatValue={(value) => `${Math.round(value)}`}
+              />
             </div>
           </div>
         )}

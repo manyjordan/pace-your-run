@@ -1,17 +1,8 @@
 import { useMemo } from "react";
-import {
-  Area,
-  ComposedChart,
-  Line,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { estimateVO2maxFromRun } from "@/lib/racePredictions";
 import type { RunRow } from "@/lib/database";
 import { getStartOfWeek } from "@/lib/dashboardHelpers";
-import { chartTooltipStyle } from "@/components/dashboard/chartShared";
+import { LineChartSvg } from "@/components/charts/LineChartSvg";
 import { cn } from "@/lib/utils";
 
 const VO2_WEEKS = 8;
@@ -107,51 +98,15 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
       </div>
 
       <div className="h-40 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={series} margin={{ top: 4, right: 8, left: 4, bottom: 4 }}>
-            <defs>
-              <linearGradient id="vo2maxAreaFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="hsl(var(--accent))" stopOpacity={0.28} />
-                <stop offset="100%" stopColor="hsl(var(--accent))" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <XAxis
-              dataKey="week"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-            />
-            <YAxis
-              width={32}
-              axisLine={false}
-              tickLine={false}
-              domain={["auto", "auto"]}
-              tick={{ fontSize: 9, fill: "hsl(var(--muted-foreground))" }}
-            />
-            <Tooltip
-              contentStyle={chartTooltipStyle}
-              formatter={(value) => [(value != null ? `${Number(value).toFixed(1)} ml/kg/min` : "—"), "VO2max moy."]}
-              labelFormatter={(label) => `Semaine ${label}`}
-            />
-            <Area
-              type="monotone"
-              dataKey="vo2"
-              stroke="none"
-              fill="url(#vo2maxAreaFill)"
-              connectNulls
-              isAnimationActive={false}
-            />
-            <Line
-              type="monotone"
-              dataKey="vo2"
-              stroke="hsl(var(--accent))"
-              strokeWidth={2}
-              dot={false}
-              connectNulls
-              isAnimationActive={false}
-            />
-          </ComposedChart>
-        </ResponsiveContainer>
+        <LineChartSvg
+          data={series
+            .filter((point): point is { week: string; vo2: number } => point.vo2 != null)
+            .map((point) => ({ label: point.week, value: point.vo2 }))}
+          height={160}
+          showArea
+          showDots={false}
+          formatValue={(value) => `${Number(value).toFixed(1)}`}
+        />
       </div>
 
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{EXPLAIN}</p>

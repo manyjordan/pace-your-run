@@ -1,12 +1,11 @@
 import { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
-import { chartTooltipStyle, CompactWeekTick } from "@/components/dashboard/chartShared";
+import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
-import { getStartOfWeek, type MetricChartPeriod } from "@/lib/dashboardHelpers";
+import { formatXLabel, getStartOfWeek, type MetricChartPeriod } from "@/lib/dashboardHelpers";
 import { formatDistance, formatDuration, formatPace } from "@/lib/runFormatters";
 
 const WEEKS_BACK = 12;
@@ -149,41 +148,16 @@ export const PerformanceSection = ({
             <p className="mt-1 text-xs text-muted-foreground">Dernière semaine avec course</p>
           </div>
           <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={paceSeries} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
-                <XAxis
-                  dataKey="week"
-                  axisLine={false}
-                  tickLine={false}
-                  height={70}
-                  tick={<CompactWeekTick period={PERFORMANCE_CHART_PERIOD} />}
-                  interval={0}
-                />
-                <YAxis
-                  width={40}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  tickFormatter={(value) =>
-                    Number(value) > 0 ? formatPace(1000, Number(value)) : ""
-                  }
-                />
-                <Tooltip
-                  contentStyle={chartTooltipStyle}
-                  formatter={(_value, _name, props) => {
-                    const p = props?.payload as { paceLabel?: string } | undefined;
-                    return [p?.paceLabel || "—", "Allure moy."];
-                  }}
-                />
-                <Bar
-                  dataKey="value"
-                  fill="hsl(var(--accent))"
-                  fillOpacity={0.85}
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChartSvg
+              data={paceSeries.map((point) => ({
+                label: point.week,
+                value: point.value,
+                showTick: point.showTick,
+              }))}
+              height={176}
+              formatValue={(value) => (Number(value) > 0 ? formatPace(1000, Number(value)) : "")}
+              formatLabel={(label) => formatXLabel(label, PERFORMANCE_CHART_PERIOD)}
+            />
           </div>
         </div>
       </ScrollReveal>
@@ -207,36 +181,16 @@ export const PerformanceSection = ({
             <p className="mt-1 text-xs text-muted-foreground">Dernière semaine avec volume</p>
           </div>
           <div className="h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={distanceSeries} margin={{ top: 8, right: 8, left: 4, bottom: 16 }}>
-                <XAxis
-                  dataKey="week"
-                  axisLine={false}
-                  tickLine={false}
-                  height={70}
-                  tick={<CompactWeekTick period={PERFORMANCE_CHART_PERIOD} />}
-                  interval={0}
-                />
-                <YAxis
-                  width={36}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                  tickFormatter={(value) => `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`}
-                />
-                <Tooltip
-                  contentStyle={chartTooltipStyle}
-                  formatter={(value) => [`${Number(value).toFixed(1).replace(".", ",")} km`, "Distance"]}
-                />
-                <Bar
-                  dataKey="value"
-                  fill="hsl(var(--accent))"
-                  fillOpacity={0.85}
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={40}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            <BarChartSvg
+              data={distanceSeries.map((point) => ({
+                label: point.week,
+                value: point.value,
+                showTick: point.showTick,
+              }))}
+              height={176}
+              formatValue={(value) => `${Number(value).toFixed(Number(value) >= 10 ? 0 : 1)}`}
+              formatLabel={(label) => formatXLabel(label, PERFORMANCE_CHART_PERIOD)}
+            />
           </div>
         </div>
       </ScrollReveal>
