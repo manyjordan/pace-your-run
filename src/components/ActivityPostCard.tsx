@@ -2,7 +2,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import GPSMap from "@/components/GPSMap";
+import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 import type { CommunityPost } from "@/lib/runFormatters";
 import { Clock, MapPin, MessageCircle, Share2, Trophy, Zap } from "lucide-react";
 
@@ -73,7 +73,11 @@ export function ActivityPostCard({
           </div>
         </div>
 
-        {post.gpsTrace && post.gpsTrace.length > 0 && <GPSMap trace={post.gpsTrace} />}
+        {post.gpsTrace && post.gpsTrace.length > 0 ? (
+          <div className="overflow-hidden rounded-xl border border-accent/20 bg-muted/30">
+            <GpsTraceSvg trace={post.gpsTrace} height={180} />
+          </div>
+        ) : null}
 
         {showActions && (
           <div className="flex items-center gap-1 border-t border-border pt-1">

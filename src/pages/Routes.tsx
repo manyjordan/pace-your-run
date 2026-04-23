@@ -1,14 +1,13 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Map, Trash2, Upload } from "lucide-react";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { RouteTraceSvg } from "@/components/RouteTraceSvg";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { deleteRoute, getRoutes, saveRoute, type RouteRow } from "@/lib/database";
 import { parseGpxFile } from "@/lib/parsers/gpxParser";
-
-const GPSMap = lazy(() => import("@/components/GPSMap"));
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -145,9 +144,9 @@ export default function RoutesPage() {
                   </Button>
                 </div>
 
-                <Suspense fallback={<div className="h-[180px] animate-pulse rounded-lg bg-muted" />}>
-                  <GPSMap trace={route.gps_trace} showFullTrace height={180} />
-                </Suspense>
+                <div className="overflow-hidden rounded-xl border border-accent/20 bg-muted/30">
+                  <RouteTraceSvg trace={route.gps_trace} height={180} className="w-full" />
+                </div>
 
                 <Button className="w-full" onClick={() => handleUseRoute(route)}>
                   <Map className="mr-2 h-4 w-4" />
