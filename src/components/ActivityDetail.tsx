@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
 import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { logger } from "@/lib/logger";
@@ -6,8 +6,7 @@ import { getRunWithGps, type RunRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
-
-const GPSMap = lazy(() => import("@/components/GPSMap"));
+import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -414,6 +413,7 @@ export function ActivityDetail({
       startDate: new Date(resolvedActivity.start_date),
     };
   }, [fallbackTrace, fullRun?.gps_trace, normalizedAllActivities, resolvedActivity]);
+  const displayTrace = analysis.trace;
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
 
   return (
@@ -502,15 +502,15 @@ export function ActivityDetail({
         <div className="rounded-lg border border-accent/20 bg-card p-3">
           <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
           {gpsLoading ? (
-            <div className="flex h-[200px] animate-pulse items-center justify-center rounded-xl bg-muted">
-              <p className="text-xs text-muted-foreground">Chargement de la carte...</p>
+            <div className="h-[180px] rounded-xl bg-muted animate-pulse flex items-center justify-center">
+              <p className="text-xs text-muted-foreground">Chargement du tracé...</p>
             </div>
-          ) : fullRun?.gps_trace && fullRun.gps_trace.length > 0 ? (
-            <Suspense fallback={<div className="h-[200px] rounded-xl bg-muted animate-pulse" />}>
-              <GPSMap trace={fullRun.gps_trace as GPSTracePoint[]} />
-            </Suspense>
+          ) : displayTrace && displayTrace.length > 1 ? (
+            <div className="rounded-xl overflow-hidden border border-accent/20 bg-muted/30">
+              <GpsTraceSvg trace={displayTrace} height={180} />
+            </div>
           ) : (
-            <div className="flex h-[200px] items-center justify-center rounded-xl bg-muted">
+            <div className="h-[120px] rounded-xl bg-muted/30 flex items-center justify-center">
               <p className="text-xs text-muted-foreground">Pas de données GPS disponibles</p>
             </div>
           )}
