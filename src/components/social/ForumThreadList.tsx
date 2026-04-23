@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { Lock, MessageSquare, Plus } from "lucide-react";
 import { toast } from "sonner";
+import { ForumThreadDetail } from "@/components/social/ForumThreadDetail";
 
 type Props = {
   categoryId?: string;
@@ -58,6 +59,7 @@ export function ForumThreadList({ categoryId }: Props) {
   const [newThreadTitle, setNewThreadTitle] = useState("");
   const [newThreadContent, setNewThreadContent] = useState("");
   const [newThreadVisibility, setNewThreadVisibility] = useState<"public" | "network">("public");
+  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
 
   const selectedCategory = useMemo(
     () => categories.find((category) => category.id === categoryId) ?? null,
@@ -152,6 +154,17 @@ export function ForumThreadList({ categoryId }: Props) {
 
   return (
     <div className="space-y-4">
+      <ForumThreadDetail
+        threadId={selectedThreadId}
+        open={selectedThreadId !== null}
+        onOpenChange={(next) => {
+          if (!next) {
+            setSelectedThreadId(null);
+            void loadThreads(0);
+          }
+        }}
+        onUpdated={() => void loadThreads(0)}
+      />
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Discussions</h3>
@@ -288,6 +301,11 @@ export function ForumThreadList({ categoryId }: Props) {
                 const initials = getInitials(author);
                 return (
                   <ScrollReveal key={thread.id}>
+                    <button
+                      type="button"
+                      className="w-full text-left transition-opacity hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-xl"
+                      onClick={() => setSelectedThreadId(thread.id)}
+                    >
                     <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
                       <CardContent className="space-y-3 p-5">
                         <div className="flex flex-wrap items-center gap-2">
@@ -319,6 +337,7 @@ export function ForumThreadList({ categoryId }: Props) {
                         </div>
                       </CardContent>
                     </Card>
+                    </button>
                   </ScrollReveal>
                 );
               })}
