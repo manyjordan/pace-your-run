@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 interface SplashScreenProps {
   onComplete: () => void;
@@ -16,56 +15,27 @@ export const SplashScreen = ({ onComplete, durationMs = 800 }: SplashScreenProps
   }, [durationMs, onComplete]);
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key="splash"
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0a]"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        transition={{ duration: 0.2 }}
-      >
-        <div className="flex flex-col items-center gap-6">
-          {/* App Icon */}
-          <motion.img
-            src="/logo-splash.png"
-            alt="Pace"
-            className="w-24 h-24 rounded-2xl"
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3, delay: 0 }}
-          />
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0a] animate-in fade-in duration-200">
+      <div className="flex flex-col items-center gap-6">
+        <img
+          src="/logo-splash.png"
+          alt="Pace"
+          className="h-24 w-24 rounded-2xl animate-in zoom-in-75 fade-in duration-300"
+        />
 
-          {/* App Name */}
-          <motion.h1
-            className="text-5xl font-bold text-white tracking-tight"
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.05 }}
-          >
-            Pace
-          </motion.h1>
+        <h1 className="text-5xl font-bold tracking-tight text-white animate-in slide-in-from-top-2 fade-in duration-300">
+          Pace
+        </h1>
 
-          {/* Subtitle */}
-          <motion.p
-            className="text-sm text-muted-foreground"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-          >
-            Your running coach
-          </motion.p>
+        <p className="text-sm text-muted-foreground animate-in slide-in-from-bottom-2 fade-in duration-300">
+          Your running coach
+        </p>
 
-          {/* Accent Line Animation - Lime/Yellow */}
-          <motion.div
-            className="mt-2 h-1 rounded-full"
-            style={{ backgroundColor: "hsl(45 97% 54%)" }}
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: 80, opacity: 1 }}
-            transition={{ duration: 0.4, delay: 0.15 }}
-          />
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        <div
+          className="mt-2 h-1 w-20 rounded-full animate-in fade-in zoom-in-50 duration-300"
+          style={{ backgroundColor: "hsl(45 97% 54%)" }}
+        />
+      </div>
+    </div>
   );
 };

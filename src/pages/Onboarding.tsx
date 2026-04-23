@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -192,23 +191,6 @@ const Onboarding = () => {
     await completeOnboarding(true);
   };
 
-  const slideVariants = {
-    enter: (direction: number) => ({
-      x: direction > 0 ? 1000 : -1000,
-      opacity: 0,
-    }),
-    center: {
-      zIndex: 1,
-      x: 0,
-      opacity: 1,
-    },
-    exit: (direction: number) => ({
-      zIndex: 0,
-      x: direction < 0 ? 1000 : -1000,
-      opacity: 0,
-    }),
-  };
-
   return (
     <div className="flex min-h-screen flex-col bg-background">
       {/* Progress Bar */}
@@ -235,10 +217,10 @@ const Onboarding = () => {
       {/* Progress indicator dots */}
       <div className="flex shrink-0 justify-center gap-2 px-4 py-4">
         {[1, 2, 3, 4, 5].map((dotStep) => (
-          <motion.div
+          <div
             key={dotStep}
-            className="h-1.5 rounded-full transition-all"
-            animate={{
+            className="h-1.5 rounded-full transition-all duration-200"
+            style={{
               width: dotStep === step ? 24 : 6,
               backgroundColor: dotStep <= step ? "hsl(var(--accent))" : "hsl(var(--border))",
             }}
@@ -251,87 +233,40 @@ const Onboarding = () => {
         ref={contentScrollRef}
         className="relative max-h-[calc(100dvh-8.5rem)] min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-4 pb-20"
       >
-        <AnimatePresence mode="wait" custom={step > 1 ? 1 : -1}>
-          {step === 1 && (
-            <motion.div
-              key="step1"
-              custom={step > 1 ? 1 : -1}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="space-y-8 py-8"
-            >
-              <Step1Welcome onNext={handleNext} />
-            </motion.div>
-          )}
+        {step === 1 ? (
+          <div className="space-y-8 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
+            <Step1Welcome onNext={handleNext} />
+          </div>
+        ) : null}
 
-          {step === 2 && (
-            <motion.div
-              key="step2"
-              custom={step > 2 ? 1 : -1}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="space-y-6 py-8"
-            >
-              <Step2Profile data={data} setData={setData} onNext={handleNext} />
-            </motion.div>
-          )}
+        {step === 2 ? (
+          <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
+            <Step2Profile data={data} setData={setData} onNext={handleNext} />
+          </div>
+        ) : null}
 
-          {step === 3 && (
-            <motion.div
-              key="step3"
-              custom={step > 3 ? 1 : -1}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="space-y-6 py-8"
-            >
-              <Step3Level data={data} setData={setData} onNext={handleNext} />
-            </motion.div>
-          )}
+        {step === 3 ? (
+          <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
+            <Step3Level data={data} setData={setData} onNext={handleNext} />
+          </div>
+        ) : null}
 
-          {step === 4 && (
-            <motion.div
-              key="step4"
-              custom={step > 4 ? 1 : -1}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="space-y-6 py-8"
-            >
-              <Step4Goal data={data} setData={setData} onNext={handleNext} />
-            </motion.div>
-          )}
+        {step === 4 ? (
+          <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
+            <Step4Goal data={data} setData={setData} onNext={handleNext} />
+          </div>
+        ) : null}
 
-          {step === 5 && (
-            <motion.div
-              key="step5-summary"
-              custom={step > 5 ? 1 : -1}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="space-y-6 py-8"
-            >
-              <Step5Summary 
-                data={data} 
-                isLoading={isLoading} 
-                onComplete={handleComplete}
-                onCompleteAndImport={handleCompleteAndNavigateToImport}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {step === 5 ? (
+          <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
+            <Step5Summary
+              data={data}
+              isLoading={isLoading}
+              onComplete={handleComplete}
+              onCompleteAndImport={handleCompleteAndNavigateToImport}
+            />
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -609,9 +544,8 @@ function Step2Profile({
         <Label>Vous êtes</Label>
         <div className="grid grid-cols-2 gap-3">
           {(["homme", "femme"] as const).map((gender) => (
-            <motion.button
+            <button
               key={gender}
-              whileTap={{ scale: 0.97 }}
               onClick={() => setData({ ...data, gender })}
               className={`relative rounded-lg border-2 px-4 py-6 text-center transition-all ${
                 data.gender === gender
@@ -620,7 +554,7 @@ function Step2Profile({
               }`}
             >
               <p className="font-semibold capitalize">{gender}</p>
-            </motion.button>
+            </button>
           ))}
         </div>
       </div>
@@ -684,9 +618,8 @@ function Step3Level({
 
       <div className="space-y-3">
         {levels.map((level) => (
-          <motion.button
+          <button
             key={level.id}
-            whileTap={{ scale: 0.97 }}
             onClick={() => setData({ ...data, fitnessLevel: level.id })}
             className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
               data.fitnessLevel === level.id
@@ -704,7 +637,7 @@ function Step3Level({
                 <p className="mt-1 text-xs text-muted-foreground">{level.example}</p>
               </div>
             </div>
-          </motion.button>
+          </button>
         ))}
       </div>
 
@@ -765,9 +698,8 @@ function Step4Goal({
 
       <div className="space-y-3">
         {goals.map((goal) => (
-          <motion.button
+          <button
             key={goal.id}
-            whileTap={{ scale: 0.97 }}
             onClick={() => setData({ ...data, goalType: goal.id })}
             className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
               data.goalType === goal.id
@@ -784,13 +716,13 @@ function Step4Goal({
                 <p className="text-sm text-muted-foreground">{goal.desc}</p>
               </div>
             </div>
-          </motion.button>
+          </button>
         ))}
       </div>
 
       {/* Distance selector */}
       {data.goalType === "distance" && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <DistanceSelector
             label="Distance cible"
             options={["5k", "10k", "20k", "semi", "marathon"]}
@@ -820,12 +752,12 @@ function Step4Goal({
             }}
             onCustomChange={(value) => setData({ ...data, raceType: "other", raceDistance: value })}
           />
-        </motion.div>
+        </div>
       )}
 
       {/* Race selector */}
       {data.goalType === "race" && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
+        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <DistanceSelector
             label="Distance de la course"
             options={["5k", "10k", "20k", "semi", "marathon"]}
@@ -873,31 +805,23 @@ function Step4Goal({
             <p className="text-xs text-muted-foreground">Ce temps sera utilisé pour personnaliser votre plan d'entraînement</p>
             {targetTimeError ? <p className="text-xs text-destructive">{targetTimeError}</p> : null}
           </div>
-        </motion.div>
+        </div>
       )}
 
       {data.goalType !== "none" ? (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="space-y-2 rounded-xl border border-border bg-card/50 p-4"
-        >
+        <div className="space-y-2 rounded-xl border border-border bg-card/50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <Label>Quels jours pouvez-vous vous entraîner ?</Label>
           <DaySelector
             selectedDays={data.availableDays}
             onChange={(days) => setData({ ...data, availableDays: days })}
           />
-        </motion.div>
+        </div>
       ) : (
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-xl border border-border bg-card/50 p-4"
-        >
+        <div className="rounded-xl border border-border bg-card/50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <p className="text-sm text-muted-foreground">
             Aucun objectif précis sélectionné. Vous pourrez en définir un plus tard depuis l&apos;onglet Plan.
           </p>
-        </motion.div>
+        </div>
       )}
 
       <Button

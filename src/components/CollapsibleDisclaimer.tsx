@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,20 +46,11 @@ export function CollapsibleDisclaimer({ summary, fullText, variant = "warning" }
             {expanded ? "Réduire ↑" : "En savoir plus →"}
           </button>
         </div>
-        <AnimatePresence initial={false}>
-          {expanded ? (
-            <motion.div
-              key="full-text"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
-              className="overflow-hidden"
-            >
-              <p className="mt-2 leading-relaxed">{fullText}</p>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+        {expanded ? (
+          <div className="overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200">
+            <p className="mt-2 leading-relaxed">{fullText}</p>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Calendar, TrendingUp, Route, Clock, Mountain, Edit2, Save, X, ChevronRight, Activity, Zap, Camera, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -648,15 +647,10 @@ function StatisticsGrid({ runs }: { runs: RunRow[] }) {
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-      {stats.map((stat, index) => {
+      {stats.map((stat) => {
         const Icon = stat.icon;
         return (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-          >
+          <div key={stat.label} className="animate-in fade-in slide-in-from-bottom-2 duration-200">
             <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
               <CardContent className="flex flex-col items-center gap-2 pt-4">
                 <div className="rounded-lg bg-accent/10 p-2">
@@ -666,7 +660,7 @@ function StatisticsGrid({ runs }: { runs: RunRow[] }) {
                 <p className="text-center text-lg font-bold">{stat.value}</p>
               </CardContent>
             </Card>
-          </motion.div>
+          </div>
         );
       })}
     </div>

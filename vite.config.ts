@@ -99,7 +99,6 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
           "vendor-ui": [
-            "framer-motion",
             "@radix-ui/react-dialog",
             "@radix-ui/react-tabs",
             "@radix-ui/react-select",
