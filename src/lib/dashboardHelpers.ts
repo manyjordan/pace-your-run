@@ -9,6 +9,23 @@ export type MetricKind = "distance" | "duration" | "elevation";
 export type MetricChartPeriod = "1m" | "3m" | "6m" | "1y" | "all";
 export type AggregationUnit = "week" | "month" | "quarter";
 
+export function getMetricPeriodLabel(period: MetricChartPeriod): string {
+  switch (period) {
+    case "1m":
+      return "mois en cours";
+    case "3m":
+      return "3 derniers mois";
+    case "6m":
+      return "6 derniers mois";
+    case "1y":
+      return "cette année";
+    case "all":
+      return "tout le temps";
+    default:
+      return "semaine en cours";
+  }
+}
+
 /** X-axis tick label: for 1y monthly view, drop the year suffix (e.g. "Janv 24" → "Janv"). */
 export function formatXLabel(label: string, period: MetricChartPeriod): string {
   if (period === "1y") {
@@ -328,7 +345,7 @@ export function buildMetricData(
   } else if (period === "6m") {
     startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
   } else if (period === "1y") {
-    startDate.setFullYear(now.getFullYear() - 1);
+    startDate = new Date(now.getFullYear(), 0, 1);
   } else {
     startDate = new Date("2000-01-01");
   }
@@ -459,13 +476,17 @@ export function buildMetricData(
   const icon = kind === "distance" ? Route : kind === "duration" ? Clock : Mountain;
   const color = "hsl(var(--accent))";
 
+  const totalDistanceKm = periods.reduce((sum, entry) => sum + entry.distanceKm, 0);
+  const totalDurationSeconds = periods.reduce((sum, entry) => sum + entry.durationSeconds, 0);
+  const totalElevation = periods.reduce((sum, entry) => sum + entry.elevation, 0);
+
   let displayValue = "";
   if (kind === "distance") {
-    displayValue = `${currentValue.toFixed(1)} km`;
+    displayValue = `${totalDistanceKm.toFixed(1)} km`;
   } else if (kind === "duration") {
-    displayValue = formatWeeklyDurationLabel(currentValue);
+    displayValue = formatWeeklyDurationLabel(totalDurationSeconds);
   } else {
-    displayValue = `${Math.round(currentValue)} m`;
+    displayValue = `${Math.round(totalElevation)} m`;
   }
 
   return {

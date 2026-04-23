@@ -4,7 +4,7 @@ import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { Calendar, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
-import { formatXLabel } from "@/lib/dashboardHelpers";
+import { formatXLabel, getMetricPeriodLabel } from "@/lib/dashboardHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
 import { cn } from "@/lib/utils";
 
@@ -191,7 +191,7 @@ export const DashboardSection = ({
               </div>
               <div className="mb-4">
                 <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
-                <p className="mt-1 text-xs text-muted-foreground">semaine en cours</p>
+                <p className="mt-1 text-xs text-muted-foreground">{getMetricPeriodLabel(metric.period ?? period)}</p>
                 <p className="mt-1 text-xs text-muted-foreground">{metric.change}</p>
               </div>
               <div className="h-44">

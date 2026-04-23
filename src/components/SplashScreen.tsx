@@ -3,16 +3,17 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface SplashScreenProps {
   onComplete: () => void;
+  durationMs?: number;
 }
 
-export const SplashScreen = ({ onComplete }: SplashScreenProps) => {
+export const SplashScreen = ({ onComplete, durationMs = 800 }: SplashScreenProps) => {
   useEffect(() => {
     const timer = setTimeout(() => {
       onComplete();
-    }, 3000);
+    }, Math.min(durationMs, 800));
 
     return () => clearTimeout(timer);
-  }, [onComplete]);
+  }, [durationMs, onComplete]);
 
   return (
     <AnimatePresence mode="wait">

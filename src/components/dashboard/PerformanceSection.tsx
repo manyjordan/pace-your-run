@@ -5,7 +5,7 @@ import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
 import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
-import { formatXLabel, getStartOfWeek, type MetricChartPeriod } from "@/lib/dashboardHelpers";
+import { formatXLabel, getMetricPeriodLabel, getStartOfWeek, type MetricChartPeriod } from "@/lib/dashboardHelpers";
 import { formatDistance, formatDuration, formatPace } from "@/lib/runFormatters";
 
 const WEEKS_BACK = 12;
@@ -65,7 +65,12 @@ function weekBuckets(runs: RunRow[]) {
     };
   });
 
-  return { paceSeries, distanceSeries };
+  const totalDistanceKm = distanceKm.reduce((sum, value) => sum + value, 0);
+  const totalDurationSeconds = paceWeightedNum.reduce((sum, value) => sum + value, 0);
+  const periodPaceLabel =
+    totalDistanceKm > 0 && totalDurationSeconds > 0 ? formatPace(totalDistanceKm * 1000, totalDurationSeconds) : "—";
+
+  return { paceSeries, distanceSeries, totalDistanceKm, periodPaceLabel };
 }
 
 const PERFORMANCE_CHART_PERIOD: MetricChartPeriod = "3m";
@@ -77,7 +82,7 @@ export const PerformanceSection = ({
   runs: RunRow[];
   runsForStats: RunRow[];
 }) => {
-  const { paceSeries, distanceSeries } = useMemo(() => weekBuckets(runs), [runs]);
+  const { paceSeries, distanceSeries, totalDistanceKm, periodPaceLabel } = useMemo(() => weekBuckets(runs), [runs]);
 
   const stats = useMemo(() => {
     if (runsForStats.length === 0) {
@@ -121,9 +126,6 @@ export const PerformanceSection = ({
     };
   }, [runsForStats]);
 
-  const lastPace = [...paceSeries].reverse().find((p) => p.value > 0);
-  const lastDistance = [...distanceSeries].reverse().find((d) => d.value > 0);
-
   return (
     <div className="space-y-6">
       <div>
@@ -143,9 +145,9 @@ export const PerformanceSection = ({
             </div>
           </div>
           <div className="mb-4">
-            <span className="text-3xl font-bold tabular-nums">{lastPace?.paceLabel ?? "—"}</span>
-            <p className="mt-1 text-xs text-muted-foreground">semaine en cours</p>
-            <p className="mt-1 text-xs text-muted-foreground">Dernière semaine avec course</p>
+            <span className="text-3xl font-bold tabular-nums">{periodPaceLabel}</span>
+            <p className="mt-1 text-xs text-muted-foreground">{getMetricPeriodLabel(PERFORMANCE_CHART_PERIOD)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Allure moyenne pondérée sur la période</p>
           </div>
           <div className="h-44">
             <BarChartSvg
@@ -175,10 +177,10 @@ export const PerformanceSection = ({
           </div>
           <div className="mb-4">
             <span className="text-3xl font-bold tabular-nums">
-              {lastDistance != null && lastDistance.value > 0 ? `${lastDistance.value} km` : "—"}
+              {totalDistanceKm > 0 ? `${totalDistanceKm.toFixed(1)} km` : "—"}
             </span>
-            <p className="mt-1 text-xs text-muted-foreground">semaine en cours</p>
-            <p className="mt-1 text-xs text-muted-foreground">Dernière semaine avec volume</p>
+            <p className="mt-1 text-xs text-muted-foreground">{getMetricPeriodLabel(PERFORMANCE_CHART_PERIOD)}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Distance cumulée sur la période</p>
           </div>
           <div className="h-44">
             <BarChartSvg

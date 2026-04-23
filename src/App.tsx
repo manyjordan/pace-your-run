@@ -4,7 +4,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/AppShell";
 import { SplashScreen } from "@/components/SplashScreen";
@@ -81,8 +81,12 @@ function AppRoutes() {
   );
 }
 
-const App = () => {
+const MIN_SPLASH_MS = 500;
+
+function AppWithAuth() {
+  const { loading } = useAuth();
   const [showSplash, setShowSplash] = useState(true);
+  const [splashStartedAt] = useState(() => Date.now());
 
   useEffect(() => {
     // Check if splash screen has been shown before (use sessionStorage to show only on first load)
@@ -92,10 +96,27 @@ const App = () => {
     }
   }, []);
 
-  const handleSplashComplete = useCallback(() => {
+  const hideSplash = useCallback(() => {
     sessionStorage.setItem("splashShown", "true");
     setShowSplash(false);
   }, []);
+
+  useEffect(() => {
+    if (!showSplash) return;
+    if (loading) return;
+
+    const elapsed = Date.now() - splashStartedAt;
+    const remaining = Math.max(0, MIN_SPLASH_MS - elapsed);
+    if (remaining === 0) {
+      hideSplash();
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      hideSplash();
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [hideSplash, loading, showSplash, splashStartedAt]);
 
   useEffect(() => {
     const preload = () => {
@@ -123,21 +144,29 @@ const App = () => {
   }, []);
 
   return (
+    <>
+      <Toaster />
+      <Sonner />
+      {showSplash ? (
+        <SplashScreen onComplete={hideSplash} durationMs={800} />
+      ) : (
+        <BrowserRouter>
+          <DeepLinkAuthHandler />
+          <AppRoutes />
+        </BrowserRouter>
+      )}
+    </>
+  );
+}
+
+const App = () => {
+  return (
     <ErrorBoundary>
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
         <QueryClientProvider client={queryClient}>
           <TooltipProvider>
             <AuthProvider>
-              <Toaster />
-              <Sonner />
-              {showSplash ? (
-                <SplashScreen onComplete={handleSplashComplete} />
-              ) : (
-                <BrowserRouter>
-                  <DeepLinkAuthHandler />
-                  <AppRoutes />
-                </BrowserRouter>
-              )}
+              <AppWithAuth />
             </AuthProvider>
           </TooltipProvider>
         </QueryClientProvider>
