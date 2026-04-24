@@ -48,15 +48,14 @@ function periodRangeLabel(p: DashboardPeriod): string {
   if (p === "3m") return "les 3 derniers mois";
   if (p === "6m") return "les 6 derniers mois";
   if (p === "1y") return "la dernière année";
-  return "tout l'historique";
+  return "les 52 dernières semaines";
 }
 
 function metricSubtitle(kind: MetricKind, period: DashboardPeriod): string {
   const range = periodRangeLabel(period);
-  const bucket = period === "all" ? "trimestre" : period === "1y" ? "mois" : "semaine";
-  if (kind === "distance") return `Kilomètres cumulés par ${bucket} sur ${range}.`;
-  if (kind === "duration") return `Temps total d'activité par ${bucket} sur ${range}.`;
-  return `Dénivelé positif cumulé par ${bucket} sur ${range}.`;
+  if (kind === "distance") return `Kilomètres cumulés par semaine sur ${range}.`;
+  if (kind === "duration") return `Temps total d'activité par semaine sur ${range}.`;
+  return `Dénivelé positif cumulé par semaine sur ${range}.`;
 }
 
 export const DashboardSection = ({
@@ -192,7 +191,6 @@ export const DashboardSection = ({
               <div className="mb-4">
                 <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
                 <p className="mt-1 text-xs text-muted-foreground">{getMetricPeriodLabel(metric.period ?? period)}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{metric.change}</p>
               </div>
               <div className="h-44">
                 <BarChartSvg

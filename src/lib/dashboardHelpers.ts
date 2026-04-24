@@ -1,7 +1,5 @@
 import type { RunRow } from "@/lib/database";
 import { Route, Clock, Mountain } from "lucide-react";
-import { format, getMonth } from "date-fns";
-import { fr } from "date-fns/locale";
 
 export type MetricKind = "distance" | "duration" | "elevation";
 
@@ -18,9 +16,9 @@ export function getMetricPeriodLabel(period: MetricChartPeriod): string {
     case "6m":
       return "6 derniers mois";
     case "1y":
-      return "cette année";
+      return "52 dernières semaines";
     case "all":
-      return "tout le temps";
+      return "52 dernières semaines";
     default:
       return "semaine en cours";
   }
@@ -28,18 +26,12 @@ export function getMetricPeriodLabel(period: MetricChartPeriod): string {
 
 /** X-axis tick label: for 1y monthly view, drop the year suffix (e.g. "Janv 24" → "Janv"). */
 export function formatXLabel(label: string, period: MetricChartPeriod): string {
-  if (period === "1y") {
-    return label.split(" ")[0] ?? label;
-  }
-  if (period === "all") {
-    return label;
-  }
+  void period;
   return label;
 }
 
 export function getAggregationUnit(period: MetricChartPeriod): AggregationUnit {
-  if (period === "all") return "quarter";
-  if (period === "1y") return "month";
+  void period;
   return "week";
 }
 
@@ -216,16 +208,8 @@ export function formatAxisDateLabel(
   granularity: "week" | "month" | "quarter",
   _period: MetricChartPeriod,
 ) {
-  if (granularity === "month") {
-    const monthLabels = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"];
-    return monthLabels[getMonth(start)] ?? format(start, "MMM", { locale: fr }).replace(".", "");
-  }
-  if (granularity === "quarter") {
-    const quarter = Math.floor(getMonth(start) / 3) + 1;
-    return `T${quarter} ${format(start, "yy")}`;
-  }
-  const month = format(start, "MMM", { locale: fr }).replace(".", "");
-  return `${start.getDate()} ${month.charAt(0).toUpperCase()}${month.slice(1)}`;
+  void granularity;
+  return `${start.getDate()}/${start.getMonth() + 1}`;
 }
 
 export function trimLeadingZeroPeriods<T extends { value: number }>(series: T[]) {
@@ -336,24 +320,14 @@ export function buildMetricData(
 ): WeeklyMetricCard {
   const kind = metricKind ?? inferMetricKind(title);
   const now = new Date();
-  let startDate = new Date();
-
-  if (period === "1m") {
-    startDate.setMonth(now.getMonth() - 1);
-  } else if (period === "3m") {
-    startDate.setMonth(now.getMonth() - 3);
-  } else if (period === "6m") {
-    startDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
-  } else if (period === "1y") {
-    startDate = new Date(now.getFullYear(), 0, 1);
-  } else {
-    startDate = new Date("2000-01-01");
-  }
-
-  const filteredRuns = runs.filter((run) => {
-    const actDate = new Date(runActivityDate(run));
-    return actDate >= startDate && actDate <= now;
-  });
+  const weekCountByPeriod: Record<MetricChartPeriod, number> = {
+    "1m": 5,
+    "3m": 13,
+    "6m": 26,
+    "1y": 52,
+    all: 52,
+  };
+  const weekCount = weekCountByPeriod[period];
 
   const effectiveGranularity = getAggregationUnit(period);
 
@@ -384,8 +358,14 @@ export function buildMetricData(
   }> = [];
   let currentLabel = "";
 
-  const alignedStartDate = startForUnit(startDate, effectiveGranularity);
   const alignedCurrentStart = startForUnit(now, effectiveGranularity);
+  const alignedStartDate = new Date(alignedCurrentStart);
+  alignedStartDate.setDate(alignedStartDate.getDate() - (weekCount - 1) * 7);
+  const startDate = alignedStartDate;
+  const filteredRuns = runs.filter((run) => {
+    const actDate = new Date(runActivityDate(run));
+    return actDate >= startDate && actDate <= now;
+  });
   for (
     let bucketStart = new Date(alignedStartDate);
     bucketStart <= alignedCurrentStart;

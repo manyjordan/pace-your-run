@@ -22,6 +22,13 @@ export function BarChartSvg({
   formatValue,
   formatLabel,
 }: BarChartSvgProps) {
+  const showBarLabel = (i: number, total: number): boolean => {
+    if (total <= 8) return true;
+    if (total <= 16) return i % 2 === 0;
+    if (total <= 26) return i % 3 === 0;
+    return i % 4 === 0;
+  };
+
   const { bars, yLabels, maxValue } = useMemo(() => {
     if (!data.length) return { bars: [] as BarData[], yLabels: [] as string[], maxValue: 0 };
     const max = Math.max(...data.map((d) => d.value), 0.001);
@@ -71,10 +78,25 @@ export function BarChartSvg({
         const barH = Math.max(2, (bar.value / maxValue) * chartHeight);
         const y = paddingTop + chartHeight - barH;
         const label = formatLabel ? formatLabel(bar.label) : bar.label;
+        const isSignificant = bar.value >= maxValue * 0.12;
+        const canShowTopLabel = showBarLabel(i, bars.length) && bar.value > 0 && barH >= 14 && isSignificant;
+        const topLabel = formatValue ? formatValue(bar.value) : String(Math.round(bar.value));
 
         return (
           <g key={`bar-${bar.label}-${i}`}>
             <rect x={x} y={y} width={barWidth} height={barH} rx={2} fill={color} opacity={0.85} />
+            {canShowTopLabel ? (
+              <text
+                x={x + barWidth / 2}
+                y={y - 3}
+                textAnchor="middle"
+                fontSize={8}
+                fill="hsl(var(--muted-foreground))"
+                fontWeight={500}
+              >
+                {topLabel}
+              </text>
+            ) : null}
             {bar.showTick !== false && (
               <text
                 x={x + barWidth / 2}
