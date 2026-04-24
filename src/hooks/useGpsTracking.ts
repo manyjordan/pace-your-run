@@ -53,12 +53,13 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
 
   const applyPosition = useCallback(
     (latitude: number, longitude: number, accuracy: number, altitude: number | null | undefined, now: number) => {
-      if (accuracy > 50) {
-        setGpsAccuracy(accuracy);
+      setGpsAccuracy(accuracy);
+
+      const isFirstPoint = lastGpsPointRef.current === null;
+      if (!isFirstPoint && accuracy > 50) {
         return;
       }
 
-      setGpsAccuracy(accuracy);
       setGpsError("");
 
       const newPoint: RunGpsPoint = {

@@ -145,6 +145,7 @@ export function useRunSession({
   const [routeProgress, setRouteProgress] = useState(0);
 
   const runStartedAtRef = useRef<string | null>(null);
+  const prevStatusRef = useRef<RunStatus>("idle");
 
   const bumpDistance = useCallback((deltaKm: number) => {
     setDistance((d) => d + deltaKm);
@@ -180,26 +181,17 @@ export function useRunSession({
   }, [status, statusRef]);
 
   useEffect(() => {
-    if (status === "paused") {
+    const previousStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+
+    if (status === "paused" && previousStatus === "running") {
       void stopGpsTracking();
       stopInterval();
-    } else if (status === "idle") {
+    } else if (status === "idle" && previousStatus !== "idle") {
       void stopGpsTracking();
       stopInterval();
     }
-
-    return () => {
-      stopInterval();
-      void stopGpsTracking();
-    };
-  }, [
-    treadmill.isTreadmill,
-    status,
-    startGpsTracking,
-    stopGpsTracking,
-    startInterval,
-    stopInterval,
-  ]);
+  }, [status, stopGpsTracking, stopInterval]);
 
   useEffect(() => {
     if (!treadmill.isTreadmill || status !== "running") return;
