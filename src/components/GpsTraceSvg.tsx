@@ -10,24 +10,15 @@ interface GpsTraceSvgProps {
   className?: string;
 }
 
-function latLngToTile(lat: number, lng: number, zoom: number) {
-  const x = Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
-  const y = Math.floor(
-    ((1 - Math.log(Math.tan((lat * Math.PI) / 180) + 1 / Math.cos((lat * Math.PI) / 180)) / Math.PI) / 2) *
-      Math.pow(2, zoom),
-  );
-  return { x, y };
-}
-
 export function GpsTraceSvg({ trace, width = 400, height = 200, className }: GpsTraceSvgProps) {
   const displayTrace = useMemo(
     () => (trace.length > 200 ? simplifyGpsTrace(trace, 0.00003) : trace),
     [trace],
   );
 
-  const { path, startX, startY, endX, endY, mapUrl } = useMemo(() => {
+  const { path, startX, startY, endX, endY } = useMemo(() => {
     if (!displayTrace || displayTrace.length < 2) {
-      return { path: null, startX: 0, startY: 0, endX: 0, endY: 0, mapUrl: null };
+      return { path: null, startX: 0, startY: 0, endX: 0, endY: 0 };
     }
 
     const lats = displayTrace.map((p) => p.lat);
@@ -36,23 +27,6 @@ export function GpsTraceSvg({ trace, width = 400, height = 200, className }: Gps
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
-    const centerLat = (minLat + maxLat) / 2;
-    const centerLng = (minLng + maxLng) / 2;
-
-    const latDiff = maxLat - minLat;
-    const lngDiff = maxLng - minLng;
-    const maxDiff = Math.max(latDiff, lngDiff);
-    let zoom = 14;
-    if (maxDiff > 0.1) zoom = 12;
-    else if (maxDiff > 0.05) zoom = 13;
-    else if (maxDiff < 0.01) zoom = 15;
-
-    // Keeps tile math helper useful if static map provider changes.
-    latLngToTile(centerLat, centerLng, zoom);
-    const mapWidth = Math.max(200, Math.round(width));
-    const mapHeight = Math.max(120, Math.round(height));
-    const staticMapUrl = `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLng}&zoom=${zoom}&size=${mapWidth}x${mapHeight}&maptype=osm`;
-
     const latRange = maxLat - minLat || 0.001;
     const lngRange = maxLng - minLng || 0.001;
 
@@ -77,27 +51,25 @@ export function GpsTraceSvg({ trace, width = 400, height = 200, className }: Gps
       startY: start[1],
       endX: end[0],
       endY: end[1],
-      mapUrl: staticMapUrl,
     };
   }, [displayTrace, width, height]);
 
   if (!path) return null;
 
   return (
-    <div className={`relative overflow-hidden rounded-xl ${className ?? ""}`} style={{ height }}>
-      {mapUrl ? (
-        <img
-          src={mapUrl}
-          alt="carte"
-          className="absolute inset-0 h-full w-full object-cover opacity-60"
-          loading="lazy"
-        />
-      ) : null}
-      <div className="absolute inset-0 bg-background/40" />
+    <div className={`relative overflow-hidden rounded-xl bg-muted/80 ${className ?? ""}`} style={{ height }}>
+      <svg className="absolute inset-0 opacity-10" width="100%" height="100%">
+        <defs>
+          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid)" />
+      </svg>
       <svg
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
-      height={height}
+        height={height}
         className="absolute inset-0"
         style={{ background: "transparent" }}
       >

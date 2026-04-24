@@ -282,7 +282,7 @@ const Dashboard = () => {
   );
 
   return (
-    <PageContainer>
+    <>
       {selectedRunForDetail && session?.user?.id ? (
         <ActivityDetail
           activity={selectedRunForDetail}
@@ -293,7 +293,8 @@ const Dashboard = () => {
         />
       ) : null}
 
-      <ScrollReveal>
+      <PageContainer>
+        <ScrollReveal>
         {isLoading ? (
           <SkeletonHeroBanner />
         ) : (
@@ -382,8 +383,9 @@ const Dashboard = () => {
             </Suspense>
           )}
         </TabsContent>
-      </Tabs>
-    </PageContainer>
+        </Tabs>
+      </PageContainer>
+    </>
   );
 };
 
