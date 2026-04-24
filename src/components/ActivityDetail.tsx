@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { ArrowLeft, BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, Zap } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { getRunWithGps, type RunRow } from "@/lib/database";
@@ -210,6 +210,32 @@ export function ActivityDetail({
   const [gpsLoading, setGpsLoading] = useState(true);
   const traceLen = Array.isArray(activity?.gps_trace) ? activity.gps_trace.length : 0;
 
+  const touchStartYRef = useRef<number | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleTouchStart = useCallback((e: TouchEvent) => {
+    const scrollTop = scrollContainerRef.current?.scrollTop ?? 0;
+    if (scrollTop === 0) {
+      touchStartYRef.current = e.touches[0].clientY;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback(
+    (e: TouchEvent) => {
+      if (touchStartYRef.current === null) return;
+      const deltaY = e.touches[0].clientY - touchStartYRef.current;
+      if (deltaY > 80) {
+        touchStartYRef.current = null;
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  const handleTouchEnd = useCallback(() => {
+    touchStartYRef.current = null;
+  }, []);
+
   useEffect(() => {
     if (!activity?.id || !resolvedUserId) {
       setFullRun(null);
@@ -417,16 +443,31 @@ export function ActivityDetail({
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
 
   return (
-    <div className="fixed inset-0 z-[200] flex flex-col bg-background">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
-        <button onClick={onClose} className="rounded-lg p-2 transition hover:bg-muted" aria-label="Retour">
-          <ArrowLeft className="h-5 w-5" />
-        </button>
-        <h2 className="font-semibold text-foreground">Détail de l&apos;activité</h2>
-        <div className="w-9" />
+    <div
+      className="fixed inset-0 z-[200] flex flex-col bg-background"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="flex justify-center pb-1 pt-3">
+        <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
       </div>
 
-      <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-8 pt-4">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2 transition-all hover:bg-muted/80 active:scale-95"
+          aria-label="Retour"
+        >
+          <ArrowLeft className="h-5 w-5" />
+          <span className="text-sm font-medium">Retour</span>
+        </button>
+        <h2 className="font-semibold text-foreground">Activité</h2>
+        <div className="w-20" />
+      </div>
+
+      <div ref={scrollContainerRef} className="flex-1 space-y-4 overflow-y-auto px-4 pb-8 pt-2">
         <div className="rounded-lg border border-accent/20 bg-card p-4">
           {activity.run_type === "treadmill" && (
             <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">
