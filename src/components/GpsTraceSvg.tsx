@@ -1,4 +1,5 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
+import "leaflet/dist/leaflet.css";
 import { simplifyGpsTrace } from "@/lib/gpsSimplify";
 
 type Point = { lat: number; lng: number };
@@ -11,6 +12,8 @@ interface GpsTraceSvgProps {
 }
 
 export function GpsTraceSvg({ trace, width = 400, height = 200, className }: GpsTraceSvgProps) {
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const leafletMapRef = useRef<import("leaflet").Map | null>(null);
   const displayTrace = useMemo(
     () => (trace.length > 200 ? simplifyGpsTrace(trace, 0.00003) : trace),
     [trace],
@@ -54,23 +57,58 @@ export function GpsTraceSvg({ trace, width = 400, height = 200, className }: Gps
     };
   }, [displayTrace, width, height]);
 
+  useEffect(() => {
+    if (!mapContainerRef.current || !displayTrace || displayTrace.length < 2) return;
+    if (leafletMapRef.current) return;
+
+    const lats = displayTrace.map((p) => p.lat);
+    const lngs = displayTrace.map((p) => p.lng);
+    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const centerLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
+
+    void import("leaflet").then((L) => {
+      if (!mapContainerRef.current || leafletMapRef.current) return;
+
+      const map = L.map(mapContainerRef.current, {
+        center: [centerLat, centerLng],
+        zoom: 14,
+        zoomControl: false,
+        dragging: false,
+        touchZoom: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        attributionControl: false,
+      });
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+      }).addTo(map);
+
+      const bounds = L.latLngBounds(displayTrace.map((p) => [p.lat, p.lng] as [number, number]));
+      map.fitBounds(bounds, { padding: [24, 24] });
+
+      leafletMapRef.current = map;
+    });
+
+    return () => {
+      leafletMapRef.current?.remove();
+      leafletMapRef.current = null;
+    };
+  }, [displayTrace]);
+
   if (!path) return null;
 
   return (
-    <div className={`relative overflow-hidden rounded-xl bg-muted/80 ${className ?? ""}`} style={{ height }}>
-      <svg className="absolute inset-0 opacity-10" width="100%" height="100%">
-        <defs>
-          <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="hsl(var(--foreground))" strokeWidth="0.5" />
-          </pattern>
-        </defs>
-        <rect width="100%" height="100%" fill="url(#grid)" />
-      </svg>
+    <div className={`relative overflow-hidden rounded-xl ${className ?? ""}`} style={{ height }}>
+      <div ref={mapContainerRef} className="absolute inset-0 h-full w-full" />
+      <div className="absolute inset-0 bg-black/20 pointer-events-none" />
       <svg
         viewBox={`0 0 ${width} ${height}`}
         width="100%"
         height={height}
-        className="absolute inset-0"
+        className="absolute inset-0 pointer-events-none"
         style={{ background: "transparent" }}
       >
         <polyline

@@ -55,6 +55,12 @@ export function formatPaceFromSeconds(durationSeconds: number, distanceMeters: n
   return `${wholeMinutes}:${String(safeSeconds).padStart(2, "0")} /km`;
 }
 
+export function convertPaceFromMinutesPerKm(paceMinPerKm: number, unit: "km" | "mi" = "km"): number {
+  if (!paceMinPerKm || paceMinPerKm <= 0) return 0;
+  if (unit === "mi") return paceMinPerKm * 1.60934;
+  return paceMinPerKm;
+}
+
 export function formatRelativeTime(dateString: string) {
   const diffMs = Date.now() - new Date(dateString).getTime();
   const diffMinutes = Math.max(1, Math.round(diffMs / 60000));

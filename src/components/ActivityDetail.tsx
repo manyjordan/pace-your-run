@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, X, Zap } from "lucide-react";
+import { ArrowLeft, BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, Zap } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { getRunWithGps, type RunRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
@@ -417,15 +417,16 @@ export function ActivityDetail({
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/40 backdrop-blur-sm">
-      <div className="absolute left-0 right-0 top-0 flex items-center justify-between border-b border-accent/50 bg-gradient-to-r from-accent/90 to-accent/70 p-4 text-accent-foreground">
-        <h2 className="truncate text-lg font-bold">{resolvedActivity.name}</h2>
-        <button onClick={onClose} className="rounded-lg p-1 transition hover:bg-accent-foreground/10">
-          <X className="h-5 w-5" />
+    <div className="fixed inset-0 z-[200] flex flex-col bg-background">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/90 px-4 py-3 backdrop-blur">
+        <button onClick={onClose} className="rounded-lg p-2 transition hover:bg-muted" aria-label="Retour">
+          <ArrowLeft className="h-5 w-5" />
         </button>
+        <h2 className="font-semibold text-foreground">Détail de l&apos;activité</h2>
+        <div className="w-9" />
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-4 px-4 pb-8 pt-16">
+      <div className="flex-1 space-y-4 overflow-y-auto px-4 pb-8 pt-4">
         <div className="rounded-lg border border-accent/20 bg-card p-4">
           {activity.run_type === "treadmill" && (
             <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">

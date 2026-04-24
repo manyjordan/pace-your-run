@@ -19,10 +19,9 @@ import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
 import { useSessionProgram } from "@/hooks/useSessionProgram";
 import { useTreadmill } from "@/hooks/useTreadmill";
 import { updatePostAudience, type RouteRow, type RunRow } from "@/lib/database";
-import type { CommunityPost } from "@/lib/runFormatters";
+import { convertPaceFromMinutesPerKm, type CommunityPost } from "@/lib/runFormatters";
 import {
   convertDistanceFromKm,
-  convertPaceFromMinutesPerKm,
   getDistanceUnitShortLabel,
   getDefaultRunPreferences,
   getSplitDistanceKm,
@@ -160,8 +159,15 @@ export default function Run() {
   resetKilometreAnnouncementRefRef.current = resetKilometreAnnouncementRef;
 
   const formatPace = useCallback(
-    (p: number) => (p > 0 ? `${Math.floor(p)}:${String(Math.round((p % 1) * 60)).padStart(2, "0")}` : "--:--"),
-    [],
+    (paceMinPerKm: number): string => {
+      if (!paceMinPerKm || paceMinPerKm <= 0) return "--:-- /km";
+      const wholeMin = Math.floor(paceMinPerKm);
+      const secs = Math.round((paceMinPerKm - wholeMin) * 60);
+      const safeSecs = secs === 60 ? 59 : secs;
+      const unit = runPreferences.distanceUnit === "mi" ? "/mi" : "/km";
+      return `${wholeMin}:${String(safeSecs).padStart(2, "0")} ${unit}`;
+    },
+    [runPreferences.distanceUnit],
   );
   const distanceUnitShortLabel = getDistanceUnitShortLabel(runPreferences.distanceUnit);
   const splitDistanceKm = getSplitDistanceKm(runPreferences.distanceUnit);
