@@ -90,6 +90,44 @@ const Dashboard = () => {
   const hasMountedRef = useRef(false);
   const loadUserDataRef = useRef<() => Promise<void>>(async () => {});
 
+  useEffect(() => {
+    const storedUserId = localStorage.getItem("pace_user_id");
+    if (!storedUserId) return;
+
+    const cachedRuns = cache.get<RunRow[]>(`runs_${storedUserId}`);
+    const cachedRunsStats = cache.get<RunRow[]>(`runsStats_${storedUserId}`);
+    const cachedProfile = cache.get<ProfileRow>(`profile_${storedUserId}`);
+
+    if (cachedRuns) {
+      setRecentRuns(cachedRuns);
+      setRunCount(cachedRuns.length);
+      setIsLoading(false);
+    }
+    if (cachedRunsStats) {
+      setRunsForStats(cachedRunsStats);
+      setIsLoading(false);
+    }
+    if (cachedProfile) {
+      setAthleteName(cachedProfile.first_name?.trim() || "Coureur");
+      if (
+        cachedProfile.goal_data &&
+        typeof cachedProfile.goal_data === "object" &&
+        !Array.isArray(cachedProfile.goal_data)
+      ) {
+        setUserGoal(normalizeGoalData(cachedProfile.goal_data as ProfileGoalData) as ProfileGoalData);
+      } else {
+        setUserGoal(null);
+      }
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      localStorage.setItem("pace_user_id", session.user.id);
+    }
+  }, [session?.user?.id]);
+
   const loadUserData = useCallback(async () => {
     if (!session?.user.id) {
       setUserGoal(null);

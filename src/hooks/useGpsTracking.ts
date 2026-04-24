@@ -22,20 +22,27 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
 
   const calculateRollingPace = useCallback((points: RunGpsPoint[]): number => {
     if (points.length < 2) return 0;
-    const windowMs = 15_000;
+
+    const windowMs = points.length < 10 ? 60_000 : 30_000;
     const now = points[points.length - 1].time;
     const windowPoints = points.filter((p) => now - p.time <= windowMs);
     if (windowPoints.length < 2) return 0;
 
-    const first = windowPoints[0];
-    const last = windowPoints[windowPoints.length - 1];
-    const distKm = haversineDistanceKm(
-      { lat: first.lat, lng: first.lng },
-      { lat: last.lat, lng: last.lng },
-    );
-    const timeSec = (last.time - first.time) / 1000;
-    if (distKm < 0.001 || timeSec <= 0) return 0;
-    return timeSec / distKm;
+    let totalDistKm = 0;
+    for (let i = 1; i < windowPoints.length; i++) {
+      totalDistKm += haversineDistanceKm(
+        { lat: windowPoints[i - 1].lat, lng: windowPoints[i - 1].lng },
+        { lat: windowPoints[i].lat, lng: windowPoints[i].lng },
+      );
+    }
+
+    const timeSec = (windowPoints[windowPoints.length - 1].time - windowPoints[0].time) / 1000;
+
+    if (totalDistKm < 0.001 || timeSec <= 0) return 0;
+    const paceSecPerKm = timeSec / totalDistKm;
+    if (paceSecPerKm < 120 || paceSecPerKm > 1800) return 0;
+
+    return paceSecPerKm;
   }, []);
 
   const requestLocationPermission = useCallback(async () => {

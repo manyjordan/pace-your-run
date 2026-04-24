@@ -46,6 +46,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setLoading(false);
       if (event === "SIGNED_OUT") {
         cache.invalidateAll();
+        localStorage.removeItem("pace_user_id");
         Sentry.setUser(null);
       }
       if (event === "SIGNED_IN" && session?.user) {
@@ -60,6 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await supabase.auth.signOut();
       cache.invalidateAll();
+      localStorage.removeItem("pace_user_id");
       setUser(null);
       setSession(null);
     } catch (error) {

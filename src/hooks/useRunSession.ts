@@ -365,7 +365,7 @@ export function useRunSession({
       }
 
       const activityName = resolvedTitle;
-      const activityDescription = `Je viens de terminer ${finalDistance.toFixed(2)} km en ${formatTime(finalElapsed)}.`;
+      const activityDescription = "";
       const postNumericId = Date.now();
       const syntheticRun: RunRow = {
         id: String(postNumericId),
@@ -382,7 +382,12 @@ export function useRunSession({
         title: activityName,
         created_at: new Date().toISOString(),
       };
-      const identity = user?.email ?? "Vous";
+      const firstName =
+        (user?.user_metadata?.first_name as string | undefined) ??
+        (user?.user_metadata?.full_name as string | undefined) ??
+        user?.email?.split("@")[0] ??
+        "Coureur";
+      const identity = firstName;
       const syntheticPost: CommunityPost = {
         id: postNumericId,
         user: identity,
