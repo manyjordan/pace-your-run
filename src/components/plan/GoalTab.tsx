@@ -527,9 +527,9 @@ export default function GoalTab() {
     <div className="space-y-4">
       {changeWarning && (
         <ScrollReveal>
-          <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-red-700 dark:text-red-300">Votre objectif a changé ? Le plan généré pour cet objectif écrasera celui en cours.</p>
+          <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2">
+            <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700">Votre objectif a changé ? Le plan généré pour cet objectif écrasera celui en cours.</p>
           </div>
         </ScrollReveal>
       )}

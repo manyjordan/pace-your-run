@@ -18,11 +18,11 @@ function confidenceBadge(conf: PredictionResult["confidence"]) {
   switch (conf) {
     case "high":
       return (
-        <Badge className="border-0 bg-emerald-500/15 text-emerald-800 dark:text-emerald-300">Élevée</Badge>
+        <Badge className="border-0 bg-emerald-500/15 text-emerald-800">Élevée</Badge>
       );
     case "medium":
       return (
-        <Badge className="border-0 bg-amber-500/15 text-amber-900 dark:text-amber-200">Moyenne</Badge>
+        <Badge className="border-0 bg-amber-500/15 text-amber-900">Moyenne</Badge>
       );
     default:
       return <Badge variant="secondary">Faible</Badge>;
@@ -97,9 +97,9 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{prediction.reference.explanation}</p>
           </div>
 
-          <Card className="border-lime-500/40 bg-lime-500/5 dark:bg-lime-500/10">
+          <Card className="border-lime-500/40 bg-lime-500/5">
             <CardContent className="space-y-2 p-4">
-              <p className="text-3xl font-bold tabular-nums text-lime-600 dark:text-lime-400">
+              <p className="text-3xl font-bold tabular-nums text-lime-600">
                 {formatPredictionTime(prediction.consensusSeconds)}
               </p>
               <p className="text-sm font-medium text-foreground">Estimation consensus</p>
@@ -123,13 +123,13 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             </div>
             <div className="flex items-start justify-between gap-2 text-xs">
               <div>
-                <p className="font-semibold text-lime-600 dark:text-lime-400">
+                <p className="font-semibold text-lime-600">
                   {formatPredictionTime(prediction.rangeMinSeconds)}
                 </p>
                 <p className="text-muted-foreground">Optimiste</p>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-lime-600 dark:text-lime-400">
+                <p className="font-semibold text-lime-600">
                   {formatPredictionTime(prediction.rangeMaxSeconds)}
                 </p>
                 <p className="text-muted-foreground">Prudent</p>
@@ -140,7 +140,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
           <Collapsible open={modelsOpen} onOpenChange={setModelsOpen}>
             <CollapsibleTrigger
               className={cn(
-                "w-full text-left text-xs text-lime-700 underline underline-offset-2 dark:text-lime-400",
+                "w-full text-left text-xs text-lime-700 underline underline-offset-2",
                 "cursor-pointer hover:opacity-90",
               )}
             >

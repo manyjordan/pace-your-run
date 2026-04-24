@@ -243,9 +243,9 @@ export default function SessionDetail({
               </ul>
             </div>
 
-            <div className="flex gap-2 bg-blue-50/50 dark:bg-blue-950/30 border border-blue-200/50 dark:border-blue-800/50 p-2 rounded">
-              <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-700 dark:text-blue-300">
+            <div className="flex gap-2 bg-blue-50/50 border border-blue-200/50 p-2 rounded">
+              <AlertCircle className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-700">
                 Écoutez votre corps. Si trop facile, augmentez légèrement. Si trop dur, c'est normal les premiers jours.
               </p>
             </div>

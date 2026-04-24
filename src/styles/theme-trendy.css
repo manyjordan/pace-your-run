@@ -2,24 +2,23 @@
    PACE — Thème vert logo (#B4DC5A, HSL 76 65% 60%)
    Importé depuis src/main.tsx. Sans cet import,
    les couleurs de base reviennent à src/index.css.
+   Mode clair uniquement.
    ============================================ */
 
 :root {
   --safe-area-inset-top: env(safe-area-inset-top);
-  /* Mode clair — fond blanc */
   --background: 0 0% 100%;
-  --foreground: 220 25% 12%;
+  --foreground: 0 0% 8%;
 
-  --card: 0 0% 100%;
-  --card-foreground: 220 25% 12%;
+  --card: 0 0% 98%;
+  --card-foreground: 0 0% 8%;
 
-  /* accent-foreground reste foncé pour bg-accent/10, cartes légères, etc. */
   --accent: 76 65% 60%;
   --accent-foreground: 76 10% 10%;
 
-  --border: 220 15% 60%;
-  --muted: 240 15% 96%;
-  --muted-foreground: 220 10% 42%;
+  --border: 0 0% 90%;
+  --muted: 0 0% 95%;
+  --muted-foreground: 0 0% 45%;
   --input: 240 12% 88%;
 
   --primary: 76 62% 58%;
@@ -32,7 +31,7 @@
   --destructive-foreground: 0 0% 100%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 220 25% 12%;
+  --popover-foreground: 0 0% 8%;
 
   --ring: 76 65% 58%;
   --radius: 1rem;
@@ -51,77 +50,6 @@
   --sidebar-accent-foreground: 220 25% 12%;
   --sidebar-border: 240 12% 90%;
   --sidebar-ring: 76 65% 58%;
-}
-
-.dark {
-  /* Mode sombre — Cyan/Neon inchangé */
-  --background: 0 0% 0%;
-  --foreground: 0 0% 98%;
-
-  --card: 240 10% 4%;
-  --card-foreground: 0 0% 98%;
-
-  --accent: 76 65% 60%;
-  --accent-foreground: 76 10% 10%;
-
-  --border: 240 10% 40%;
-  --muted: 240 10% 8%;
-  --muted-foreground: 240 6% 70%;
-  --input: 240 10% 8%;
-
-  --primary: 76 62% 58%;
-  --primary-foreground: 0 0% 0%;
-
-  --secondary: 240 10% 10%;
-  --secondary-foreground: 0 0% 98%;
-
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 98%;
-
-  --popover: 240 10% 5%;
-  --popover-foreground: 0 0% 98%;
-
-  --ring: 76 65% 58%;
-  --radius: 1rem;
-
-  --lime: 76 65% 60%;
-  --lime-foreground: 0 0% 0%;
-  --navy: 0 0% 98%;
-  --navy-light: 240 10% 70%;
-  --navy-muted: 240 8% 68%;
-  --surface: 240 10% 6%;
-  --sidebar-background: 240 10% 5%;
-  --sidebar-foreground: 0 0% 92%;
-  --sidebar-primary: 76 65% 58%;
-  --sidebar-primary-foreground: 0 0% 0%;
-  --sidebar-accent: 240 10% 12%;
-  --sidebar-accent-foreground: 0 0% 96%;
-  --sidebar-border: 240 10% 41%;
-  --sidebar-ring: 76 65% 58%;
-}
-
-/* Mode sombre : --accent-foreground est noir (boutons accent pleins) ; sur en-tête vitré ou
-   fond accent très transparent, forcer un texte clair pour rester lisible sur noir. */
-.dark .pace-header {
-  --accent-foreground: 0 0% 98%;
-}
-
-.dark [class~="bg-accent/5"],
-.dark [class~="bg-accent/10"],
-.dark [class~="bg-accent/15"],
-.dark [class~="bg-accent/20"] {
-  --accent-foreground: 0 0% 96%;
-}
-
-/* Boutons / pastilles accent pleins : garder le texte foncé même imbriqués dans un bloc ci-dessus */
-.dark .bg-accent {
-  --accent-foreground: 76 10% 10%;
-}
-
-/* Hero type accueil : dégradé .bg-accent.rounded-2xl très sombre → texte clair (le noir était illisible) */
-.dark .bg-accent.rounded-2xl {
-  --accent-foreground: 0 0% 98%;
-  color: hsl(0 0% 98%);
 }
 
 /* Header app — glassmorphism (classe pace-header dans AppShell) */
@@ -143,34 +71,24 @@ img.header-logo {
 
 /* ── Bouton accent — dégradé vert Pace ── */
 .bg-accent {
-  background: linear-gradient(135deg, hsl(76 65% 58%), hsl(76 42% 44%)) !important;
-  box-shadow: 0 0 20px hsl(76 65% 58% / 0.35);
-}
-
-.bg-accent:hover {
-  box-shadow: 0 0 32px hsl(76 65% 58% / 0.55);
-  transform: translateY(-1px);
-  transition: all 0.2s ease;
-}
-
-/* Mode clair : ne pas appliquer le dégradé hero sombre aux boutons rounded-lg / rounded-md */
-html:not(.dark) .bg-accent {
   background: linear-gradient(135deg, hsl(76 64% 58%), hsl(76 55% 52%)) !important;
   color: hsl(220 30% 16%) !important;
   box-shadow: 0 0 18px hsl(76 62% 58% / 0.3);
 }
 
-html:not(.dark) .bg-accent:hover {
+.bg-accent:hover {
   box-shadow: 0 0 28px hsl(76 62% 58% / 0.42);
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
 }
 
 /* Outline / ghost : survol/focus sur fond accent clair = texte marine (WCAG) */
-html:not(.dark) .hover\:bg-accent:hover,
-html:not(.dark) .focus\:bg-accent:focus {
+.hover\:bg-accent:hover,
+.focus\:bg-accent:focus {
   color: hsl(220 30% 16%) !important;
 }
 
-html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
+.aria-selected\:bg-accent[aria-selected="true"] {
   color: hsl(220 30% 16%) !important;
 }
 
@@ -200,15 +118,6 @@ html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
   border-color: hsl(76 65% 58% / 0.2) !important;
 }
 
-.dark [class*="bg-card"] {
-  background: linear-gradient(
-    145deg,
-    hsl(240 10% 5%),
-    hsl(240 10% 4%)
-  ) !important;
-  border-color: hsl(76 65% 58% / 0.12) !important;
-}
-
 /* ── Glow effect sur les cartes accent ── */
 [class*="border-accent"] {
   box-shadow:
@@ -219,18 +128,6 @@ html:not(.dark) .aria-selected\:bg-accent[aria-selected="true"] {
 
 /* ── Hero banner — uniquement rounded-2xl (évite d’assombrir rounded-lg) ── */
 .bg-accent.rounded-2xl {
-  background: linear-gradient(
-    135deg,
-    hsl(76 52% 44%),
-    hsl(76 45% 46%),
-    hsl(76 48% 40%)
-  ) !important;
-  box-shadow:
-    0 0 40px hsl(76 65% 58% / 0.3),
-    0 20px 60px hsl(76 42% 44% / 0.15) !important;
-}
-
-html:not(.dark) .bg-accent.rounded-2xl {
   background: linear-gradient(
     135deg,
     hsl(76 66% 60%),
@@ -251,21 +148,8 @@ nav.fixed.bottom-0 {
   box-shadow: 0 -8px 32px hsl(76 65% 58% / 0.06) !important;
 }
 
-.dark nav.fixed.bottom-0 {
-  background: hsl(0 0% 0% / 0.85) !important;
-  border-top: 1px solid hsl(76 65% 58% / 0.2) !important;
-  box-shadow: 0 -8px 32px hsl(76 65% 58% / 0.08) !important;
-}
-
 /* ── Bouton primaire Course (nav centrale) — glow ── */
 .bg-accent.rounded-full {
-  background: linear-gradient(135deg, hsl(76 65% 58%), hsl(76 42% 44%)) !important;
-  box-shadow:
-    0 0 20px hsl(76 65% 58% / 0.5),
-    0 0 40px hsl(76 65% 58% / 0.25) !important;
-}
-
-html:not(.dark) .bg-accent.rounded-full {
   background: linear-gradient(135deg, hsl(76 64% 58%), hsl(76 55% 52%)) !important;
   color: hsl(220 30% 16%) !important;
   box-shadow:
@@ -292,10 +176,6 @@ textarea:focus {
   color: hsl(76 42% 28%) !important;
 }
 
-.dark [data-state="active"][role="tab"] {
-  color: hsl(76 72% 66%) !important;
-}
-
 /* ── Progress bars & accents ── */
 .bg-accent\/10 {
   background: hsl(76 65% 58% / 0.08) !important;
@@ -306,20 +186,11 @@ textarea:focus {
   text-shadow: none;
 }
 
-.dark .text-accent {
-  color: hsl(76 72% 66%) !important;
-  text-shadow: 0 0 12px hsl(76 72% 66% / 0.3);
-}
-
 /* ── Badges accent ── */
 [class*="border-accent"][class*="text-accent"] {
   border-color: hsl(76 65% 58% / 0.4) !important;
   color: hsl(76 40% 28%) !important;
   background: hsl(76 65% 58% / 0.08) !important;
-}
-
-.dark [class*="border-accent"][class*="text-accent"] {
-  color: hsl(76 72% 66%) !important;
 }
 
 /* ── Scrollbar neon ── */
@@ -329,10 +200,6 @@ textarea:focus {
 
 ::-webkit-scrollbar-track {
   background: hsl(240 15% 96%);
-}
-
-.dark ::-webkit-scrollbar-track {
-  background: hsl(240 10% 4%);
 }
 
 ::-webkit-scrollbar-thumb {
@@ -348,11 +215,6 @@ textarea:focus {
 ::selection {
   background: hsl(76 65% 58% / 0.22);
   color: hsl(220 25% 12%);
-}
-
-.dark ::selection {
-  background: hsl(76 65% 58% / 0.25);
-  color: hsl(0 0% 98%);
 }
 
 /* Safe area — iOS status bar / notch (requires viewport-fit=cover) */

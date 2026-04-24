@@ -5,6 +5,11 @@ import "./index.css";
 import "./styles/logo-colors.css";
 import "./styles/theme-trendy.css"; // Thème vert Pace (actif)
 
+document.documentElement.classList.remove("dark");
+document.documentElement.classList.add("light");
+localStorage.removeItem("pace-theme");
+localStorage.removeItem("theme");
+
 registerSW({ immediate: true });
 
 async function initSentry() {

@@ -15,13 +15,13 @@ const variantClassNames: Record<NonNullable<CollapsibleDisclaimerProps["variant"
   toggle: string;
 }> = {
   warning: {
-    box: "rounded-xl border border-amber-300/50 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800/50",
-    icon: "text-amber-600 dark:text-amber-400",
-    body: "text-amber-900 dark:text-amber-100",
-    toggle: "text-amber-800 dark:text-amber-200",
+    box: "rounded-xl border border-amber-300/50 bg-amber-50/50",
+    icon: "text-amber-600",
+    body: "text-amber-900",
+    toggle: "text-amber-800",
   },
   info: {
-    box: "rounded-xl border border-accent/50 bg-accent/10 dark:border-accent/40 dark:bg-accent/15",
+    box: "rounded-xl border border-accent/50 bg-accent/10",
     icon: "text-accent",
     body: "text-foreground",
     toggle: "text-accent",

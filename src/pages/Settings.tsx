@@ -1,7 +1,5 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useEffect, useState } from "react";
-import { useTheme } from "next-themes";
 import {
   Watch,
   ChevronRight,
@@ -13,7 +11,6 @@ import {
   HeartPulse,
   Apple,
   Database,
-  Palette,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -81,7 +78,6 @@ function SettingsSection({ title, icon: Icon, children, destructive = false }: S
 }
 
 const SettingsPage = () => {
-  const { resolvedTheme } = useTheme();
   const [signingOut, setSigningOut] = useState(false);
   const [signOutDialogOpen, setSignOutDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -157,24 +153,6 @@ const SettingsPage = () => {
 
       <ScrollReveal>
         <ProfileContent compact showDetails={false} />
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <SettingsSection title="Apparence" icon={Palette}>
-          <div className="flex items-center justify-between rounded-lg p-3">
-            <div>
-              <p className="text-sm font-medium">Thème</p>
-              <p className="text-xs text-muted-foreground">
-                {resolvedTheme === "dark"
-                  ? "Mode sombre activé"
-                  : resolvedTheme === "light"
-                    ? "Mode clair activé"
-                    : "Selon l’appareil"}
-              </p>
-            </div>
-            <ThemeToggle />
-          </div>
-        </SettingsSection>
       </ScrollReveal>
 
       <ScrollReveal>

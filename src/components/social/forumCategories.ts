@@ -32,7 +32,7 @@ export const FORUM_CATEGORIES: Record<string, ForumCategoryDefinition> = {
     label: "Nutrition",
     description: "Hydratation, alimentation et récupération autour de l'effort.",
     icon: Apple,
-    accent: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+    accent: "bg-emerald-500/10 text-emerald-600",
     topics: ["Avant la séance", "Pendant l'effort", "Récupération"],
   },
   equipment: {
@@ -48,7 +48,7 @@ export const FORUM_CATEGORIES: Record<string, ForumCategoryDefinition> = {
     label: "Préparation course",
     description: "Affûtage, stratégie et organisation avant la compétition.",
     icon: Flag,
-    accent: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
+    accent: "bg-violet-500/10 text-violet-600",
     topics: ["Plan d'entraînement", "Affûtage", "Stratégie de course"],
   },
   suggestions: {
@@ -56,7 +56,7 @@ export const FORUM_CATEGORIES: Record<string, ForumCategoryDefinition> = {
     label: "Suggestions",
     description: "Partagez vos idées d'amélioration pour l'application.",
     icon: Lightbulb,
-    accent: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+    accent: "bg-yellow-500/10 text-yellow-600",
     topics: ["Nouvelles fonctionnalités", "Améliorations existantes", "Bugs rencontrés"],
   },
   organiser: {
@@ -64,7 +64,7 @@ export const FORUM_CATEGORIES: Record<string, ForumCategoryDefinition> = {
     label: "Organiser des runs",
     description: "Trouvez des partenaires et proposez des sorties groupées.",
     icon: MapPin,
-    accent: "bg-orange-500/10 text-orange-500 dark:text-orange-400",
+    accent: "bg-orange-500/10 text-orange-500",
     topics: ["Run débutants", "Run intermédiaires", "Trail", "Soirée running"],
   },
   autres: {
@@ -72,7 +72,7 @@ export const FORUM_CATEGORIES: Record<string, ForumCategoryDefinition> = {
     label: "Autres",
     description: "Discussions générales autour du running.",
     icon: MessageCircle,
-    accent: "bg-gray-500/10 text-gray-600 dark:text-gray-400",
+    accent: "bg-gray-500/10 text-gray-600",
     topics: ["Général", "Présentations", "Hors-sujet"],
   },
 };

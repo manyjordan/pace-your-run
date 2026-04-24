@@ -1,7 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { createPost, getUnreadNotificationsCount, saveRun, type RunInput } from "@/lib/database";
@@ -253,7 +252,6 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
           </nav>
 
           <div className="flex items-center gap-1">
-            <ThemeToggle className="text-accent-foreground/80 hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground" />
             <NavLink
               to="/settings"
               className="rounded-lg p-2 text-accent-foreground/80 transition-colors hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"
@@ -266,7 +264,7 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
 
       {!isOnline ? (
         <div className="bg-yellow-500/20 border-b border-yellow-500/30 px-4 py-2 text-center">
-          <p className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+          <p className="text-xs font-medium text-yellow-700">
             📡 Mode hors ligne — certaines fonctionnalités peuvent être limitées
           </p>
         </div>
