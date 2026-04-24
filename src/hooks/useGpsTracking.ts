@@ -42,6 +42,11 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
     if (!Capacitor.isNativePlatform()) return null;
     try {
       const { Geolocation } = await import("@capacitor/geolocation");
+
+      const current = await Geolocation.checkPermissions();
+
+      if (current.location === "granted") return current;
+
       return await Geolocation.requestPermissions({
         permissions: ["location", "coarseLocation"],
       });
