@@ -14,11 +14,7 @@ import { cache } from "@/lib/cache";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllRunsForStats, type RunRow } from "@/lib/database";
-import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
-import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
-import { formatDuration } from "@/lib/runFormatters";
-import { LineChartSvg } from "@/components/charts/LineChartSvg";
-import { buildPaceProgression, formatPaceSecPerKm } from "@/lib/progressionHelpers";
+import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import { calculateTrainingLoad } from "@/lib/trainingLoad";
 
 type Issue = {
