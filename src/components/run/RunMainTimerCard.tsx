@@ -25,6 +25,11 @@ type Props = {
   stop: () => void | Promise<void>;
   isProgrammedMode: boolean;
   isProgramActive: boolean;
+  estimatedFinishTimes: Array<{
+    label: string;
+    totalSeconds: number;
+    remainingSeconds: number;
+  }> | null;
 };
 
 export function RunMainTimerCard({
@@ -43,6 +48,7 @@ export function RunMainTimerCard({
   stop,
   isProgrammedMode,
   isProgramActive,
+  estimatedFinishTimes,
 }: Props) {
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
   const heartRate = bluetooth.heartRate ?? 0;
@@ -103,6 +109,23 @@ export function RunMainTimerCard({
             <span className="text-xs text-muted-foreground">
               {gpsAccuracy ? `GPS +/-${Math.round(gpsAccuracy)}m` : "GPS en attente..."}
             </span>
+          </div>
+        )}
+
+        {status === "running" && estimatedFinishTimes && estimatedFinishTimes.length > 0 && (
+          <div className="mt-4 w-full px-2">
+            <p className="mb-2 text-center text-xs uppercase tracking-wider text-muted-foreground">A ce rythme</p>
+            <div className="flex justify-center gap-3">
+              {estimatedFinishTimes.map((est) => (
+                <div key={est.label} className="flex-1 rounded-xl bg-muted p-3 text-center">
+                  <p className="mb-1 text-xs text-muted-foreground">{est.label}</p>
+                  <p className="font-metric text-lg font-bold text-foreground">{formatTime(Math.round(est.totalSeconds))}</p>
+                  <p className="mt-0.5 text-xs text-accent">
+                    encore {formatTime(Math.round(est.remainingSeconds))}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

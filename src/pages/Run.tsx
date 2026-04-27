@@ -97,6 +97,7 @@ export default function Run() {
     setDistance,
     elapsed,
     pace,
+    estimatedFinishTimes,
     gpsTrace,
     gpsAccuracy,
     gpsError,
@@ -445,6 +446,7 @@ export default function Run() {
           stop={stop}
           isProgrammedMode={isProgrammedMode}
           isProgramActive={isProgramActive}
+          estimatedFinishTimes={estimatedFinishTimes}
         />
 
         {status === "idle" && (

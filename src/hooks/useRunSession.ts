@@ -3,6 +3,7 @@ import {
   useRef,
   useEffect,
   useCallback,
+  useMemo,
   type MutableRefObject,
   type Dispatch,
   type SetStateAction,
@@ -84,6 +85,18 @@ function generateDefaultTitle(): string {
 }
 
 type RunStatus = "idle" | "running" | "paused";
+type EstimatedFinishTime = {
+  label: string;
+  totalSeconds: number;
+  remainingSeconds: number;
+};
+
+const RACE_DISTANCES = [
+  { label: "5km", km: 5 },
+  { label: "10km", km: 10 },
+  { label: "Semi", km: 21.097 },
+  { label: "Marathon", km: 42.195 },
+] as const;
 
 export type UseRunSessionOptions = {
   statusRef: MutableRefObject<RunBluetoothStatus>;
@@ -173,6 +186,24 @@ export function useRunSession({
 
   const averagePace = distance > 0 ? elapsed / 60 / distance : 0;
   const pace = treadmill.isTreadmill ? averagePace : rollingPaceSecondsPerKm > 0 ? rollingPaceSecondsPerKm / 60 : averagePace;
+  const estimatedFinishTimes = useMemo<EstimatedFinishTime[] | null>(() => {
+    if (!rollingPaceSecondsPerKm || rollingPaceSecondsPerKm <= 0) return null;
+    if (distance <= 0) return null;
+
+    return RACE_DISTANCES
+      .filter((d) => d.km > distance)
+      .map((d) => {
+        const remainingKm = d.km - distance;
+        const remainingSec = remainingKm * rollingPaceSecondsPerKm;
+        const totalSec = elapsed + remainingSec;
+        return {
+          label: d.label,
+          totalSeconds: totalSec,
+          remainingSeconds: remainingSec,
+        };
+      })
+      .slice(0, 2);
+  }, [rollingPaceSecondsPerKm, distance, elapsed]);
 
   const calories: number | undefined = undefined;
 
@@ -484,6 +515,7 @@ export function useRunSession({
     setDistance,
     elapsed,
     pace,
+    estimatedFinishTimes,
     calories,
     gpsTrace,
     setGpsTrace,
