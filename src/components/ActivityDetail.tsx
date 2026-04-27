@@ -11,6 +11,7 @@ import { LineChartSvg } from "@/components/charts/LineChartSvg";
 import { calculateSplits, formatSplitPace, type SplitTracePoint } from "@/lib/splitCalculator";
 import { calculateZoneDistribution, getHRZones } from "@/lib/heartRateZones";
 import { downloadGpx, generateGpx } from "@/lib/gpxExport";
+import { fetchRunWeather, type RunWeather } from "@/lib/weather";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -212,6 +213,7 @@ export function ActivityDetail({
 
   const [fullRun, setFullRun] = useState<RunRow | null>(null);
   const [gpsLoading, setGpsLoading] = useState(true);
+  const [weather, setWeather] = useState<RunWeather | null>(null);
   const traceLen = Array.isArray(activity?.gps_trace) ? activity.gps_trace.length : 0;
   const [maxHR, setMaxHR] = useState<number>(() => {
     const saved = localStorage.getItem("pace_max_hr");
@@ -249,6 +251,7 @@ export function ActivityDetail({
     if (!activity?.id || !resolvedUserId) {
       setFullRun(null);
       setGpsLoading(false);
+      setWeather(null);
       return;
     }
     if (traceLen > 0) {
@@ -275,6 +278,28 @@ export function ActivityDetail({
       cancelled = true;
     };
   }, [activity, resolvedUserId, traceLen]);
+
+  useEffect(() => {
+    if (!Array.isArray(fullRun?.gps_trace) || fullRun.gps_trace.length === 0 || !activity?.started_at) {
+      setWeather(null);
+      return;
+    }
+
+    const firstPoint = fullRun.gps_trace[0];
+    let cancelled = false;
+
+    void fetchRunWeather(firstPoint.lat, firstPoint.lng, activity.started_at)
+      .then((value) => {
+        if (!cancelled) setWeather(value);
+      })
+      .catch(() => {
+        if (!cancelled) setWeather(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fullRun?.gps_trace, activity?.started_at]);
 
   const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
   const normalizedAllActivities = useMemo(
@@ -602,6 +627,18 @@ export function ActivityDetail({
             <p className="mt-2 text-lg font-bold">{Math.round(resolvedActivity.total_elevation_gain ?? 0)} m</p>
           </div>
         </div>
+
+        {weather ? (
+          <div className="flex items-center gap-3 rounded-xl bg-muted/30 px-4 py-3">
+            <span className="text-2xl">{weather.emoji}</span>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-foreground">{weather.description}</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {weather.temperature}°C · Vent {weather.windSpeed} km/h · Humidité {weather.humidity}%
+              </p>
+            </div>
+          </div>
+        ) : null}
 
         <div className="rounded-lg border border-accent/20 bg-card p-3">
           <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
