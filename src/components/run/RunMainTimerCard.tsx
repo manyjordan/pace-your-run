@@ -1,6 +1,8 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { Pause, Play, Square } from "lucide-react";
+import { Pause, Play, Square, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useMemo } from "react";
+import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
 
 type RunStatus = "idle" | "running" | "paused";
 
@@ -52,6 +54,16 @@ export function RunMainTimerCard({
 }: Props) {
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
   const heartRate = bluetooth.heartRate ?? 0;
+  const maxHR = useMemo(() => {
+    if (typeof window === "undefined") return 190;
+    const parsed = Number.parseInt(localStorage.getItem("pace_max_hr") ?? "190", 10);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 190;
+  }, []);
+  const hrZones = useMemo(() => getHRZones(maxHR), [maxHR]);
+  const currentZone = useMemo(() => {
+    if (!heartRate || heartRate <= 0) return null;
+    return getZoneForBpm(heartRate, hrZones);
+  }, [heartRate, hrZones]);
   const formattedElapsed = formatTime(elapsed);
   const formattedPace = displayPace > 0 ? formatPace(displayPace).replace(` /${distanceUnitShortLabel}`, "") : "--:--";
   const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
@@ -87,12 +99,23 @@ export function RunMainTimerCard({
             <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">/{distanceUnitShortLabel}</div>
           </div>
 
-          {isBluetoothConnected && heartRate > 0 && (
+          {isBluetoothConnected && heartRate > 0 && currentZone && (
             <>
               <div className="h-10 w-px bg-border" />
-              <div className="text-center">
-                <div className="font-metric text-3xl font-bold text-red-400">{heartRate}</div>
-                <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">bpm</div>
+              <div className="flex flex-col items-center text-center">
+                <div className="flex items-center gap-1.5">
+                  <Heart className="h-4 w-4 animate-pulse" style={{ color: currentZone.color }} />
+                  <span className="font-metric text-3xl font-bold" style={{ color: currentZone.color }}>
+                    {heartRate}
+                  </span>
+                  <span className="text-xs text-muted-foreground">bpm</span>
+                </div>
+                <div className="mt-1 flex items-center gap-1">
+                  <div className="h-2 w-2 rounded-full" style={{ backgroundColor: currentZone.color }} />
+                  <span className="text-xs font-semibold" style={{ color: currentZone.color }}>
+                    Zone {currentZone.zone} - {currentZone.name}
+                  </span>
+                </div>
               </div>
             </>
           )}

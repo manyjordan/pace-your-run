@@ -50,6 +50,7 @@ type UseSpeechAnnouncementsParams = {
   gpsTrace: RunGpsPoint[];
   status: RunStatus;
   pace: number;
+  rollingPaceSecondsPerKm: number;
   activeSession: ActiveSession | null;
   activeRoute: RouteRow | null;
   routeProgress: number;
@@ -69,6 +70,7 @@ export function useSpeechAnnouncements({
   gpsTrace,
   status,
   pace,
+  rollingPaceSecondsPerKm,
   activeSession,
   activeRoute,
   routeProgress,
@@ -83,6 +85,7 @@ export function useSpeechAnnouncements({
   const lastAnnouncedKmRef = useRef(0);
   const lastPaceAlertRef = useRef(0);
   const prevStatusRef = useRef<RunStatus>(status);
+  const thirtySecondTick = Math.floor(elapsed / 30);
 
   const speak = useCallback((message: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -92,6 +95,13 @@ export function useSpeechAnnouncements({
     utterance.volume = 1.0;
     window.speechSynthesis.cancel();
     window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const formatPaceFromSeconds = useCallback((secondsPerKm: number): string => {
+    if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return "--:--";
+    const minutes = Math.floor(secondsPerKm / 60);
+    const seconds = Math.round(secondsPerKm % 60);
+    return `${minutes}:${String(seconds).padStart(2, "0")}`;
   }, []);
 
   useEffect(() => {
@@ -227,10 +237,27 @@ export function useSpeechAnnouncements({
   }, [distance, elapsed, gpsTrace, speechPrefsRef, status]);
 
   useEffect(() => {
+    const prefs = speechPrefsRef.current;
+    const targetPaceSecPerKm = prefs.targetPaceSecPerKm ?? 0;
+    const paceAlertThreshold = prefs.paceAlertThresholdSeconds > 0 ? prefs.paceAlertThresholdSeconds : 15;
+    if (!prefs.paceAlerts || targetPaceSecPerKm <= 0) return;
+    if (status !== "running" || !rollingPaceSecondsPerKm) return;
+    if (thirtySecondTick < 1) return;
+
+    const diff = rollingPaceSecondsPerKm - targetPaceSecPerKm;
+    if (diff > paceAlertThreshold) {
+      speak(`Allure trop lente. Objectif ${formatPaceFromSeconds(targetPaceSecPerKm)} par kilomètre.`);
+    } else if (diff < -paceAlertThreshold) {
+      speak(`Allure trop rapide. Objectif ${formatPaceFromSeconds(targetPaceSecPerKm)} par kilomètre.`);
+    }
+  }, [formatPaceFromSeconds, rollingPaceSecondsPerKm, speak, speechPrefsRef, status, thirtySecondTick]);
+
+  useEffect(() => {
     if (status !== "running" || !activeSession || pace <= 0) return;
 
     const prefs = speechPrefsRef.current;
     if (!prefs.paceAlerts) return;
+    if ((prefs.targetPaceSecPerKm ?? 0) > 0) return;
 
     const now = Date.now();
     const timeSinceLastAlert = (now - lastPaceAlertRef.current) / 1000;

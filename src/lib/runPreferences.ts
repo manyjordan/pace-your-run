@@ -7,6 +7,7 @@ export type RunPreferences = {
   cumulativeTimeAnnouncement: CumulativeTimeAnnouncement;
   paceAlerts: boolean;
   paceAlertThresholdSeconds: number;
+  targetPaceSecPerKm: number;
 };
 
 const DEFAULT_RUN_PREFERENCES: RunPreferences = {
@@ -15,6 +16,7 @@ const DEFAULT_RUN_PREFERENCES: RunPreferences = {
   cumulativeTimeAnnouncement: "off",
   paceAlerts: true,
   paceAlertThresholdSeconds: 15,
+  targetPaceSecPerKm: 0,
 };
 
 function getStorageKey(userId?: string | null) {
@@ -51,6 +53,12 @@ export function loadRunPreferences(userId?: string | null): RunPreferences {
         parsed.paceAlertThresholdSeconds > 0
           ? Math.round(parsed.paceAlertThresholdSeconds)
           : 15,
+      targetPaceSecPerKm:
+        typeof parsed.targetPaceSecPerKm === "number" &&
+        Number.isFinite(parsed.targetPaceSecPerKm) &&
+        parsed.targetPaceSecPerKm > 0
+          ? Math.round(parsed.targetPaceSecPerKm)
+          : 0,
     };
   } catch {
     return DEFAULT_RUN_PREFERENCES;

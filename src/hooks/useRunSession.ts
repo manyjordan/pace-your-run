@@ -515,6 +515,7 @@ export function useRunSession({
     setDistance,
     elapsed,
     pace,
+    rollingPaceSecondsPerKm,
     estimatedFinishTimes,
     calories,
     gpsTrace,

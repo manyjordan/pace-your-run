@@ -16,7 +16,7 @@ import type { SessionSegment } from "@/hooks/useSessionProgram";
 import { cn } from "@/lib/utils";
 import { Gauge, MapPin, Settings2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { Dispatch, SetStateAction } from "react";
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { RunPreferences } from "@/lib/runPreferences";
 
 type ProgramSource = "custom" | "template";
@@ -53,6 +53,33 @@ export function RunCourseSettingsDialog({
   setIsTreadmill,
   programmed,
 }: Props) {
+  const initialTargetPace = useMemo(() => {
+    if (!runPreferences.targetPaceSecPerKm || runPreferences.targetPaceSecPerKm <= 0) return "";
+    const min = Math.floor(runPreferences.targetPaceSecPerKm / 60);
+    const sec = runPreferences.targetPaceSecPerKm % 60;
+    return `${min}:${String(sec).padStart(2, "0")}`;
+  }, [runPreferences.targetPaceSecPerKm]);
+  const [targetPace, setTargetPace] = useState(initialTargetPace);
+
+  useEffect(() => {
+    setTargetPace(initialTargetPace);
+  }, [initialTargetPace]);
+
+  const applyTargetPace = () => {
+    const normalized = targetPace.trim();
+    if (!normalized) {
+      setRunPreferences((current) => ({ ...current, targetPaceSecPerKm: 0 }));
+      return;
+    }
+
+    const match = normalized.match(/^(\d{1,2}):([0-5]\d)$/);
+    if (!match) return;
+    const minutes = Number(match[1]);
+    const seconds = Number(match[2]);
+    const totalSeconds = minutes * 60 + seconds;
+    setRunPreferences((current) => ({ ...current, targetPaceSecPerKm: totalSeconds }));
+  };
+
   return (
     <ScrollReveal>
       <Dialog>
@@ -203,6 +230,21 @@ export function RunCourseSettingsDialog({
                   <SelectItem value="10">Tous les 10 {runPreferences.distanceUnit === "mi" ? "miles" : "km"}</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Allure cible (optionnel)</Label>
+              <p className="text-xs text-muted-foreground">
+                Recevez une alerte vocale si vous vous éloignez de plus de 15 sec/km de votre objectif.
+              </p>
+              <input
+                type="text"
+                placeholder="ex: 5:30"
+                value={targetPace}
+                onChange={(e) => setTargetPace(e.target.value)}
+                onBlur={applyTargetPace}
+                className="w-32 rounded-lg bg-muted px-3 py-2 text-center font-metric text-sm"
+              />
             </div>
 
             <Button variant="ghost" size="sm" className="w-full text-muted-foreground" asChild>
