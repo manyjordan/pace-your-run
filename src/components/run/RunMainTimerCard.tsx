@@ -1,11 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Play, Pause, Square, MapPin, Zap, Heart, Volume2 } from "lucide-react";
-import type { RunPreferences } from "@/lib/runPreferences";
-import type { TreadmillRunControls } from "@/hooks/useTreadmill";
+import { Pause, Play, Square } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type RunStatus = "idle" | "running" | "paused";
 
@@ -21,12 +16,8 @@ type Props = {
   distanceUnitShortLabel: string;
   displayPace: number;
   formatPace: (p: number) => string;
-  treadmill: TreadmillRunControls;
   bluetooth: BluetoothState;
   gpsAccuracy: number | null;
-  getAccuracyColor: (accuracy: number | null) => string;
-  isRunActive: boolean;
-  runPreferences: RunPreferences;
   status: RunStatus;
   start: () => void;
   pause: () => void;
@@ -43,12 +34,8 @@ export function RunMainTimerCard({
   distanceUnitShortLabel,
   displayPace,
   formatPace,
-  treadmill,
   bluetooth,
   gpsAccuracy,
-  getAccuracyColor,
-  isRunActive,
-  runPreferences,
   status,
   start,
   pause,
@@ -59,154 +46,118 @@ export function RunMainTimerCard({
 }: Props) {
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
   const heartRate = bluetooth.heartRate ?? 0;
+  const formattedElapsed = formatTime(elapsed);
+  const formattedPace = displayPace > 0 ? formatPace(displayPace).replace(` /${distanceUnitShortLabel}`, "") : "--:--";
+  const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
+  const isGpsMedium = gpsAccuracy !== null && gpsAccuracy < 30;
 
   return (
     <ScrollReveal>
-      <Card className="border-accent/30">
-        <CardContent className="p-6 flex flex-col items-center space-y-6">
-          <div
-            className="font-metric text-7xl font-black tracking-tighter text-foreground"
-            style={{ lineHeight: 1.1 }}
-          >
-            {formatTime(elapsed)}
+      <div className="flex w-full flex-col items-center px-4 pb-2 pt-1">
+        {status === "running" && (
+          <div className="mb-6 flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Course en cours</span>
           </div>
-          <div className="grid grid-cols-3 gap-4 w-full">
-            <div className="text-center space-y-1">
-              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                Distance
-                {isRunActive && !treadmill.isTreadmill && (
-                  <TooltipProvider delayDuration={150}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          type="button"
-                          className="inline-flex items-center"
-                          aria-label={
-                            gpsAccuracy !== null
-                              ? `Précision GPS : ${Math.round(gpsAccuracy)} m`
-                              : "Précision GPS indisponible"
-                          }
-                        >
-                          <span className={`h-2 w-2 rounded-full ${getAccuracyColor(gpsAccuracy)}`} />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Précision GPS : {gpsAccuracy !== null ? `${Math.round(gpsAccuracy)}m` : "--"}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
-                {isRunActive && treadmill.isTreadmill && (
-                  <Badge variant="outline" className="border-muted-foreground/30 text-[10px] text-muted-foreground">
-                    Mode tapis
-                  </Badge>
-                )}
-              </div>
-              {isRunActive && runPreferences.announceSplitSpeed && (
-                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                  <Volume2 className="h-3 w-3 shrink-0" aria-hidden />
-                  <span>Annonces vocales actives</span>
-                </div>
-              )}
-              <div className="font-metric text-3xl font-bold">{displayDistance.toFixed(2)}</div>
-              <div className="text-[10px] text-muted-foreground">{distanceUnitShortLabel}</div>
-            </div>
-            <div className="text-center space-y-1">
-              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                <Zap className="h-3 w-3" /> Allure
-              </div>
-              <div className="font-metric text-3xl font-bold">{formatPace(displayPace)}</div>
-              <div className="text-[10px] text-muted-foreground">/{distanceUnitShortLabel}</div>
-            </div>
-            <div className="text-center space-y-1">
-              {isBluetoothConnected ? (
-                <>
-                  <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                    <Heart className="h-3 w-3" /> Fréquence
-                  </div>
-                  {heartRate > 0 ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <Heart className="h-4 w-4 text-red-400 animate-pulse" />
-                      <span className="font-metric text-2xl font-bold">{heartRate}</span>
-                      <span className="text-xs text-muted-foreground">bpm</span>
-                    </div>
-                  ) : status === "idle" ? (
-                    <div className="flex items-center justify-center gap-2 text-muted-foreground">
-                      <Heart className="h-4 w-4" />
-                      <span className="text-sm">En attente FC...</span>
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
-            </div>
+        )}
+
+        <div
+          className="font-metric mb-1 text-8xl font-black leading-none text-foreground"
+          style={{ letterSpacing: "-0.04em" }}
+        >
+          {formattedElapsed}
+        </div>
+
+        <div className="mb-8 mt-6 flex w-full items-center justify-center gap-8">
+          <div className="text-center">
+            <div className="font-metric text-3xl font-bold text-foreground">{displayDistance.toFixed(2)}</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{distanceUnitShortLabel}</div>
           </div>
-          <div className="flex items-center gap-4">
+
+          <div className="h-10 w-px bg-border" />
+
+          <div className="text-center">
+            <div className="font-metric text-3xl font-bold text-accent">{formattedPace}</div>
+            <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">/{distanceUnitShortLabel}</div>
+          </div>
+
+          {isBluetoothConnected && heartRate > 0 && (
+            <>
+              <div className="h-10 w-px bg-border" />
+              <div className="text-center">
+                <div className="font-metric text-3xl font-bold text-red-400">{heartRate}</div>
+                <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">bpm</div>
+              </div>
+            </>
+          )}
+        </div>
+
+        {status === "running" && (
+          <div className="mb-6 flex items-center gap-1.5">
             <div
-              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                status === "running"
-                  ? "bg-accent/20 text-accent"
-                  : status === "paused"
-                    ? "bg-yellow-500/20 text-yellow-600"
-                    : "bg-muted text-muted-foreground"
-              }`}
-            >
-              {status === "running" ? "Course en cours" : status === "paused" ? "Course en pause" : "Prêt à démarrer"}
-            </div>
-            {status === "idle" && (
-              <Button
-                size="lg"
-                onClick={start}
-                disabled={isProgrammedMode && !isProgramActive}
-                className="h-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25 px-6"
-              >
-                <Play className="h-7 w-7 ml-0.5" />
-                <span className="ml-1 text-sm font-semibold">Start</span>
-              </Button>
-            )}
-            {status === "running" && (
-              <>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => void stop()}
-                  className="h-14 w-14 rounded-full border-destructive text-destructive hover:bg-destructive/10"
-                >
-                  <Square className="h-5 w-5" />
-                </Button>
-                <Button
-                  size="lg"
-                  onClick={pause}
-                  className="h-16 rounded-full bg-green-600 text-white hover:bg-green-500 shadow-lg shadow-green-600/25 px-6"
-                >
-                  <Pause className="h-7 w-7" />
-                  <span className="ml-1 text-sm font-semibold">Pause</span>
-                </Button>
-              </>
-            )}
-            {status === "paused" && (
-              <>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  onClick={() => void stop()}
-                  className="h-14 w-14 rounded-full border-destructive text-destructive hover:bg-destructive/10"
-                >
-                  <Square className="h-5 w-5" />
-                </Button>
-                <Button
-                  size="lg"
-                  onClick={resume}
-                  className="h-16 rounded-full bg-accent text-accent-foreground hover:bg-accent/90 shadow-lg shadow-accent/25 px-6"
-                >
-                  <Play className="h-7 w-7 ml-0.5" />
-                  <span className="ml-1 text-sm font-semibold">Reprendre</span>
-                </Button>
-              </>
-            )}
+              className={cn(
+                "h-1.5 w-1.5 rounded-full",
+                isGpsGood ? "bg-accent" : isGpsMedium ? "bg-yellow-400" : "bg-red-400",
+              )}
+            />
+            <span className="text-xs text-muted-foreground">
+              {gpsAccuracy ? `GPS +/-${Math.round(gpsAccuracy)}m` : "GPS en attente..."}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        )}
+
+        {status === "idle" && (
+          <button
+            type="button"
+            onClick={start}
+            disabled={isProgrammedMode && !isProgramActive}
+            className={cn(
+              "flex h-24 w-24 items-center justify-center rounded-full bg-accent shadow-lg transition-transform active:scale-95",
+              isProgrammedMode && !isProgramActive && "cursor-not-allowed opacity-50 active:scale-100",
+            )}
+          >
+            <Play className="ml-1 h-8 w-8 fill-white text-white" />
+          </button>
+        )}
+
+        {status === "running" && (
+          <div className="flex gap-6">
+            <button
+              type="button"
+              onClick={pause}
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted transition-transform active:scale-95"
+            >
+              <Pause className="h-6 w-6 text-foreground" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void stop()}
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 transition-transform active:scale-95"
+            >
+              <Square className="h-5 w-5 fill-destructive text-destructive" />
+            </button>
+          </div>
+        )}
+
+        {status === "paused" && (
+          <div className="flex gap-6">
+            <button
+              type="button"
+              onClick={resume}
+              className="flex h-20 w-20 items-center justify-center rounded-full bg-accent shadow-lg transition-transform active:scale-95"
+            >
+              <Play className="ml-1 h-7 w-7 fill-white text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void stop()}
+              className="self-center flex h-16 w-16 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 transition-transform active:scale-95"
+            >
+              <Square className="h-5 w-5 fill-destructive text-destructive" />
+            </button>
+          </div>
+        )}
+      </div>
     </ScrollReveal>
   );
 }

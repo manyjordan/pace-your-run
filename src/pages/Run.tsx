@@ -100,7 +100,6 @@ export default function Run() {
     gpsTrace,
     gpsAccuracy,
     gpsError,
-    getAccuracyColor,
     formatTime,
     routeProgress,
     setRouteProgress,
@@ -274,15 +273,6 @@ export default function Run() {
         <PageHeader title="Course" subtitle="Enregistrez votre course en temps réel" />
       </ScrollReveal>
 
-      {status === "running" && (
-        <ScrollReveal>
-          <div className="flex items-center gap-2 px-4 py-2 bg-accent/20 rounded-full w-fit">
-            <div className="w-2 h-2 bg-accent rounded-full animate-pulse" />
-            <span className="text-xs font-semibold text-accent">Course en cours</span>
-          </div>
-        </ScrollReveal>
-      )}
-
       {gpsError && (
         <ScrollReveal>
           <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3 flex items-start gap-3">
@@ -443,15 +433,11 @@ export default function Run() {
           distanceUnitShortLabel={distanceUnitShortLabel}
           displayPace={displayPace}
           formatPace={formatPace}
-          treadmill={treadmill}
           bluetooth={{
             isBluetoothConnected: bluetooth.isBluetoothConnected,
             heartRate: bluetooth.heartRate,
           }}
           gpsAccuracy={gpsAccuracy}
-          getAccuracyColor={getAccuracyColor}
-          isRunActive={isRunActive}
-          runPreferences={runPreferences}
           status={status}
           start={start}
           pause={pause}
