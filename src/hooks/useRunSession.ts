@@ -183,6 +183,21 @@ export function useRunSession({
   });
 
   const { elapsed, setElapsed, startInterval, stopInterval, startKeepAlive, formatTime } = useRunTimer();
+  const startIntervalRef = useRef(startInterval);
+  const startKeepAliveRef = useRef(startKeepAlive);
+  const startGpsTrackingRef = useRef(startGpsTracking);
+
+  useEffect(() => {
+    startIntervalRef.current = startInterval;
+  }, [startInterval]);
+
+  useEffect(() => {
+    startKeepAliveRef.current = startKeepAlive;
+  }, [startKeepAlive]);
+
+  useEffect(() => {
+    startGpsTrackingRef.current = startGpsTracking;
+  }, [startGpsTracking]);
 
   const averagePace = distance > 0 ? elapsed / 60 / distance : 0;
   const pace = treadmill.isTreadmill ? averagePace : rollingPaceSecondsPerKm > 0 ? rollingPaceSecondsPerKm / 60 : averagePace;
@@ -257,10 +272,6 @@ export function useRunSession({
   }, []);
 
   const start = useCallback(() => {
-    // Reset state before starting interval so timer refs are not reset after start.
-    if (runSummary || showTreadmillCorrection || completedActivity || completedPost) {
-      treadmill.resetTreadmillForFreshRun();
-    }
     setElapsed(0);
     setDistance(0);
     setGpsTrace([]);
@@ -273,16 +284,13 @@ export function useRunSession({
     setShowCompletedActivityDetail(false);
     setSaveError("");
 
-    // Start timer/keepalive only after state reset.
-    startInterval();
-    startKeepAlive();
+    startIntervalRef.current();
+    startKeepAliveRef.current();
     setStatus("running");
     if (!treadmill.isTreadmill) {
-      void startGpsTracking();
+      void startGpsTrackingRef.current();
     }
 
-    setTitle(activeSession?.session.type ?? "");
-    bluetooth.clearErrorAndSamplesForRunStart();
     lastGpsPointRef.current = null;
     runStartedAtRef.current = new Date().toISOString();
     speechPrefsRef.current = loadRunPreferences(userPreferencesUserId);
@@ -291,39 +299,36 @@ export function useRunSession({
     currentIntervalRepRef.current = 0;
     setRouteProgress(0);
     routeArrivalAnnouncedRef.current = false;
+    bluetooth.clearErrorAndSamplesForRunStart();
+    treadmill.resetTreadmillForFreshRun();
+    setTitle(activeSession?.session.type ?? "");
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }
   }, [
-    startInterval,
-    runSummary,
-    showTreadmillCorrection,
-    completedActivity,
-    completedPost,
-    treadmill.resetTreadmillForFreshRun,
+    treadmill.isTreadmill,
+    userPreferencesUserId,
     activeSession,
     setTitle,
+    setElapsed,
+    setDistance,
+    setGpsTrace,
+    setRollingPaceSecondsPerKm,
+    setGpsAccuracy,
     setRunSummary,
     setCompletedActivity,
     setCompletedPost,
     setCompletedPostId,
     setShowCompletedActivityDetail,
     setSaveError,
-    setGpsTrace,
-    setElapsed,
-    setGpsAccuracy,
-    bluetooth.clearErrorAndSamplesForRunStart,
     lastGpsPointRef,
     speechPrefsRef,
     resetAnnouncementRefsRef,
     resetProgramProgressRef,
     currentIntervalRepRef,
     routeArrivalAnnouncedRef,
-    userPreferencesUserId,
-    startKeepAlive,
-    setRollingPaceSecondsPerKm,
-    treadmill.isTreadmill,
-    startGpsTracking,
+    bluetooth.clearErrorAndSamplesForRunStart,
+    treadmill.resetTreadmillForFreshRun,
   ]);
 
   const pause = useCallback(() => setStatus("paused"), []);

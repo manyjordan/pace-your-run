@@ -19,6 +19,7 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
   const watchIdRef = useRef<WatchId | null>(null);
   const lastGpsPointRef = useRef<RunGpsPoint | null>(null);
   const watchEpochRef = useRef(0);
+  const smoothedPaceRef = useRef<number>(0);
 
   const calculateRollingPace = useCallback((points: RunGpsPoint[]): number => {
     if (points.length < 2) return 0;
@@ -89,15 +90,30 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
         accuracy,
       };
 
-      const resolvePace = (nextTrace: RunGpsPoint[]) => {
-        if (speed !== null && speed >= 0) {
-          const paceSecPerKm = speed > 0.3 ? 1000 / speed : 0;
-          if (paceSecPerKm === 0 || (paceSecPerKm >= 120 && paceSecPerKm <= 1800)) {
-            setRollingPaceSecondsPerKm(paceSecPerKm);
-            return;
+      const resolvePace = (nextTrace: RunGpsPoint[], currentSpeed: number | null) => {
+        let rawPace = 0;
+
+        if (currentSpeed !== null && currentSpeed >= 0) {
+          const paceSecPerKm = currentSpeed > 0.3 ? 1000 / currentSpeed : 0;
+          if (paceSecPerKm >= 120 && paceSecPerKm <= 1800) {
+            rawPace = paceSecPerKm;
           }
         }
-        setRollingPaceSecondsPerKm(calculateRollingPace(nextTrace));
+
+        if (rawPace === 0) {
+          rawPace = calculateRollingPace(nextTrace);
+        }
+
+        if (rawPace === 0) {
+          return;
+        }
+
+        const alpha = 0.3;
+        const smoothed =
+          smoothedPaceRef.current === 0 ? rawPace : smoothedPaceRef.current * (1 - alpha) + rawPace * alpha;
+
+        smoothedPaceRef.current = smoothed;
+        setRollingPaceSecondsPerKm(Math.round(smoothed));
       };
 
       if (lastGpsPointRef.current) {
@@ -110,14 +126,14 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
           onDistanceDelta(dist);
           setGpsTrace((t) => {
             const nextTrace = [...t, newPoint];
-            resolvePace(nextTrace);
+            resolvePace(nextTrace, speed);
             return nextTrace;
           });
           lastGpsPointRef.current = newPoint;
         }
       } else {
         setGpsTrace([newPoint]);
-        resolvePace([newPoint]);
+        resolvePace([newPoint], speed);
         lastGpsPointRef.current = newPoint;
       }
     },
@@ -126,6 +142,7 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
 
   const startGpsTracking = useCallback(async (): Promise<boolean> => {
     const epoch = ++watchEpochRef.current;
+    smoothedPaceRef.current = 0;
 
     if (Capacitor.isNativePlatform()) {
       try {
