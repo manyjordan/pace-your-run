@@ -71,10 +71,18 @@ export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps
             attributionControl: false,
           });
 
-          L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_matter_nolabels/{z}/{x}/{y}{r}.png", {
+          const tileLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
             maxZoom: 19,
-            subdomains: "abcd",
-          }).addTo(map);
+            crossOrigin: "anonymous",
+          });
+          let tilesLoaded = false;
+          tileLayer.on("tileload", () => {
+            tilesLoaded = true;
+          });
+          tileLayer.on("tileerror", () => {
+            if (!tilesLoaded) setLeafletFailed(true);
+          });
+          tileLayer.addTo(map);
 
           const latLngs = displayTrace.map((p) => [p.lat, p.lng] as [number, number]);
 

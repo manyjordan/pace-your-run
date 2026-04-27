@@ -64,7 +64,14 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
   }, []);
 
   const applyPosition = useCallback(
-    (latitude: number, longitude: number, accuracy: number, altitude: number | null | undefined, now: number) => {
+    (
+      latitude: number,
+      longitude: number,
+      accuracy: number,
+      altitude: number | null | undefined,
+      now: number,
+      speed: number | null,
+    ) => {
       setGpsAccuracy(accuracy);
 
       const isFirstPoint = lastGpsPointRef.current === null;
@@ -82,6 +89,17 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
         accuracy,
       };
 
+      const resolvePace = (nextTrace: RunGpsPoint[]) => {
+        if (speed !== null && speed >= 0) {
+          const paceSecPerKm = speed > 0.3 ? 1000 / speed : 0;
+          if (paceSecPerKm === 0 || (paceSecPerKm >= 120 && paceSecPerKm <= 1800)) {
+            setRollingPaceSecondsPerKm(paceSecPerKm);
+            return;
+          }
+        }
+        setRollingPaceSecondsPerKm(calculateRollingPace(nextTrace));
+      };
+
       if (lastGpsPointRef.current) {
         const dist = haversineDistanceKm(
           { lat: lastGpsPointRef.current.lat, lng: lastGpsPointRef.current.lng },
@@ -92,14 +110,14 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
           onDistanceDelta(dist);
           setGpsTrace((t) => {
             const nextTrace = [...t, newPoint];
-            setRollingPaceSecondsPerKm(calculateRollingPace(nextTrace));
+            resolvePace(nextTrace);
             return nextTrace;
           });
           lastGpsPointRef.current = newPoint;
         }
       } else {
         setGpsTrace([newPoint]);
-        setRollingPaceSecondsPerKm(0);
+        resolvePace([newPoint]);
         lastGpsPointRef.current = newPoint;
       }
     },
@@ -134,8 +152,8 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
             return;
           }
           if (!position) return;
-          const { latitude, longitude, accuracy, altitude } = position.coords;
-          applyPosition(latitude, longitude, accuracy, altitude, Date.now());
+          const { latitude, longitude, accuracy, altitude, speed } = position.coords;
+          applyPosition(latitude, longitude, accuracy, altitude, Date.now(), speed ?? null);
         });
 
         if (epoch !== watchEpochRef.current) {
@@ -160,8 +178,8 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
     watchIdRef.current = navigator.geolocation.watchPosition(
       (position) => {
         if (epoch !== watchEpochRef.current) return;
-        const { latitude, longitude, accuracy, altitude } = position.coords;
-        applyPosition(latitude, longitude, accuracy, altitude, Date.now());
+        const { latitude, longitude, accuracy, altitude, speed } = position.coords;
+        applyPosition(latitude, longitude, accuracy, altitude, Date.now(), speed ?? null);
       },
       (error) => {
         logger.error("Geolocation error", error);
