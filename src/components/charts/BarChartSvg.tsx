@@ -20,7 +20,7 @@ export function BarChartSvg({
   data,
   height = 120,
   color = "hsl(var(--accent))",
-  highlightLast = false,
+  highlightLast = true,
   formatValue,
   formatLabel,
 }: BarChartSvgProps) {
@@ -95,7 +95,7 @@ export function BarChartSvg({
   const barColor = useCallback(
     (i: number, isActive: boolean): string => {
       if (isActive || i === bars.length - 1) return "hsl(var(--accent))";
-      return "hsl(var(--accent) / 0.45)";
+      return "hsl(var(--accent) / 0.6)";
     },
     [bars.length],
   );

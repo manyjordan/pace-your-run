@@ -71,18 +71,31 @@ export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps
             attributionControl: false,
           });
 
-          const tileLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-            maxZoom: 19,
-            crossOrigin: "anonymous",
-          });
+          const stadiaLayer = L.tileLayer(
+            "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png",
+            {
+              maxZoom: 20,
+              attribution: "",
+              crossOrigin: "anonymous",
+            },
+          );
           let tilesLoaded = false;
-          tileLayer.on("tileload", () => {
+          stadiaLayer.on("tileload", () => {
             tilesLoaded = true;
           });
-          tileLayer.on("tileerror", () => {
-            if (!tilesLoaded) setLeafletFailed(true);
+          stadiaLayer.on("tileerror", () => {
+            if (!tilesLoaded) {
+              stadiaLayer.off("tileerror");
+              if (map.hasLayer(stadiaLayer)) map.removeLayer(stadiaLayer);
+              L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
+                maxZoom: 20,
+                subdomains: "abcd",
+                attribution: "",
+                crossOrigin: "anonymous",
+              }).addTo(map);
+            }
           });
-          tileLayer.addTo(map);
+          stadiaLayer.addTo(map);
 
           const latLngs = displayTrace.map((p) => [p.lat, p.lng] as [number, number]);
 

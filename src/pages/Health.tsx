@@ -3,7 +3,7 @@ import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
-import { subWeeks } from "date-fns";
+import { differenceInDays, subWeeks } from "date-fns";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -721,7 +721,6 @@ const Health = () => {
   const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
   const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
-  const [progressionPeriod, setProgressionPeriod] = useState<3 | 6 | 12>(6);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -843,51 +842,15 @@ const Health = () => {
         : null,
     [runsForStats],
   );
-  const totals = useMemo(() => {
-    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const totalSeconds = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0);
-    const totalElevation = runsForStats.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
-    return { totalKm, totalSeconds, totalElevation };
+  const lastRunDaysAgo = useMemo(() => {
+    const lastRun = runsForStats.find((run) => Boolean(run.started_at));
+    if (!lastRun?.started_at) return 99;
+    return Math.max(0, differenceInDays(new Date(), new Date(lastRun.started_at)));
   }, [runsForStats]);
-  const personalRecords = useMemo(() => {
-    if (!runsForStats?.length) return null;
-    const pacedRuns = runsForStats
-      .filter((run) => (run.distance_km ?? 0) >= 3 && (run.duration_seconds ?? 0) > 0)
-      .map((run) => (run.duration_seconds ?? 0) / Math.max(run.distance_km ?? 1, 0.001) / 60);
-    return {
-      bestPace: pacedRuns.length ? Math.min(...pacedRuns) : 0,
-      longestRun: Math.max(...runsForStats.map((run) => run.distance_km ?? 0), 0),
-      longestTime: Math.max(...runsForStats.map((run) => run.duration_seconds ?? 0), 0),
-    };
-  }, [runsForStats]);
-  const paceProgression = useMemo(
-    () =>
-      buildPaceProgression(
-        runsForStats
-          .map((run) => ({
-            started_at: run.started_at ?? run.created_at ?? "",
-            distance_km: run.distance_km ?? 0,
-            duration_seconds: run.duration_seconds ?? 0,
-          }))
-          .filter((run) => run.started_at.length > 0),
-        progressionPeriod,
-      ),
-    [runsForStats, progressionPeriod],
+  const dailyRec = useMemo(
+    () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
+    [trainingLoad, lastRunDaysAgo],
   );
-  const progressionTrend = useMemo(() => {
-    if (paceProgression.length < 2) return null;
-    const first = paceProgression.slice(0, 2).reduce((sum, month) => sum + month.value, 0) / 2;
-    const last = paceProgression.slice(-2).reduce((sum, month) => sum + month.value, 0) / 2;
-    const diffSec = first - last;
-    return { improving: diffSec > 5, seconds: Math.abs(diffSec) };
-  }, [paceProgression]);
-  const formatPaceMinPerKm = (paceMinPerKm: number) => {
-    if (!paceMinPerKm || paceMinPerKm <= 0) return "--:--";
-    const minutes = Math.floor(paceMinPerKm);
-    const seconds = Math.round((paceMinPerKm - minutes) * 60);
-    const safeSeconds = seconds === 60 ? 59 : seconds;
-    return `${minutes}:${String(safeSeconds).padStart(2, "0")}`;
-  };
 
   const issueDetailBulletList = (items: string[]) => (
     <ul className="mt-1 list-disc space-y-2 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-accent">
@@ -1009,112 +972,19 @@ const Health = () => {
         </AppCard>
       </ScrollReveal>
 
-      <ScrollReveal>
-        <VO2maxCard runs={runsForStats} />
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <RacePredictionsCard runs={runsForStats} />
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <AppCard>
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-semibold text-foreground">Progression de l&apos;allure</h3>
-              {progressionTrend ? (
-                <p
-                  className={cn(
-                    "mt-0.5 text-xs font-medium",
-                    progressionTrend.improving ? "text-accent" : "text-orange-400",
-                  )}
-                >
-                  {progressionTrend.improving ? "↑ En amélioration" : "↓ En baisse"} de{" "}
-                  {formatPaceSecPerKm(progressionTrend.seconds)} /km
-                </p>
-              ) : null}
-            </div>
-            <div className="flex gap-1">
-              {([3, 6, 12] as const).map((monthPeriod) => (
-                <button
-                  key={monthPeriod}
-                  type="button"
-                  onClick={() => setProgressionPeriod(monthPeriod)}
-                  className={cn(
-                    "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
-                    progressionPeriod === monthPeriod
-                      ? "bg-accent text-white"
-                      : "bg-muted text-muted-foreground",
-                  )}
-                >
-                  {monthPeriod}m
-                </button>
-              ))}
-            </div>
-          </div>
-          {paceProgression.length >= 2 ? (
-            <LineChartSvg
-              data={paceProgression.map((month) => ({ label: month.label, value: month.value }))}
-              height={100}
-              showDots
-              formatValue={formatPaceSecPerKm}
-            />
-          ) : (
-            <p className="py-4 text-center text-xs text-muted-foreground">
-              Pas assez de données pour afficher la progression.
-            </p>
-          )}
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            Une courbe descendante = vous courez plus vite
-          </p>
-        </AppCard>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <AppCard>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Synthèse totale</h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">{totals.totalKm.toFixed(0)}</div>
-              <div className="mt-1 text-xs text-muted-foreground">Km totaux</div>
-            </div>
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">{(totals.totalSeconds / 3600).toFixed(1)}</div>
-              <div className="mt-1 text-xs text-muted-foreground">Heures totales</div>
-            </div>
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">{Math.round(totals.totalElevation)}</div>
-              <div className="mt-1 text-xs text-muted-foreground">Dénivelé total (m)</div>
-            </div>
-          </div>
-        </AppCard>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <AppCard>
-          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Records personnels
-          </h3>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-accent">
-                {formatPaceMinPerKm(personalRecords?.bestPace ?? 0)}
+      {dailyRec ? (
+        <ScrollReveal>
+          <AppCard className="border-l-4 py-3" style={{ borderLeftColor: dailyRec.color }}>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{dailyRec.emoji}</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">{dailyRec.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{dailyRec.description}</p>
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">Meilleure allure</div>
             </div>
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">{personalRecords?.longestRun.toFixed(1) ?? "0.0"}</div>
-              <div className="mt-1 text-xs text-muted-foreground">Plus longue sortie (km)</div>
-            </div>
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">
-                {formatDuration(personalRecords?.longestTime ?? 0)}
-              </div>
-              <div className="mt-1 text-xs text-muted-foreground">Plus longue durée</div>
-            </div>
-          </div>
-        </AppCard>
-      </ScrollReveal>
+          </AppCard>
+        </ScrollReveal>
+      ) : null}
 
       <ScrollReveal>
         <CollapsibleDisclaimer

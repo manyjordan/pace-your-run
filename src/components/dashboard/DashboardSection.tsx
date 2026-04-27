@@ -206,7 +206,6 @@ export const DashboardSection = ({
                     return `${Math.round(Number(value))}`;
                   }}
                   formatLabel={(label) => formatXLabel(label, metric.period ?? period)}
-                  highlightLast
                 />
               </div>
             </div>

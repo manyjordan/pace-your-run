@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { differenceInDays, endOfWeek, startOfWeek } from "date-fns";
-import { Calendar, Check, Footprints, Target } from "lucide-react";
+import { differenceInDays, endOfWeek, format, startOfWeek } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Calendar, Check, Footprints, Target, Trophy } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -14,7 +15,7 @@ import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import GoalTab from "@/components/plan/GoalTab";
 import TrainingTab from "@/components/plan/TrainingTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
-import type { TrainingPlan } from "@/lib/plans/types";
+import type { Session, TrainingPlan } from "@/lib/plans/types";
 
 type PlanGoal = {
   goalType?: string;
@@ -101,7 +102,7 @@ export default function PlanPage() {
   }, [targetDate]);
   const weeksUntilGoal = daysUntilGoal !== null ? Math.floor(daysUntilGoal / 7) : null;
   const raceLabel = useMemo(() => {
-    if (!userGoal?.goalType) return null;
+    if (!userGoal?.goalType && !userGoal?.goal_type) return null;
     if (normalizedGoalType === "race") {
       if (normalizedRaceType === "marathon") return "Marathon";
       if (normalizedRaceType === "semi") return "Semi-marathon";
@@ -235,6 +236,39 @@ export default function PlanPage() {
   }, [targetDate, selectedPlan]);
 
   const currentWeekData = selectedPlan?.weeklySchedule[currentPlanWeek - 1];
+  const sessionsToShow = useMemo((): Session[] => {
+    if (!currentWeekData?.sessions?.length) return [];
+    const list = [...currentWeekData.sessions];
+    if (
+      selectedPlan &&
+      currentPlanWeek === selectedPlan.durationWeeks &&
+      targetDate &&
+      !Number.isNaN(new Date(targetDate).getTime())
+    ) {
+      const parsed = Number.parseFloat(String(targetDistanceKm ?? "").replace(",", "."));
+      const raceKm =
+        (Number.isFinite(parsed) && parsed > 0 ? parsed : null) ??
+        (numericTargetDistance > 0 ? numericTargetDistance : 42.195);
+      list.push({
+        day: format(new Date(targetDate), "EEE", { locale: fr }),
+        type: "Jour de course",
+        distance: raceKm,
+        pace: "--:--",
+        duration: 0,
+        description: `🏁 ${raceLabel ?? "Course"} — Bonne course !`,
+        intensity: "race",
+      });
+    }
+    return list;
+  }, [
+    currentPlanWeek,
+    currentWeekData?.sessions,
+    numericTargetDistance,
+    raceLabel,
+    selectedPlan,
+    targetDate,
+    targetDistanceKm,
+  ]);
   const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   const todayShort = dayNames[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
@@ -305,6 +339,27 @@ export default function PlanPage() {
         </ScrollReveal>
       ) : null}
 
+      {targetDate && daysUntilGoal !== null && daysUntilGoal <= 7 ? (
+        <ScrollReveal>
+          <AppCard className="border-2 border-accent">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent">
+                <Trophy className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-foreground">🏁 Jour de course !</p>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(targetDate), "EEEE dd MMMM yyyy", { locale: fr })}
+                </p>
+                {raceLabel ? (
+                  <p className="mt-0.5 text-xs font-semibold text-accent">{raceLabel}</p>
+                ) : null}
+              </div>
+            </div>
+          </AppCard>
+        </ScrollReveal>
+      ) : null}
+
       <ScrollReveal>
         <AppCard>
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Cette semaine</h3>
@@ -349,7 +404,7 @@ export default function PlanPage() {
             </div>
 
             <div className="space-y-3">
-              {currentWeekData.sessions.map((session, i) => {
+              {sessionsToShow.map((session, i) => {
                 const intensityColors: Record<string, string> = {
                   easy: "#4ade80",
                   moderate: "#60a5fa",
