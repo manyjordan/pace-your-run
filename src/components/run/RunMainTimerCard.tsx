@@ -64,7 +64,10 @@ export function RunMainTimerCard({
     <ScrollReveal>
       <Card className="border-accent/30">
         <CardContent className="p-6 flex flex-col items-center space-y-6">
-          <div className="text-6xl font-black tracking-tighter tabular-nums text-foreground" style={{ lineHeight: 1.1 }}>
+          <div
+            className="font-metric text-7xl font-black tracking-tighter text-foreground"
+            style={{ lineHeight: 1.1 }}
+          >
             {formatTime(elapsed)}
           </div>
           <div className="grid grid-cols-3 gap-4 w-full">
@@ -106,14 +109,14 @@ export function RunMainTimerCard({
                   <span>Annonces vocales actives</span>
                 </div>
               )}
-              <div className="text-xl font-bold tabular-nums">{displayDistance.toFixed(2)}</div>
+              <div className="font-metric text-3xl font-bold">{displayDistance.toFixed(2)}</div>
               <div className="text-[10px] text-muted-foreground">{distanceUnitShortLabel}</div>
             </div>
             <div className="text-center space-y-1">
               <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
                 <Zap className="h-3 w-3" /> Allure
               </div>
-              <div className="text-xl font-bold tabular-nums">{formatPace(displayPace)}</div>
+              <div className="font-metric text-3xl font-bold">{formatPace(displayPace)}</div>
               <div className="text-[10px] text-muted-foreground">/{distanceUnitShortLabel}</div>
             </div>
             <div className="text-center space-y-1">
@@ -125,7 +128,7 @@ export function RunMainTimerCard({
                   {heartRate > 0 ? (
                     <div className="flex items-center justify-center gap-2">
                       <Heart className="h-4 w-4 text-red-400 animate-pulse" />
-                      <span className="text-2xl font-bold tabular-nums">{heartRate}</span>
+                      <span className="font-metric text-2xl font-bold">{heartRate}</span>
                       <span className="text-xs text-muted-foreground">bpm</span>
                     </div>
                   ) : status === "idle" ? (

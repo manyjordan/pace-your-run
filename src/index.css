@@ -7,6 +7,7 @@
 @layer base {
   :root {
     --safe-area-inset-top: env(safe-area-inset-top);
+    --font-mono-display: 'DM Mono', ui-monospace, monospace;
     --background: 45 100% 92%;
     --foreground: 213 44% 11%;
     --card: 45 100% 98%;
@@ -104,5 +105,10 @@
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  .font-metric {
+    font-family: var(--font-mono-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 }

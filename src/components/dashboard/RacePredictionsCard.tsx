@@ -99,7 +99,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
 
           <Card className="border-lime-500/40 bg-lime-500/5">
             <CardContent className="space-y-2 p-4">
-              <p className="text-3xl font-bold tabular-nums text-lime-600">
+              <p className="font-metric text-3xl font-bold text-lime-600">
                 {formatPredictionTime(prediction.consensusSeconds)}
               </p>
               <p className="text-sm font-medium text-foreground">Estimation consensus</p>
@@ -123,13 +123,13 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             </div>
             <div className="flex items-start justify-between gap-2 text-xs">
               <div>
-                <p className="font-semibold text-lime-600">
+                <p className="font-metric font-semibold text-lime-600">
                   {formatPredictionTime(prediction.rangeMinSeconds)}
                 </p>
                 <p className="text-muted-foreground">Optimiste</p>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-lime-600">
+                <p className="font-metric font-semibold text-lime-600">
                   {formatPredictionTime(prediction.rangeMaxSeconds)}
                 </p>
                 <p className="text-muted-foreground">Prudent</p>
@@ -157,7 +157,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
                     <p className="text-xs text-muted-foreground">{p.description}</p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <span className="text-sm font-bold tabular-nums text-foreground">
+                    <span className="font-metric text-sm font-bold text-foreground">
                       {formatPredictionTime(p.predictedSeconds)}
                     </span>
                     {confidenceBadge(p.confidence)}

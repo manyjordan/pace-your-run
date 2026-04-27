@@ -522,14 +522,14 @@ export function ActivityDetail({
               <Route className="h-4 w-4 text-lime" />
               <span className="text-xs text-muted-foreground">Distance</span>
             </div>
-            <p className="mt-2 text-lg font-bold">{formatDistance(resolvedActivity.distance)}</p>
+            <p className="font-metric mt-2 text-lg font-bold">{formatDistance(resolvedActivity.distance)}</p>
           </div>
           <div className="rounded-lg border border-accent/20 bg-card p-3">
             <div className="flex items-center gap-1.5">
               <Clock className="h-4 w-4 text-lime" />
               <span className="text-xs text-muted-foreground">Durée totale</span>
             </div>
-            <p className="mt-2 text-lg font-bold">{formatDuration(resolvedActivity.elapsed_time)}</p>
+            <p className="font-metric mt-2 text-lg font-bold">{formatDuration(resolvedActivity.elapsed_time)}</p>
           </div>
           {showMovingMetrics ? (
             <div className="rounded-lg border border-accent/20 bg-card p-3">
@@ -537,7 +537,7 @@ export function ActivityDetail({
                 <Play className="h-4 w-4 text-lime" />
                 <span className="text-xs text-muted-foreground">Temps de course</span>
               </div>
-              <p className="mt-2 text-lg font-bold text-accent">{formatDuration(resolvedActivity.moving_time)}</p>
+              <p className="font-metric mt-2 text-lg font-bold text-accent">{formatDuration(resolvedActivity.moving_time)}</p>
             </div>
           ) : null}
           <div className="rounded-lg border border-accent/20 bg-card p-3">
@@ -545,7 +545,7 @@ export function ActivityDetail({
               <Zap className="h-4 w-4 text-lime" />
               <span className="text-xs text-muted-foreground">{showMovingMetrics ? "Allure de course" : "Allure moyenne"}</span>
             </div>
-            <p className="mt-2 text-lg font-bold">
+            <p className="font-metric mt-2 text-lg font-bold">
               {formatPaceFromSeconds(
                 showMovingMetrics ? resolvedActivity.moving_time : resolvedActivity.elapsed_time,
                 resolvedActivity.distance,
@@ -558,7 +558,7 @@ export function ActivityDetail({
                 <TrendingUp className="h-4 w-4 text-lime" />
                 <span className="text-xs text-muted-foreground">Allure moyenne</span>
               </div>
-              <p className="mt-2 text-lg font-bold">
+              <p className="font-metric mt-2 text-lg font-bold">
                 {formatPaceFromSeconds(resolvedActivity.elapsed_time, resolvedActivity.distance)}
               </p>
             </div>

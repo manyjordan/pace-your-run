@@ -189,7 +189,7 @@ export const DashboardSection = ({
                 </div>
               </div>
               <div className="mb-4">
-                <span className="text-3xl font-bold tabular-nums">{metric.currentValue}</span>
+                <span className="font-metric text-3xl font-bold">{metric.currentValue}</span>
                 <p className="mt-1 text-xs text-muted-foreground">{getMetricPeriodLabel(metric.period ?? period)}</p>
               </div>
               <div className="h-44">
@@ -206,6 +206,7 @@ export const DashboardSection = ({
                     return `${Math.round(Number(value))}`;
                   }}
                   formatLabel={(label) => formatXLabel(label, metric.period ?? period)}
+                  highlightLast
                 />
               </div>
             </div>
@@ -254,7 +255,7 @@ export const DashboardSection = ({
               {upcomingRace.targetTime ? ` · Objectif ${upcomingRace.targetTime}` : ""}
             </p>
             <div className="mt-4 inline-flex items-center rounded-full border border-accent/30 bg-accent/10 px-4 py-2">
-              <span className="text-2xl font-black tabular-nums text-foreground">{daysLeft}</span>
+              <span className="font-metric text-2xl font-black text-foreground">{daysLeft}</span>
               <span className="ml-2 text-sm font-medium text-muted-foreground">jours restants</span>
             </div>
           </div>

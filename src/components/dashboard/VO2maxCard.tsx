@@ -108,6 +108,15 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
           formatValue={(value) => `${Number(value).toFixed(1)}`}
         />
       </div>
+      <div className="mt-3">
+        <p className="text-xs text-muted-foreground">Dernière valeur estimée</p>
+        <p className="font-metric text-3xl font-bold text-foreground">
+          {(() => {
+            const latest = [...series].reverse().find((point) => point.vo2 != null)?.vo2;
+            return latest != null ? latest.toFixed(1) : "--";
+          })()}
+        </p>
+      </div>
 
       <p className="mt-4 text-xs leading-relaxed text-muted-foreground">{EXPLAIN}</p>
     </div>
