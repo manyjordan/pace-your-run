@@ -59,6 +59,7 @@ import {
   type CommunityPost,
 } from "@/lib/runFormatters";
 import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
+import { ActivityPostCard } from "@/components/social/ActivityPostCard";
 
 const ForumSection = lazy(() =>
   import("@/components/social/ForumSection").then((module) => ({ default: module.ForumSection })),
@@ -923,13 +924,15 @@ export default function Social() {
                 <>
                   {visibleItems.map((post) => (
                     <ScrollReveal key={post.dbId ?? post.activityId}>
-                      <FeedActivityCard
+                      <ActivityPostCard
                         post={post}
                         userId={user?.id}
-                        likeBusyId={likeBusyId}
-                        onOpenActivity={handleOpenActivity}
-                        onToggleLike={handleToggleLike}
-                        onShare={handleShare}
+                        isLikeBusy={likeBusyId === post.dbId}
+                        onOpen={handleOpenActivity}
+                        onLike={(p) => {
+                          void handleToggleLike(p);
+                        }}
+                        onComment={handleOpenActivity}
                       />
                     </ScrollReveal>
                   ))}
