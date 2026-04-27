@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { estimateVO2maxFromRun } from "@/lib/racePredictions";
 import type { RunRow } from "@/lib/database";
 import { getStartOfWeek } from "@/lib/dashboardHelpers";
+import { smoothedVo2max } from "@/lib/progressionHelpers";
 import { LineChartSvg } from "@/components/charts/LineChartSvg";
 import { cn } from "@/lib/utils";
 
@@ -63,8 +64,25 @@ function vo2TrendFromSeries(series: Vo2WeekRow[]): "up" | "down" | "stable" {
 
 export function VO2maxCard({ runs }: { runs: RunRow[] }) {
   const series = useMemo(() => buildVo2WeeklySeries(runs), [runs]);
+  const { displayChartData, trendSeries, latestSmoothedVo2 } = useMemo(() => {
+    const base = series.map((r) => ({ label: r.week, value: r.vo2 ?? 0, rawValue: r.vo2 }));
+    const smoothed = smoothedVo2max(base.map(({ label, value }) => ({ label, value })));
+    const merged = smoothed.map((s, i) => ({
+      label: s.label,
+      value: s.value,
+      rawValue: base[i].rawValue,
+    }));
+    const displayChartData = merged.filter((p) => p.rawValue != null || p.value > 0);
+    const trendSeries = series.map((r, i) => ({
+      week: r.week,
+      vo2: smoothed[i].value > 0 ? smoothed[i].value : null,
+    }));
+    const latestSmoothedVo2 = [...merged].reverse().find((p) => p.value > 0)?.value ?? null;
+    return { displayChartData, trendSeries, latestSmoothedVo2 };
+  }, [series]);
+
   const hasAnyPoint = useMemo(() => series.some((r) => r.vo2 != null), [series]);
-  const trend = useMemo(() => vo2TrendFromSeries(series), [series]);
+  const trend = useMemo(() => vo2TrendFromSeries(trendSeries), [trendSeries]);
 
   if (!hasAnyPoint) {
     return (
@@ -99,22 +117,26 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
 
       <div className="h-40 w-full">
         <LineChartSvg
-          data={series
-            .filter((point): point is { week: string; vo2: number } => point.vo2 != null)
-            .map((point) => ({ label: point.week, value: point.vo2 }))}
+          data={displayChartData}
           height={160}
           showArea
           showDots={false}
           formatValue={(value) => `${Number(value).toFixed(1)}`}
+          interactive
+          formatTooltip={(d) => {
+            const smooth = d.value;
+            let text = `VO2max estimé : ${smooth.toFixed(1)} (moyenne 3 sem.)`;
+            if (d.rawValue != null && Number.isFinite(d.rawValue) && Math.abs(d.rawValue - smooth) > 0.05) {
+              text += ` · brut : ${d.rawValue.toFixed(1)}`;
+            }
+            return text;
+          }}
         />
       </div>
       <div className="mt-3">
-        <p className="text-xs text-muted-foreground">Dernière valeur estimée</p>
+        <p className="text-xs text-muted-foreground">Dernière valeur estimée (moyenne 3 sem.)</p>
         <p className="font-metric text-3xl font-bold text-foreground">
-          {(() => {
-            const latest = [...series].reverse().find((point) => point.vo2 != null)?.vo2;
-            return latest != null ? latest.toFixed(1) : "--";
-          })()}
+          {latestSmoothedVo2 != null ? latestSmoothedVo2.toFixed(1) : "--"}
         </p>
       </div>
 

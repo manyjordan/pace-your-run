@@ -46,3 +46,14 @@ export function formatPaceSecPerKm(secPerKm: number): string {
   const safeSec = sec === 60 ? 59 : sec;
   return `${min}:${String(safeSec).padStart(2, "0")}`;
 }
+
+/** 3-point (≈3-week) rolling average; only averages entries with value > 0. */
+export function smoothedVo2max<T extends { label: string; value: number }>(data: T[]): T[] {
+  return data.map((point, i) => {
+    const window = data.slice(Math.max(0, i - 2), i + 1);
+    const validValues = window.filter((p) => p.value > 0);
+    if (validValues.length === 0) return point;
+    const avg = validValues.reduce((s, p) => s + p.value, 0) / validValues.length;
+    return { ...point, value: Math.round(avg * 10) / 10 };
+  });
+}
