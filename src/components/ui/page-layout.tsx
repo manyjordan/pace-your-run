@@ -24,12 +24,7 @@ export const PageHeader = ({
 );
 
 export const AppCard = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div
-    className={cn(
-      "rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_8px_24px_hsl(var(--accent)/0.06)]",
-      className,
-    )}
-  >
+  <div className={cn("rounded-xl border border-border bg-card p-5 shadow-sm", className)}>
     {children}
   </div>
 );

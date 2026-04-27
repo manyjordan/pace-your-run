@@ -4,6 +4,7 @@ import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { createPost, getUnreadNotificationsCount, saveRun, type RunInput } from "@/lib/database";
+import { cn } from "@/lib/utils";
 
 const OFFLINE_RUNS_KEY = "pace-offline-runs";
 
@@ -291,7 +292,7 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
       </main>
 
       {/* Mobile bottom nav — 5 tabs */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-accent/30 bg-background/90 backdrop-blur-xl md:hidden">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl md:hidden">
         <div className="grid grid-cols-5 items-end gap-1 px-2 py-2">
           {mobileNavItems.map((item) => {
             const isActive =
@@ -307,20 +308,22 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={`-mt-5 flex flex-col items-center gap-0.5 border-t-2 px-1 py-1 transition-all ${
-                    isActive ? "border-accent text-accent" : "border-transparent text-muted-foreground opacity-50"
-                  }`}
+                  className={cn("flex flex-col items-center gap-1 -mt-5")}
                 >
                   <div
-                    className={`flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition-all ${
-                      isActive
-                        ? "bg-accent text-accent-foreground shadow-accent/30"
-                        : "bg-accent/10 text-muted-foreground shadow-accent/10"
-                    }`}
+                    className={cn(
+                      "w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all",
+                      isActive ? "bg-accent scale-110" : "bg-accent/90",
+                    )}
                   >
-                    <item.icon className={`h-6 w-6 ${isActive ? "stroke-[2.5]" : ""}`} />
+                    <item.icon className="w-5 h-5 text-white" />
                   </div>
-                  <span className={`text-[10px] whitespace-nowrap ${isActive ? "font-semibold text-accent" : "font-medium"}`}>
+                  <span
+                    className={cn(
+                      "text-[10px]",
+                      isActive ? "text-accent font-semibold" : "text-muted-foreground",
+                    )}
+                  >
                     {item.label}
                   </span>
                 </NavLink>
@@ -331,12 +334,15 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex min-w-0 flex-col items-center gap-1 border-t-2 px-1 py-1 text-xs transition-all ${
-                  isActive ? "border-accent text-accent" : "border-transparent text-muted-foreground opacity-50"
-                }`}
+                className={cn(
+                  "flex flex-col items-center gap-1 pt-1 border-t-2 px-1 py-1 text-xs transition-all",
+                  isActive
+                    ? "border-accent text-accent"
+                    : "border-transparent text-muted-foreground",
+                )}
               >
-                <span className={`relative inline-flex rounded-full px-3 py-1 ${isActive ? "bg-accent/10" : ""}`}>
-                  <item.icon className={`h-5 w-5 ${isActive ? "stroke-[2.5]" : ""}`} />
+                <span className={cn("relative inline-flex rounded-full px-3 py-1", isActive ? "bg-accent/10" : "")}>
+                  <item.icon className="h-5 w-5" />
                   {item.to === "/social" && socialUnread > 0 ? (
                     <span className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
                   ) : null}

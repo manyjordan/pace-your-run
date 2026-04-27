@@ -336,7 +336,9 @@ const Dashboard = () => {
         {isLoading ? (
           <SkeletonHeroBanner />
         ) : (
-          <AppCard className="rounded-xl bg-gradient-to-br from-accent/20 via-background to-background text-foreground shadow-[0_12px_30px_hsl(var(--foreground)/0.06)]">
+          <AppCard className="relative overflow-hidden border-border">
+            <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/10" />
+            <div className="pointer-events-none absolute right-3 top-3 h-12 w-12 rounded-full bg-accent/5" />
             <div>
               <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
                 Bonjour <span className="text-foreground">{athleteName}</span>

@@ -10,6 +10,7 @@ interface BarChartSvgProps {
   data: BarData[];
   height?: number;
   color?: string;
+  highlightLast?: boolean;
   unit?: string;
   formatValue?: (v: number) => string;
   formatLabel?: (l: string) => string;
@@ -18,7 +19,8 @@ interface BarChartSvgProps {
 export function BarChartSvg({
   data,
   height = 120,
-  color = "hsl(var(--accent))",
+  color = "#E5E7EB",
+  highlightLast = false,
   formatValue,
   formatLabel,
 }: BarChartSvgProps) {
@@ -127,6 +129,7 @@ export function BarChartSvg({
         const x = paddingLeft + gap + i * (barWidth + gap);
         const barH = Math.max(2, (bar.value / maxValue) * chartHeight);
         const y = paddingTop + chartHeight - barH;
+        const isLastHighlighted = highlightLast && i === bars.length - 1;
         const label = formatLabel ? formatLabel(bar.label) : bar.label;
         const isSignificant = bar.value >= maxValue * 0.12;
         const canShowTopLabel = showBarLabel(i, bars.length) && bar.value > 0 && barH >= 14 && isSignificant;
@@ -134,7 +137,15 @@ export function BarChartSvg({
 
         return (
           <g key={`bar-${bar.label}-${i}`}>
-            <rect x={x} y={y} width={barWidth} height={barH} rx={2} fill={color} opacity={0.85} />
+            <rect
+              x={x}
+              y={y}
+              width={barWidth}
+              height={barH}
+              rx={2}
+              fill={isLastHighlighted ? "hsl(var(--accent))" : color}
+              opacity={isLastHighlighted ? 1 : 0.95}
+            />
             {canShowTopLabel ? (
               <text
                 x={x + barWidth / 2}
@@ -190,7 +201,7 @@ export function BarChartSvg({
             width={50}
             height={20}
             rx={4}
-            fill="hsl(var(--foreground))"
+            fill="hsl(var(--accent))"
             opacity={0.9}
           />
           <text

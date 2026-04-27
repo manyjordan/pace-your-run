@@ -7,60 +7,48 @@
 
 :root {
   --safe-area-inset-top: env(safe-area-inset-top);
-  --background: 0 0% 100%;
-  --foreground: 0 0% 8%;
-
-  --card: 0 0% 98%;
-  --card-foreground: 0 0% 8%;
-
-  --accent: 76 65% 60%;
-  --accent-foreground: 76 10% 10%;
-
-  --border: 0 0% 90%;
-  --muted: 0 0% 95%;
-  --muted-foreground: 0 0% 45%;
-  --input: 240 12% 88%;
-
-  --primary: 76 62% 58%;
-  --primary-foreground: 220 30% 16%;
-
-  --secondary: 240 15% 96%;
-  --secondary-foreground: 220 25% 12%;
-
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
-
+  --background: 0 0% 96%;
+  --foreground: 0 0% 11%;
+  --card: 0 0% 100%;
+  --card-foreground: 0 0% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 8%;
-
-  --ring: 76 65% 58%;
+  --popover-foreground: 0 0% 11%;
+  --primary: 141 69% 42%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 9% 96%;
+  --secondary-foreground: 0 0% 11%;
+  --muted: 220 9% 96%;
+  --muted-foreground: 220 9% 63%;
+  --accent: 141 69% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 13% 91%;
+  --input: 220 13% 91%;
+  --ring: 141 69% 42%;
   --radius: 1rem;
 
-  --lime: 76 65% 60%;
-  --lime-foreground: 0 0% 0%;
-  --navy: 220 30% 18%;
-  --navy-light: 220 20% 35%;
-  --navy-muted: 220 12% 45%;
-  --surface: 240 25% 98%;
+  --lime: 141 69% 42%;
+  --lime-foreground: 0 0% 100%;
+  --navy: 0 0% 11%;
+  --navy-light: 220 9% 40%;
+  --navy-muted: 220 9% 63%;
+  --surface: 0 0% 96%;
   --sidebar-background: 0 0% 100%;
-  --sidebar-foreground: 220 25% 12%;
-  --sidebar-primary: 76 65% 58%;
-  --sidebar-primary-foreground: 0 0% 0%;
-  --sidebar-accent: 240 15% 95%;
-  --sidebar-accent-foreground: 220 25% 12%;
-  --sidebar-border: 240 12% 90%;
-  --sidebar-ring: 76 65% 58%;
+  --sidebar-foreground: 0 0% 11%;
+  --sidebar-primary: 141 69% 42%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 9% 96%;
+  --sidebar-accent-foreground: 0 0% 11%;
+  --sidebar-border: 220 13% 91%;
+  --sidebar-ring: 141 69% 42%;
 }
 
 /* Header app — glassmorphism (classe pace-header dans AppShell) */
 .pace-header {
-  background: linear-gradient(
-    135deg,
-    hsl(76 65% 58% / 0.15),
-    hsl(76 42% 44% / 0.08)
-  );
-  border-bottom: 1px solid hsl(76 65% 58% / 0.25);
-  box-shadow: 0 4px 32px hsl(76 65% 58% / 0.1);
+  background: hsl(0 0% 100% / 0.92);
+  border-bottom: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 12px hsl(220 9% 63% / 0.12);
   backdrop-filter: blur(20px);
 }
 
