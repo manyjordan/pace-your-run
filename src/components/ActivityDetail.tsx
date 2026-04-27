@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
-import { ArrowLeft, BarChart3, Clock, Heart, Mountain, Play, Route, TrendingUp, Zap } from "lucide-react";
+import { ArrowLeft, BarChart3, Clock, Download, Heart, Mountain, Play, Route, TrendingUp, Zap } from "lucide-react";
 import { logger } from "@/lib/logger";
 import { getRunWithGps, type RunRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
@@ -10,6 +10,7 @@ import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 import { LineChartSvg } from "@/components/charts/LineChartSvg";
 import { calculateSplits, formatSplitPace, type SplitTracePoint } from "@/lib/splitCalculator";
 import { calculateZoneDistribution, getHRZones } from "@/lib/heartRateZones";
+import { downloadGpx, generateGpx } from "@/lib/gpxExport";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -462,6 +463,24 @@ export function ActivityDetail({
   }, [kmSplits]);
   const displayTrace = analysis.trace;
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
+  const hasGpsTrace = Array.isArray(fullRun?.gps_trace) && fullRun.gps_trace.length > 0;
+
+  const handleExportGpx = useCallback(() => {
+    if (!Array.isArray(fullRun?.gps_trace) || fullRun.gps_trace.length === 0) return;
+    const activityDate = analysis.startDate.toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const name = activity.title?.trim() || `Course du ${activityDate}`;
+    const gpx = generateGpx(
+      fullRun.gps_trace as Array<{ lat: number; lng: number; time: number; altitude?: number; heart_rate?: number }>,
+      name,
+      activity.started_at ?? new Date().toISOString(),
+    );
+    const filename = `${name.replace(/[^\w.-]+/g, "_")}.gpx`;
+    downloadGpx(gpx, filename);
+  }, [activity.started_at, activity.title, analysis.startDate, fullRun?.gps_trace]);
 
   useEffect(() => {
     const handleStorage = () => {
@@ -495,7 +514,19 @@ export function ActivityDetail({
           <span className="text-sm font-medium">Retour</span>
         </button>
         <h2 className="font-semibold text-foreground">Activité</h2>
-        <div className="w-20" />
+        {hasGpsTrace ? (
+          <button
+            type="button"
+            onClick={handleExportGpx}
+            className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-medium transition-all hover:bg-muted/80 active:scale-95"
+            aria-label="Exporter en GPX"
+          >
+            <Download className="h-4 w-4" />
+            GPX
+          </button>
+        ) : (
+          <div className="w-20" />
+        )}
       </div>
 
       <div ref={scrollContainerRef} className="flex-1 space-y-4 overflow-y-auto px-4 pb-8 pt-2">
