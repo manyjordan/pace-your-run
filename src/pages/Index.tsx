@@ -2,7 +2,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, List, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { differenceInDays } from "date-fns";
+import { differenceInDays, format, parseISO } from "date-fns";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -386,6 +386,43 @@ const Dashboard = () => {
     () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
     [trainingLoad, lastRunDaysAgo],
   );
+  const lifetimeStats = useMemo(() => {
+    if (!runsForStats?.length) return null;
+
+    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const totalHours = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0) / 3600;
+    const totalRuns = runsForStats.length;
+    const totalElevation = runsForStats.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
+
+    const validRuns = runsForStats.filter((run) => (run.distance_km ?? 0) > 0 && (run.duration_seconds ?? 0) > 0);
+    const totalDist = validRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const totalSec = validRuns.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0);
+    const avgPaceSecPerKm = totalDist > 0 ? totalSec / totalDist : 0;
+
+    const longestRun = Math.max(...runsForStats.map((run) => run.distance_km ?? 0));
+
+    const sortedDates = [
+      ...new Set(
+        runsForStats
+          .filter((run) => Boolean(run.started_at))
+          .map((run) => format(new Date(run.started_at as string), "yyyy-MM-dd")),
+      ),
+    ].sort().reverse();
+
+    let streak = 0;
+    let checkDate = new Date();
+    for (const dateString of sortedDates) {
+      const runDate = parseISO(dateString);
+      if (differenceInDays(checkDate, runDate) <= 1) {
+        streak += 1;
+        checkDate = runDate;
+      } else {
+        break;
+      }
+    }
+
+    return { totalKm, totalHours, totalRuns, totalElevation, avgPaceSecPerKm, longestRun, streak };
+  }, [runsForStats]);
 
   return (
     <>
@@ -477,13 +514,56 @@ const Dashboard = () => {
               <SkeletonCard />
             </div>
           ) : (
-            <DashboardSection
-              recentRuns={recentRuns}
-              userGoal={hasDefinedGoal ? userGoal : null}
-              filteredMetrics={filteredMetrics}
-              period={period}
-              onPeriodChange={setPeriod}
-            />
+            <div className="space-y-4">
+              {lifetimeStats ? (
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-foreground">Mes statistiques</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <AppCard className="py-4 text-center">
+                      <p className="font-metric text-2xl font-black text-foreground">
+                        {Math.round(lifetimeStats.totalKm).toLocaleString("fr")}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">km au total</p>
+                    </AppCard>
+
+                    <AppCard className="py-4 text-center">
+                      <p className="font-metric text-2xl font-black text-foreground">{lifetimeStats.totalRuns}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">courses</p>
+                    </AppCard>
+
+                    <AppCard className="py-4 text-center">
+                      <p className="font-metric text-2xl font-black text-accent">{Math.round(lifetimeStats.totalHours)}h</p>
+                      <p className="mt-1 text-xs text-muted-foreground">heures de course</p>
+                    </AppCard>
+
+                    <AppCard className="py-4 text-center">
+                      <p className="font-metric text-2xl font-black text-foreground">{lifetimeStats.longestRun.toFixed(1)}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">km (plus longue)</p>
+                    </AppCard>
+
+                    <AppCard className="py-4 text-center">
+                      <p className="font-metric text-2xl font-black text-foreground">
+                        {Math.round(lifetimeStats.totalElevation).toLocaleString("fr")}m
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">dénivelé total</p>
+                    </AppCard>
+
+                    <AppCard className="py-4 text-center">
+                      <p className="font-metric text-2xl font-black text-accent">{lifetimeStats.streak}🔥</p>
+                      <p className="mt-1 text-xs text-muted-foreground">jours consécutifs</p>
+                    </AppCard>
+                  </div>
+                </div>
+              ) : null}
+
+              <DashboardSection
+                recentRuns={recentRuns}
+                userGoal={hasDefinedGoal ? userGoal : null}
+                filteredMetrics={filteredMetrics}
+                period={period}
+                onPeriodChange={setPeriod}
+              />
+            </div>
           )}
         </TabsContent>
         <TabsContent value="performance">
