@@ -91,7 +91,7 @@ export function useSpeechAnnouncements({
   const lastPaceAlertRef = useRef(0);
   const lastFinishAnnouncementSecRef = useRef(0);
   const lastHrZoneAnnouncementSecRef = useRef(0);
-  const prevStatusRef = useRef<RunStatus>(status);
+  const prevStatusRef = useRef<RunStatus | null>(null);
   const thirtySecondTick = Math.floor(elapsed / 30);
   const maxHR = typeof window !== "undefined" ? parseInt(localStorage.getItem("pace_max_hr") ?? "190", 10) : 190;
 
@@ -130,6 +130,13 @@ export function useSpeechAnnouncements({
 
   useEffect(() => {
     const prev = prevStatusRef.current;
+    if (prev === null) {
+      prevStatusRef.current = status;
+      if (status === "running") {
+        speak("Course démarrée. Bonne course !");
+      }
+      return;
+    }
     if (status === "running" && prev === "idle") {
       speak("Course démarrée. Bonne course !");
     } else if (status === "paused" && prev === "running") {

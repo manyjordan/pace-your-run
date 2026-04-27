@@ -1,6 +1,5 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { ActivityDetail } from "@/components/ActivityDetail";
-import { RunCourseSettingsDialog } from "@/components/run/RunCourseSettingsDialog";
 import { RunLiveMapBlock } from "@/components/run/RunLiveMapBlock";
 import { RunMainTimerCard } from "@/components/run/RunMainTimerCard";
 import { RunPerformanceRecapCard } from "@/components/run/RunPerformanceRecapCard";
@@ -9,13 +8,12 @@ import { RunTreadmillSpeedPanel } from "@/components/run/RunTreadmillSpeedPanel"
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Map, AlertCircle, Settings } from "lucide-react";
-import { useState, useRef, useEffect, useCallback } from "react";
+import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluetoothHR, type RunBluetoothStatus } from "@/hooks/useBluetoothHR";
 import { useRunSave } from "@/hooks/useRunSave";
 import { useRunSession, type RunSummary } from "@/hooks/useRunSession";
-import { useSpeechAnnouncements } from "@/hooks/useSpeechAnnouncements";
 import { useSessionProgram } from "@/hooks/useSessionProgram";
 import { useTreadmill } from "@/hooks/useTreadmill";
 import { updatePostAudience, type RouteRow, type RunRow } from "@/lib/database";
@@ -33,6 +31,11 @@ import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib
 import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
+
+const RunSpeechBridge = lazy(() => import("@/components/run/RunSpeechBridge"));
+const RunCourseSettingsDialog = lazy(() =>
+  import("@/components/run/RunCourseSettingsDialog").then((m) => ({ default: m.RunCourseSettingsDialog })),
+);
 
 export default function Run() {
   const navigate = useNavigate();
@@ -137,29 +140,6 @@ export default function Run() {
 
   resetProgramProgressRef.current = resetProgramProgress;
 
-  const { resetAnnouncementRefs, resetKilometreAnnouncementRef } = useSpeechAnnouncements({
-    speechPrefsRef,
-    distance,
-    elapsed,
-    gpsTrace,
-    status,
-    pace,
-    rollingPaceSecondsPerKm,
-    activeSession,
-    activeRoute,
-    routeProgress,
-    routeArrivalAnnouncedRef,
-    isProgrammedSessionActive: isProgramActive,
-    programmedSegments: segments,
-    currentProgramSegmentIndex: currentSegmentIndex,
-    secondsRemainingInCurrentSegment,
-    thirtySecondAnnouncedRef,
-    segmentTransitionAnnouncedRef,
-  });
-
-  resetAnnouncementRefsRef.current = resetAnnouncementRefs;
-  resetKilometreAnnouncementRefRef.current = resetKilometreAnnouncementRef;
-
   const formatPace = useCallback(
     (paceMinPerKm: number): string => {
       if (!paceMinPerKm || paceMinPerKm <= 0) return "--:-- /km";
@@ -263,6 +243,32 @@ export default function Run() {
 
   return (
     <PageContainer>
+      <Suspense fallback={null}>
+        <RunSpeechBridge
+          speechPrefsRef={speechPrefsRef}
+          resetAnnouncementRefsRef={resetAnnouncementRefsRef}
+          resetKilometreAnnouncementRefRef={resetKilometreAnnouncementRefRef}
+          distance={distance}
+          elapsed={elapsed}
+          gpsTrace={gpsTrace}
+          status={status}
+          pace={pace}
+          rollingPaceSecondsPerKm={rollingPaceSecondsPerKm}
+          activeSession={activeSession}
+          activeRoute={activeRoute}
+          routeProgress={routeProgress}
+          routeArrivalAnnouncedRef={routeArrivalAnnouncedRef}
+          heartRate={bluetooth.heartRate}
+          isBluetoothConnected={bluetooth.isBluetoothConnected}
+          isProgrammedSessionActive={isProgramActive}
+          programmedSegments={segments}
+          currentProgramSegmentIndex={currentSegmentIndex}
+          secondsRemainingInCurrentSegment={secondsRemainingInCurrentSegment}
+          thirtySecondAnnouncedRef={thirtySecondAnnouncedRef}
+          segmentTransitionAnnouncedRef={segmentTransitionAnnouncedRef}
+        />
+      </Suspense>
+
       {completedActivity && showCompletedActivityDetail && (
         <ActivityDetail
           activity={completedActivity}
@@ -457,25 +463,27 @@ export default function Run() {
               <Map className="h-4 w-4 shrink-0" />
               Mes parcours
             </Button>
-            <RunCourseSettingsDialog
-              runPreferences={runPreferences}
-              setRunPreferences={setRunPreferences}
-              runMode={runMode}
-              setRunMode={setRunMode}
-              isProgrammedMode={isProgrammedMode}
-              isTreadmill={treadmill.isTreadmill}
-              setIsTreadmill={treadmill.setIsTreadmill}
-              programmed={{
-                programSource,
-                setProgramSource,
-                selectedTemplateId,
-                loadTemplate,
-                segments,
-                addSegment,
-                removeSegment,
-                updateSegment,
-              }}
-            />
+            <Suspense fallback={null}>
+              <RunCourseSettingsDialog
+                runPreferences={runPreferences}
+                setRunPreferences={setRunPreferences}
+                runMode={runMode}
+                setRunMode={setRunMode}
+                isProgrammedMode={isProgrammedMode}
+                isTreadmill={treadmill.isTreadmill}
+                setIsTreadmill={treadmill.setIsTreadmill}
+                programmed={{
+                  programSource,
+                  setProgramSource,
+                  selectedTemplateId,
+                  loadTemplate,
+                  segments,
+                  addSegment,
+                  removeSegment,
+                  updateSegment,
+                }}
+              />
+            </Suspense>
           </div>
         )}
 

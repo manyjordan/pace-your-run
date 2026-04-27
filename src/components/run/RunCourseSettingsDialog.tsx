@@ -11,13 +11,16 @@ import {
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RunProgrammedSessionCard } from "@/components/run/RunProgrammedSessionCard";
 import type { SessionSegment } from "@/hooks/useSessionProgram";
 import { cn } from "@/lib/utils";
 import { Gauge, MapPin, Settings2 } from "lucide-react";
+import { lazy, Suspense, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { Link } from "react-router-dom";
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import type { RunPreferences } from "@/lib/runPreferences";
+
+const RunProgrammedSessionCard = lazy(() =>
+  import("@/components/run/RunProgrammedSessionCard").then((m) => ({ default: m.RunProgrammedSessionCard })),
+);
 
 type ProgramSource = "custom" | "template";
 
@@ -161,16 +164,18 @@ export function RunCourseSettingsDialog({
             </div>
 
             {isProgrammedMode ? (
-              <RunProgrammedSessionCard
-                programSource={programmed.programSource}
-                setProgramSource={programmed.setProgramSource}
-                selectedTemplateId={programmed.selectedTemplateId}
-                loadTemplate={programmed.loadTemplate}
-                segments={programmed.segments}
-                addSegment={programmed.addSegment}
-                removeSegment={programmed.removeSegment}
-                updateSegment={programmed.updateSegment}
-              />
+              <Suspense fallback={<p className="text-xs text-muted-foreground">Chargement…</p>}>
+                <RunProgrammedSessionCard
+                  programSource={programmed.programSource}
+                  setProgramSource={programmed.setProgramSource}
+                  selectedTemplateId={programmed.selectedTemplateId}
+                  loadTemplate={programmed.loadTemplate}
+                  segments={programmed.segments}
+                  addSegment={programmed.addSegment}
+                  removeSegment={programmed.removeSegment}
+                  updateSegment={programmed.updateSegment}
+                />
+              </Suspense>
             ) : null}
 
             <div className="space-y-2">

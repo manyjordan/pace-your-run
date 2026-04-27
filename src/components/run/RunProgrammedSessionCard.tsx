@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2 } from "lucide-react";
-import { INTERVAL_TEMPLATES, type SessionSegment } from "@/hooks/useSessionProgram";
+import { INTERVAL_TEMPLATES } from "@/hooks/sessionProgramTemplates";
+import type { SessionSegment } from "@/hooks/useSessionProgram";
 import { cn } from "@/lib/utils";
 
 type ProgramSource = "custom" | "template";
