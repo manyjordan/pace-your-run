@@ -2,7 +2,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, List, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { differenceInDays, format, parseISO } from "date-fns";
+import { differenceInDays, getWeek, subWeeks } from "date-fns";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -401,21 +401,27 @@ const Dashboard = () => {
 
     const longestRun = Math.max(...runsForStats.map((run) => run.distance_km ?? 0));
 
-    const sortedDates = [
-      ...new Set(
-        runsForStats
-          .filter((run) => Boolean(run.started_at))
-          .map((run) => format(new Date(run.started_at as string), "yyyy-MM-dd")),
-      ),
-    ].sort().reverse();
+    const weekKeys = new Set(
+      runsForStats
+        .filter((run) => Boolean(run.started_at))
+        .map((run) => {
+          const d = new Date(run.started_at as string);
+          const year = d.getFullYear();
+          const week = getWeek(d, { weekStartsOn: 1 });
+          return `${year}-W${String(week).padStart(2, "0")}`;
+        }),
+    );
 
     let streak = 0;
     let checkDate = new Date();
-    for (const dateString of sortedDates) {
-      const runDate = parseISO(dateString);
-      if (differenceInDays(checkDate, runDate) <= 1) {
+    for (let i = 0; i < 104; i++) {
+      const year = checkDate.getFullYear();
+      const week = getWeek(checkDate, { weekStartsOn: 1 });
+      const key = `${year}-W${String(week).padStart(2, "0")}`;
+
+      if (weekKeys.has(key)) {
         streak += 1;
-        checkDate = runDate;
+        checkDate = subWeeks(checkDate, 1);
       } else {
         break;
       }
@@ -549,8 +555,13 @@ const Dashboard = () => {
                     </AppCard>
 
                     <AppCard className="py-4 text-center">
-                      <p className="font-metric text-2xl font-black text-accent">{lifetimeStats.streak}🔥</p>
-                      <p className="mt-1 text-xs text-muted-foreground">jours consécutifs</p>
+                      <p
+                        className="text-2xl font-black text-accent"
+                        style={{ fontFamily: "var(--font-mono-display)" }}
+                      >
+                        {lifetimeStats.streak}🔥
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">semaines consécutives</p>
                     </AppCard>
                   </div>
                 </div>
