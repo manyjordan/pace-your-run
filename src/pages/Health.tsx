@@ -827,21 +827,21 @@ const Health = () => {
     const runsPerWeek = last4Weeks.length / 4;
     return { recentKm, trend, runsPerWeek };
   }, [runsForStats]);
-  const maxHR = Number.parseInt(localStorage.getItem("pace_max_hr") ?? "190", 10) || 190;
   const trainingLoad = useMemo(
     () =>
-      calculateTrainingLoad(
-        runsForStats
-          .map((run) => ({
-            started_at: run.started_at ?? run.created_at ?? "",
-            duration_seconds: run.duration_seconds ?? 0,
-            avg_heart_rate: run.average_heartrate ?? undefined,
-            distance_km: run.distance_km ?? 0,
-          }))
-          .filter((run) => run.started_at.length > 0 && run.duration_seconds > 0 && run.distance_km > 0),
-        maxHR,
-      ),
-    [runsForStats, maxHR],
+      runsForStats?.length
+        ? calculateTrainingLoad(
+            runsForStats
+              .map((run) => ({
+                started_at: run.started_at ?? run.created_at ?? "",
+                duration_seconds: run.duration_seconds ?? 0,
+                average_heartrate: run.average_heartrate ?? undefined,
+                distance_km: run.distance_km ?? 0,
+              }))
+              .filter((run) => run.started_at.length > 0 && run.duration_seconds > 0 && run.distance_km > 0),
+          )
+        : null,
+    [runsForStats],
   );
   const totals = useMemo(() => {
     const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
@@ -944,6 +944,48 @@ const Health = () => {
       </ScrollReveal>
 
       <ScrollReveal>
+        {trainingLoad ? (
+          <AppCard className="border-l-4" style={{ borderLeftColor: trainingLoad.statusColor }}>
+            <div className="mb-2 flex items-start justify-between">
+              <div>
+                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Charge d&apos;entrainement</p>
+                <p className="text-xl font-bold" style={{ color: trainingLoad.statusColor }}>
+                  {trainingLoad.statusLabel}
+                </p>
+              </div>
+              <div className="text-right">
+                <div className="font-metric text-2xl font-black text-foreground">{Math.round(trainingLoad.ctl)}</div>
+                <div className="text-xs text-muted-foreground">forme chronique</div>
+              </div>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">{trainingLoad.statusDescription}</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="rounded-lg bg-muted/50 py-2 text-center">
+                <p className="font-metric text-sm font-bold text-foreground">{Math.round(trainingLoad.atl)}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Fatigue</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 py-2 text-center">
+                <p className="font-metric text-sm font-bold text-foreground">{Math.round(trainingLoad.ctl)}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Forme</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 py-2 text-center">
+                <p
+                  className={cn(
+                    "font-metric text-sm font-bold",
+                    trainingLoad.tsb >= 0 ? "text-accent" : "text-orange-400",
+                  )}
+                >
+                  {trainingLoad.tsb >= 0 ? "+" : ""}
+                  {Math.round(trainingLoad.tsb)}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Équilibre</p>
+              </div>
+            </div>
+          </AppCard>
+        ) : null}
+      </ScrollReveal>
+
+      <ScrollReveal>
         <AppCard className="border-accent/20">
           <div className="mb-3 flex items-center justify-between">
             <div>
@@ -966,60 +1008,6 @@ const Health = () => {
           </p>
         </AppCard>
       </ScrollReveal>
-
-      {trainingLoad ? (
-        <ScrollReveal>
-          <AppCard>
-            <div className="mb-3 flex items-center justify-between">
-              <div>
-                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Charge d&apos;entrainement</p>
-                <p className="text-lg font-bold text-foreground">{trainingLoad.statusLabel}</p>
-              </div>
-              <div
-                className="flex h-12 w-12 items-center justify-center rounded-full text-sm font-bold text-white"
-                style={{ backgroundColor: trainingLoad.statusColor }}
-              >
-                {trainingLoad.acwr.toFixed(1)}
-              </div>
-            </div>
-
-            <div className="relative mb-3 h-3 overflow-hidden rounded-full bg-muted">
-              <div className="absolute inset-0 flex">
-                <div style={{ width: "26.7%", background: "#9CA3AF" }} />
-                <div style={{ width: "16.7%", background: "#1DB954" }} />
-                <div style={{ width: "6.7%", background: "#fb923c" }} />
-                <div style={{ flex: 1, background: "#ef4444" }} />
-              </div>
-              <div
-                className="absolute bottom-0 top-0 w-0.5 bg-white shadow"
-                style={{ left: `${Math.min(95, (trainingLoad.acwr / 2) * 100)}%` }}
-              />
-            </div>
-            <div className="mb-3 flex justify-between text-xs text-muted-foreground">
-              <span>0.8</span>
-              <span>1.3</span>
-              <span>1.5</span>
-              <span>2.0+</span>
-            </div>
-
-            <p className="rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground">{trainingLoad.recommendation}</p>
-
-            <div className="mt-3 flex gap-4">
-              <div className="flex-1 text-center">
-                <p className="text-xs text-muted-foreground">7 derniers jours</p>
-                <p className="font-metric text-sm font-bold text-foreground">{Math.round(trainingLoad.acuteLoad)}</p>
-                <p className="text-xs text-muted-foreground">TRIMP</p>
-              </div>
-              <div className="w-px bg-border" />
-              <div className="flex-1 text-center">
-                <p className="text-xs text-muted-foreground">Moyenne 28j</p>
-                <p className="font-metric text-sm font-bold text-foreground">{Math.round(trainingLoad.chronicLoad)}</p>
-                <p className="text-xs text-muted-foreground">TRIMP/sem</p>
-              </div>
-            </div>
-          </AppCard>
-        </ScrollReveal>
-      ) : null}
 
       <ScrollReveal>
         <VO2maxCard runs={runsForStats} />
