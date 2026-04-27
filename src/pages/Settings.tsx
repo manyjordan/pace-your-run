@@ -2,6 +2,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { useEffect, useState } from "react";
 import {
   Watch,
+  User,
   ChevronRight,
   LogOut,
   Upload,
@@ -159,6 +160,17 @@ const SettingsPage = () => {
 
       <ScrollReveal>
         <ProfileContent compact showDetails={false} />
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <SettingsSection title="Profil" icon={User}>
+          <NavigationRow
+            icon={User}
+            label="Mon profil athlète"
+            description="Modifier votre prénom, pseudo, bio et voir vos stats"
+            onClick={() => navigate("/profile")}
+          />
+        </SettingsSection>
       </ScrollReveal>
 
       <ScrollReveal>

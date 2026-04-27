@@ -18,6 +18,7 @@ export type ProfileRow = {
   id: string;
   updated_at: string | null;
   username: string | null;
+  bio?: string | null;
   onboarding_completed?: boolean;
   gender?: string | null;
   date_of_birth?: string | null;
@@ -227,6 +228,7 @@ export async function upsertProfile(userId: string, data: Record<string, unknown
   if ("onboarding_completed" in data) payload.onboarding_completed = data.onboarding_completed ?? false;
   if ("avatar_url" in data) payload.avatar_url = data.avatar_url ?? null;
   if ("username" in data) payload.username = data.username ?? null;
+  if ("bio" in data) payload.bio = data.bio ?? null;
   if ("available_days" in data) payload.available_days = (data.available_days ?? []) as string[];
 
   if (!("full_name" in data)) {

@@ -65,7 +65,7 @@ function AppRoutes() {
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/forum/:categoryId" element={<ForumCategory />} />
                   <Route path="/routes" element={<RoutesPage />} />
-                  <Route path="/profile" element={<Navigate to="/settings" replace />} />
+                  <Route path="/profile" element={<Profile />} />
                   <Route path="/health/issue/:issueKey" element={<Health />} />
                   <Route path="/import" element={<Import />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
