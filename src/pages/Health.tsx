@@ -17,6 +17,8 @@ import { getAllRunsForStats, type RunRow } from "@/lib/database";
 import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { formatDuration } from "@/lib/runFormatters";
+import { LineChartSvg } from "@/components/charts/LineChartSvg";
+import { buildPaceProgression, formatPaceSecPerKm } from "@/lib/progressionHelpers";
 
 type Issue = {
   name: string;
@@ -718,6 +720,7 @@ const Health = () => {
   const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
   const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
+  const [progressionPeriod, setProgressionPeriod] = useState<3 | 6 | 12>(6);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -840,6 +843,27 @@ const Health = () => {
       longestTime: Math.max(...runsForStats.map((run) => run.duration_seconds ?? 0), 0),
     };
   }, [runsForStats]);
+  const paceProgression = useMemo(
+    () =>
+      buildPaceProgression(
+        runsForStats
+          .map((run) => ({
+            started_at: run.started_at ?? run.created_at ?? "",
+            distance_km: run.distance_km ?? 0,
+            duration_seconds: run.duration_seconds ?? 0,
+          }))
+          .filter((run) => run.started_at.length > 0),
+        progressionPeriod,
+      ),
+    [runsForStats, progressionPeriod],
+  );
+  const progressionTrend = useMemo(() => {
+    if (paceProgression.length < 2) return null;
+    const first = paceProgression.slice(0, 2).reduce((sum, month) => sum + month.value, 0) / 2;
+    const last = paceProgression.slice(-2).reduce((sum, month) => sum + month.value, 0) / 2;
+    const diffSec = first - last;
+    return { improving: diffSec > 5, seconds: Math.abs(diffSec) };
+  }, [paceProgression]);
   const formatPaceMinPerKm = (paceMinPerKm: number) => {
     if (!paceMinPerKm || paceMinPerKm <= 0) return "--:--";
     const minutes = Math.floor(paceMinPerKm);
@@ -932,6 +956,59 @@ const Health = () => {
 
       <ScrollReveal>
         <RacePredictionsCard runs={runsForStats} />
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <AppCard>
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-foreground">Progression de l&apos;allure</h3>
+              {progressionTrend ? (
+                <p
+                  className={cn(
+                    "mt-0.5 text-xs font-medium",
+                    progressionTrend.improving ? "text-accent" : "text-orange-400",
+                  )}
+                >
+                  {progressionTrend.improving ? "↑ En amélioration" : "↓ En baisse"} de{" "}
+                  {formatPaceSecPerKm(progressionTrend.seconds)} /km
+                </p>
+              ) : null}
+            </div>
+            <div className="flex gap-1">
+              {([3, 6, 12] as const).map((monthPeriod) => (
+                <button
+                  key={monthPeriod}
+                  type="button"
+                  onClick={() => setProgressionPeriod(monthPeriod)}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
+                    progressionPeriod === monthPeriod
+                      ? "bg-accent text-white"
+                      : "bg-muted text-muted-foreground",
+                  )}
+                >
+                  {monthPeriod}m
+                </button>
+              ))}
+            </div>
+          </div>
+          {paceProgression.length >= 2 ? (
+            <LineChartSvg
+              data={paceProgression.map((month) => ({ label: month.label, value: month.value }))}
+              height={100}
+              showDots
+              formatValue={formatPaceSecPerKm}
+            />
+          ) : (
+            <p className="py-4 text-center text-xs text-muted-foreground">
+              Pas assez de données pour afficher la progression.
+            </p>
+          )}
+          <p className="mt-2 text-center text-xs text-muted-foreground">
+            Une courbe descendante = vous courez plus vite
+          </p>
+        </AppCard>
       </ScrollReveal>
 
       <ScrollReveal>
