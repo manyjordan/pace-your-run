@@ -83,6 +83,11 @@ const SettingsPage = () => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [runPreferences, setRunPreferences] = useState<RunPreferences>(() => getDefaultRunPreferences());
+  const [maxHR, setMaxHR] = useState<number>(() => {
+    const saved = localStorage.getItem("pace_max_hr");
+    const parsed = saved ? Number.parseInt(saved, 10) : Number.NaN;
+    return Number.isFinite(parsed) ? Math.min(220, Math.max(140, parsed)) : 190;
+  });
   const { signOut, session } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -200,6 +205,24 @@ const SettingsPage = () => {
                 setRunPreferences(updated);
                 saveRunPreferences(updated, session?.user?.id ?? null);
               }}
+            />
+          </div>
+          <div className="mt-3 space-y-2 rounded-lg border border-border p-3">
+            <label className="text-sm font-medium">Fréquence cardiaque max (bpm)</label>
+            <p className="text-xs text-muted-foreground">
+              Utilisée pour calculer vos zones d&apos;entraînement. Estimation : 220 - votre âge.
+            </p>
+            <input
+              type="number"
+              value={maxHR}
+              onChange={(e) => {
+                const val = Math.min(220, Math.max(140, Number.parseInt(e.target.value, 10) || 190));
+                setMaxHR(val);
+                localStorage.setItem("pace_max_hr", String(val));
+              }}
+              className="w-24 rounded-lg bg-muted px-3 py-2 text-sm font-mono"
+              min={140}
+              max={220}
             />
           </div>
         </SettingsSection>

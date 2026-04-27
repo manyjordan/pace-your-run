@@ -9,6 +9,7 @@ import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type
 import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 import { LineChartSvg } from "@/components/charts/LineChartSvg";
 import { calculateSplits, formatSplitPace, type SplitTracePoint } from "@/lib/splitCalculator";
+import { calculateZoneDistribution, getHRZones } from "@/lib/heartRateZones";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -211,6 +212,11 @@ export function ActivityDetail({
   const [fullRun, setFullRun] = useState<RunRow | null>(null);
   const [gpsLoading, setGpsLoading] = useState(true);
   const traceLen = Array.isArray(activity?.gps_trace) ? activity.gps_trace.length : 0;
+  const [maxHR, setMaxHR] = useState<number>(() => {
+    const saved = localStorage.getItem("pace_max_hr");
+    const parsed = saved ? Number.parseInt(saved, 10) : Number.NaN;
+    return Number.isFinite(parsed) ? Math.min(220, Math.max(140, parsed)) : 190;
+  });
 
   const touchStartYRef = useRef<number | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -445,12 +451,27 @@ export function ActivityDetail({
     if (!Array.isArray(fullRun?.gps_trace)) return [];
     return calculateSplits(fullRun.gps_trace as SplitTracePoint[]);
   }, [fullRun?.gps_trace]);
+  const hrZones = useMemo(() => getHRZones(maxHR), [maxHR]);
+  const zoneDistribution = useMemo(() => {
+    if (!Array.isArray(fullRun?.gps_trace)) return [];
+    return calculateZoneDistribution(fullRun.gps_trace as Array<{ heart_rate?: number; time: number }>, hrZones);
+  }, [fullRun?.gps_trace, hrZones]);
   const avgSplitPace = useMemo(() => {
     if (kmSplits.length === 0) return 0;
     return kmSplits.reduce((sum, split) => sum + split.paceSecPerKm, 0) / kmSplits.length;
   }, [kmSplits]);
   const displayTrace = analysis.trace;
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
+
+  useEffect(() => {
+    const handleStorage = () => {
+      const saved = localStorage.getItem("pace_max_hr");
+      const parsed = saved ? Number.parseInt(saved, 10) : Number.NaN;
+      setMaxHR(Number.isFinite(parsed) ? Math.min(220, Math.max(140, parsed)) : 190);
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
 
   return (
     <div
@@ -604,6 +625,40 @@ export function ActivityDetail({
                     <span className="text-right text-sm text-muted-foreground">
                       {split.elevationGain > 0 ? `+${split.elevationGain}m` : "—"}
                     </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+
+        {zoneDistribution.length > 0 ? (
+          <div className="space-y-3 rounded-lg border border-accent/20 bg-card p-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Zones FC</h3>
+            <div className="space-y-2">
+              {zoneDistribution.map(({ zone, seconds, percentage }) => {
+                const min = Math.floor(seconds / 60);
+                const sec = Math.round(seconds % 60);
+                return (
+                  <div key={zone.zone} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full" style={{ backgroundColor: zone.color }} />
+                        <span className="font-medium">{zone.name}</span>
+                        <span className="text-muted-foreground">
+                          {zone.minBpm}-{zone.maxBpm} bpm
+                        </span>
+                      </div>
+                      <span className="font-mono font-semibold">
+                        {min}:{String(sec).padStart(2, "0")} ({percentage}%)
+                      </span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full transition-all"
+                        style={{ width: `${percentage}%`, backgroundColor: zone.color }}
+                      />
+                    </div>
                   </div>
                 );
               })}
