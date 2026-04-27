@@ -21,6 +21,7 @@ const Onboarding = lazy(() => import("@/pages/Onboarding"));
 const ForumCategory = lazy(() => import("@/pages/ForumCategory"));
 const RoutesPage = lazy(() => import("@/pages/Routes"));
 const Settings = lazy(() => import("@/pages/Settings"));
+const Shoes = lazy(() => import("@/pages/Shoes"));
 const Profile = lazy(() => import("@/pages/Profile"));
 const Import = lazy(() => import("@/pages/Import"));
 const HealthKitSync = lazy(() => import("@/pages/HealthKitSync"));
@@ -69,6 +70,7 @@ function AppRoutes() {
                   <Route path="/import" element={<Import />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/shoes" element={<Shoes />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AppShell>

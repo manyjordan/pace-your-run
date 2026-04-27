@@ -11,6 +11,7 @@ import {
   HeartPulse,
   Apple,
   Database,
+  Footprints,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -167,6 +168,12 @@ const SettingsPage = () => {
             label="Importer l'historique"
             description="Strava, Nike, Garmin, Apple Health, GPX..."
             onClick={() => navigate("/import")}
+          />
+          <NavigationRow
+            icon={Footprints}
+            label="Mes chaussures"
+            description="Suivez l'usure et le kilometrage de vos paires"
+            onClick={() => navigate("/shoes")}
           />
         </SettingsSection>
       </ScrollReveal>

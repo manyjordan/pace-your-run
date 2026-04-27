@@ -47,9 +47,22 @@ export type RunRow = {
   moving_time_seconds?: number | null;
   ran_with?: string[] | null;
   run_type: string | null;
+  shoe_id?: string | null;
   started_at: string | null;
   title: string | null;
   user_id: string | null;
+};
+
+export type ShoeRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  brand: string | null;
+  start_date: string | null;
+  km_limit: number | null;
+  is_active: boolean | null;
+  notes: string | null;
+  created_at: string | null;
 };
 
 export type RouteRow = {
@@ -72,6 +85,7 @@ export type RunInput = {
   moving_time_seconds?: number | null;
   ran_with?: string[];
   run_type?: string | null;
+  shoe_id?: string | null;
   started_at?: string | null;
   title?: string | null;
 };
@@ -310,6 +324,7 @@ export async function saveRun(userId: string, runData: RunInput) {
       moving_time_seconds: runData.moving_time_seconds ?? null,
       ran_with: runData.ran_with ?? [],
       run_type: runData.run_type ?? "run",
+      shoe_id: runData.shoe_id ?? null,
       started_at: runData.started_at ?? new Date().toISOString(),
       title: runData.title ?? null,
     })
@@ -318,6 +333,52 @@ export async function saveRun(userId: string, runData: RunInput) {
 
   if (error) throw error;
   return data as RunRow;
+}
+
+export async function getShoes(userId: string) {
+  await requireCurrentUserId(userId);
+  const { data, error } = await supabase
+    .from("shoes")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as ShoeRow[];
+}
+
+export async function createShoe(
+  userId: string,
+  shoe: { name: string; brand?: string; km_limit?: number; notes?: string; start_date?: string },
+) {
+  await requireCurrentUserId(userId);
+  const payload = {
+    ...shoe,
+    user_id: userId,
+    brand: shoe.brand ?? null,
+    km_limit: shoe.km_limit ?? 600,
+    notes: shoe.notes ?? null,
+    start_date: shoe.start_date ?? null,
+  };
+  const { error } = await supabase.from("shoes").insert(payload);
+  if (error) throw error;
+}
+
+export async function getShoeKm(shoeId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from("runs")
+    .select("distance_km")
+    .eq("shoe_id", shoeId);
+  if (error) return 0;
+  return (data ?? []).reduce((sum, r) => sum + (r.distance_km ?? 0), 0);
+}
+
+export async function retireShoe(shoeId: string) {
+  const { error } = await supabase
+    .from("shoes")
+    .update({ is_active: false })
+    .eq("id", shoeId);
+  if (error) throw error;
 }
 
 export async function detectSimultaneousRuns(
