@@ -14,7 +14,6 @@ import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import GoalTab from "@/components/plan/GoalTab";
 import TrainingTab from "@/components/plan/TrainingTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
-import { TRAINING_PLANS, getPlanById, mapSessionsToDays } from "@/lib/plans";
 import type { TrainingPlan } from "@/lib/plans/types";
 
 type PlanGoal = {
@@ -43,6 +42,7 @@ export default function PlanPage() {
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [userGoal, setUserGoal] = useState<PlanGoal | null>(null);
   const [availableDays, setAvailableDays] = useState<string[]>([]);
+  const [plansModule, setPlansModule] = useState<typeof import("@/lib/plans") | null>(null);
 
   useEffect(() => {
     const userId = session?.user?.id;
@@ -139,8 +139,30 @@ export default function PlanPage() {
     () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
     [trainingLoad, lastRunDaysAgo],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!normalizedGoalType || normalizedGoalType === "none") {
+      setPlansModule(null);
+      return;
+    }
+
+    void import("@/lib/plans")
+      .then((mod) => {
+        if (!cancelled) setPlansModule(mod);
+      })
+      .catch(() => {
+        if (!cancelled) setPlansModule(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [normalizedGoalType]);
+
   const selectedPlan = useMemo((): TrainingPlan | null => {
-    if (!normalizedGoalType) return null;
+    if (!plansModule || !normalizedGoalType) return null;
+    const { TRAINING_PLANS, getPlanById, mapSessionsToDays } = plansModule;
 
     let planId: string | null = null;
     if (normalizedGoalType === "marathon" || normalizedRaceType === "marathon" || numericTargetDistance >= 40) {
@@ -168,7 +190,7 @@ export default function PlanPage() {
 
     if (!basePlan) return null;
     return availableDays.length > 0 ? mapSessionsToDays(basePlan, availableDays) : basePlan;
-  }, [availableDays, normalizedGoalType, normalizedRaceType, numericTargetDistance]);
+  }, [availableDays, normalizedGoalType, normalizedRaceType, numericTargetDistance, plansModule]);
 
   const currentPlanWeek = useMemo((): number => {
     if (!targetDate || !selectedPlan) return 1;
