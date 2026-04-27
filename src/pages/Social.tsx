@@ -1,7 +1,7 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -80,6 +80,7 @@ type FeedPost = CommunityPost & {
   activityId: number;
   dbId?: string;
   sourceRun?: RunRow | null;
+  authorProfile?: ProfileRow | null;
   feedReason?: PersonalizedFeedPost["feedReason"];
   friendWhoLiked?: PersonalizedFeedPost["friendWhoLiked"];
 };
@@ -140,6 +141,7 @@ function ranWithBadgeText(description: string): string | null {
 
 function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
   const displayName =
+    post.profile?.first_name?.trim() ||
     post.profile?.username ||
     post.profile?.full_name ||
     "Coureur";
@@ -150,6 +152,7 @@ function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
     activityId,
     dbId: post.id,
     sourceRun: run ?? null,
+    authorProfile: post.profile ?? null,
     id: activityId,
     user: displayName,
     initials: getInitials(displayName),
@@ -238,6 +241,13 @@ function FeedActivityCard({
   }, [gpsTrace, isVisible, runId, userId]);
 
   const ranWithLine = ranWithBadgeText(post.description ?? "");
+  const displayName =
+    post.authorProfile?.first_name?.trim() ||
+    post.authorProfile?.username ||
+    post.authorProfile?.full_name ||
+    post.user ||
+    "Coureur";
+  const authorAvatar = post.authorProfile?.avatar_url ?? null;
 
   return (
     <Card ref={cardRef} className="cursor-pointer overflow-hidden" onClick={() => onOpenActivity(post)}>
@@ -259,13 +269,14 @@ function FeedActivityCard({
         ) : null}
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
+            {authorAvatar ? <AvatarImage src={authorAvatar} alt={displayName} /> : null}
             <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
-              {post.initials}
+              {getInitials(displayName)}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">{post.user}</span>
+              <span className="text-sm font-semibold">{displayName}</span>
               {post.type === "race" && (
                 <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
                   <Trophy className="mr-0.5 h-3 w-3" /> Course

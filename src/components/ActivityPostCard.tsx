@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,6 +64,17 @@ export function ActivityPostCard({
     };
   }, [gpsTrace, isVisible, runId, session?.user?.id]);
 
+  const enrichedPost = post as CommunityPost & {
+    profiles?: { first_name?: string | null; username?: string | null; email?: string | null; avatar_url?: string | null };
+  };
+  const displayName =
+    enrichedPost.profiles?.first_name?.trim() ||
+    enrichedPost.profiles?.username ||
+    enrichedPost.profiles?.email?.split("@")[0] ||
+    post.user ||
+    "Coureur";
+  const avatarUrl = enrichedPost.profiles?.avatar_url ?? null;
+
   return (
     <Card ref={cardRef} className={`overflow-hidden ${onOpen ? "cursor-pointer" : ""}`} onClick={onOpen}>
       {gpsTrace && gpsTrace.length > 1 ? (
@@ -76,13 +87,14 @@ export function ActivityPostCard({
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
+            {avatarUrl ? <AvatarImage src={avatarUrl} alt={displayName} /> : null}
             <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
               {post.initials}
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold">{post.user}</span>
+              <span className="text-sm font-semibold">{displayName}</span>
               {post.type === "race" && (
                 <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
                   <Trophy className="mr-0.5 h-3 w-3" /> Course

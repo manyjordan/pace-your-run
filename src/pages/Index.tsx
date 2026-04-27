@@ -47,7 +47,7 @@ const SkeletonCard = () => (
 );
 
 type ProfileGoalData = {
-  goalType: "weight" | "race" | "distance";
+  goalType: "weight" | "race" | "distance" | "none";
   raceType: "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
   raceDistanceKm: string;
   raceTargetDate: string;
@@ -354,6 +354,10 @@ const Dashboard = () => {
   }, [runningRuns, period]);
 
   const filteredMetrics = useMemo(() => metricCards, [metricCards]);
+  const hasDefinedGoal = useMemo(() => {
+    if (!userGoal) return false;
+    return userGoal.goalType !== "none";
+  }, [userGoal]);
 
   return (
     <>
@@ -433,7 +437,7 @@ const Dashboard = () => {
           ) : (
             <DashboardSection
               recentRuns={recentRuns}
-              userGoal={userGoal}
+              userGoal={hasDefinedGoal ? userGoal : null}
               filteredMetrics={filteredMetrics}
               period={period}
               onPeriodChange={setPeriod}
