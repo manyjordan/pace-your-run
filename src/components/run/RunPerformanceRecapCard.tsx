@@ -1,5 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { ActivityPostCard } from "@/components/ActivityPostCard";
+import { RunShareCard } from "@/components/run/RunShareCard";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,9 @@ import type { RunRow } from "@/lib/database";
 import { formatDuration as formatSocialDuration, formatPaceFromSeconds, type CommunityPost } from "@/lib/runFormatters";
 import type { RunSummary } from "@/hooks/useRunSession";
 import type { User } from "@supabase/supabase-js";
-import type { Dispatch, SetStateAction } from "react";
+import html2canvas from "html2canvas";
+import { Share2 } from "lucide-react";
+import { useMemo, type Dispatch, type SetStateAction } from "react";
 
 export type RunPerformanceRecapCardProps = {
   runSummary: RunSummary;
@@ -64,6 +67,48 @@ export function RunPerformanceRecapCard({
   setCompletedPost,
   setShowCompletedActivityDetail,
 }: RunPerformanceRecapCardProps) {
+  const sharePaceSecPerKm = useMemo(() => {
+    if (!runSummary.distance || runSummary.distance <= 0) return 0;
+    return Math.round(runSummary.duration / runSummary.distance);
+  }, [runSummary.distance, runSummary.duration]);
+
+  const userName =
+    (user?.user_metadata?.first_name as string | undefined) ??
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email?.split("@")[0] ??
+    "Coureur";
+
+  const handleShare = async () => {
+    const card = document.getElementById("run-share-card");
+    if (!card) return;
+
+    try {
+      const canvas = await html2canvas(card, { scale: 2, backgroundColor: null });
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+
+        const file = new File([blob], "ma-course-pace.png", { type: "image/png" });
+        if (navigator.share && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `J'ai couru ${runSummary.distance.toFixed(2)} km !`,
+            text: `${runSummary.distance.toFixed(2)} km en ${formatSocialDuration(runSummary.duration)} à ${Math.floor(sharePaceSecPerKm / 60)}:${String(sharePaceSecPerKm % 60).padStart(2, "0")}/km avec Pace 🏃`,
+          });
+          return;
+        }
+
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "ma-course-pace.png";
+        a.click();
+        URL.revokeObjectURL(url);
+      }, "image/png");
+    } catch (err) {
+      console.error("[Run] Share failed", err);
+    }
+  };
+
   return (
     <ScrollReveal>
       <Card className="border-accent/50 bg-accent/10">
@@ -208,7 +253,23 @@ export function RunPerformanceRecapCard({
                   {isSaving ? "Enregistrement…" : "Enregistrer la course"}
                 </Button>
               ) : null}
+              <Button type="button" onClick={() => void handleShare()} className="mt-3 w-full gap-2">
+                <Share2 className="h-4 w-4" />
+                Partager ma course
+              </Button>
               {completedPost ? <ActivityPostCard post={completedPost} onOpen={() => setShowCompletedActivityDetail(true)} /> : null}
+              <div
+                aria-hidden="true"
+                style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none" }}
+              >
+                <RunShareCard
+                  distance={runSummary.distance}
+                  duration={runSummary.duration}
+                  pace={sharePaceSecPerKm}
+                  date={runSummary.startedAt}
+                  userName={userName}
+                />
+              </div>
             </>
           )}
         </CardContent>
