@@ -4,9 +4,11 @@ import { logger } from "@/lib/logger";
 import { getRunWithGps, type RunRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
 import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 import { LineChartSvg } from "@/components/charts/LineChartSvg";
+import { calculateSplits, formatSplitPace, type SplitTracePoint } from "@/lib/splitCalculator";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -439,6 +441,14 @@ export function ActivityDetail({
       startDate: new Date(resolvedActivity.start_date),
     };
   }, [fallbackTrace, fullRun?.gps_trace, normalizedAllActivities, resolvedActivity]);
+  const kmSplits = useMemo(() => {
+    if (!Array.isArray(fullRun?.gps_trace)) return [];
+    return calculateSplits(fullRun.gps_trace as SplitTracePoint[]);
+  }, [fullRun?.gps_trace]);
+  const avgSplitPace = useMemo(() => {
+    if (kmSplits.length === 0) return 0;
+    return kmSplits.reduce((sum, split) => sum + split.paceSecPerKm, 0) / kmSplits.length;
+  }, [kmSplits]);
   const displayTrace = analysis.trace;
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
 
@@ -557,6 +567,49 @@ export function ActivityDetail({
             </div>
           )}
         </div>
+
+        {kmSplits.length > 0 ? (
+          <div className="space-y-2 rounded-lg border border-accent/20 bg-card p-3">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Splits</h3>
+            <div className="overflow-hidden rounded-xl border border-border">
+              <div className="grid grid-cols-4 bg-muted/50 px-4 py-2">
+                <span className="text-xs font-semibold text-muted-foreground">KM</span>
+                <span className="text-center text-xs font-semibold text-muted-foreground">ALLURE</span>
+                <span className="text-center text-xs font-semibold text-muted-foreground">FC</span>
+                <span className="text-right text-xs font-semibold text-muted-foreground">D+</span>
+              </div>
+              {kmSplits.map((split, i) => {
+                const isFast = avgSplitPace > 0 && split.paceSecPerKm < avgSplitPace * 0.97;
+                const isSlow = avgSplitPace > 0 && split.paceSecPerKm > avgSplitPace * 1.03;
+                return (
+                  <div
+                    key={`${split.km}-${split.durationSec}`}
+                    className={cn(
+                      "grid grid-cols-4 border-t border-border px-4 py-3",
+                      i % 2 === 0 ? "bg-background" : "bg-muted/20",
+                    )}
+                  >
+                    <span className="text-sm font-semibold">{split.km}</span>
+                    <span
+                      className={cn(
+                        "text-center font-mono text-sm font-semibold",
+                        isFast ? "text-accent" : isSlow ? "text-orange-400" : "text-foreground",
+                      )}
+                    >
+                      {formatSplitPace(split.paceSecPerKm)}
+                    </span>
+                    <span className="text-center text-sm text-muted-foreground">
+                      {split.avgHeartRate ? `${split.avgHeartRate} bpm` : "—"}
+                    </span>
+                    <span className="text-right text-sm text-muted-foreground">
+                      {split.elevationGain > 0 ? `+${split.elevationGain}m` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
 
         {analysis.hasDetailedSplits && (
           <div className="rounded-lg border border-accent/20 bg-card p-4 shadow-[0_12px_30px_hsl(var(--accent)/0.06)]">
