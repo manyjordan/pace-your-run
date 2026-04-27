@@ -1,0 +1,6 @@
+# Force LF for iOS files — prevents plist corruption on Windows
+*.plist text eol=lf
+*.xcconfig text eol=lf
+*.swift text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
