@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { differenceInDays, endOfWeek, startOfWeek } from "date-fns";
-import { Calendar, Footprints, Target, Zap } from "lucide-react";
+import { Calendar, Footprints, Target } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -12,13 +12,19 @@ import { getProfile, getRuns, type RunRow } from "@/lib/database";
 import GoalTab from "@/components/plan/GoalTab";
 import TrainingTab from "@/components/plan/TrainingTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
+import { TRAINING_PLANS, getPlanById, mapSessionsToDays } from "@/lib/plans";
+import type { TrainingPlan } from "@/lib/plans/types";
 
 type PlanGoal = {
   goalType?: string;
+  goal_type?: string;
   raceType?: string;
+  race_type?: string;
   raceDistanceKm?: string;
+  target_distance_km?: number | string;
   raceTargetTime?: string;
   raceTargetDate?: string;
+  target_date?: string;
   distanceKm?: string;
   distanceTargetDate?: string;
   weightTargetDate?: string;
@@ -34,12 +40,14 @@ export default function PlanPage() {
     tabParam === "goal" || tabParam === "training" || tabParam === "equipment" ? tabParam : "goal";
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [userGoal, setUserGoal] = useState<PlanGoal | null>(null);
+  const [availableDays, setAvailableDays] = useState<string[]>([]);
 
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) {
       setRecentRuns([]);
       setUserGoal(null);
+      setAvailableDays([]);
       return;
     }
 
@@ -49,6 +57,8 @@ export default function PlanPage() {
     if (cachedProfile?.goal_data && typeof cachedProfile.goal_data === "object" && !Array.isArray(cachedProfile.goal_data)) {
       setUserGoal(cachedProfile.goal_data as PlanGoal);
     }
+    const cachedProfileWithDays = cache.get<{ available_days?: string[] }>(`profile_${userId}`);
+    setAvailableDays(cachedProfileWithDays?.available_days ?? []);
 
     void Promise.all([getProfile(userId), getRuns(userId)])
       .then(([profile, runs]) => {
@@ -58,11 +68,17 @@ export default function PlanPage() {
         } else {
           setUserGoal(null);
         }
+        setAvailableDays(profile?.available_days ?? []);
       })
       .catch(() => {});
   }, [session?.user?.id]);
 
-  const targetDate = userGoal?.raceTargetDate || userGoal?.distanceTargetDate || userGoal?.weightTargetDate || null;
+  const normalizedGoalType = userGoal?.goalType || userGoal?.goal_type || "";
+  const normalizedRaceType = userGoal?.raceType || userGoal?.race_type || "";
+  const numericTargetDistance = Number.parseFloat(
+    String(userGoal?.target_distance_km ?? userGoal?.raceDistanceKm ?? userGoal?.distanceKm ?? "0"),
+  );
+  const targetDate = userGoal?.target_date || userGoal?.raceTargetDate || userGoal?.distanceTargetDate || userGoal?.weightTargetDate || null;
   const daysUntilGoal = useMemo(() => {
     if (!targetDate) return null;
     const diff = differenceInDays(new Date(targetDate), new Date());
@@ -71,20 +87,20 @@ export default function PlanPage() {
   const weeksUntilGoal = daysUntilGoal !== null ? Math.floor(daysUntilGoal / 7) : null;
   const raceLabel = useMemo(() => {
     if (!userGoal?.goalType) return null;
-    if (userGoal.goalType === "race") {
-      if (userGoal.raceType === "marathon") return "Marathon";
-      if (userGoal.raceType === "semi") return "Semi-marathon";
-      if (userGoal.raceType === "20k") return "20 km";
-      if (userGoal.raceType === "10k") return "10 km";
-      if (userGoal.raceType === "5k") return "5 km";
+    if (normalizedGoalType === "race") {
+      if (normalizedRaceType === "marathon") return "Marathon";
+      if (normalizedRaceType === "semi") return "Semi-marathon";
+      if (normalizedRaceType === "20k") return "20 km";
+      if (normalizedRaceType === "10k") return "10 km";
+      if (normalizedRaceType === "5k") return "5 km";
       if (userGoal.raceDistanceKm) return `${userGoal.raceDistanceKm} km`;
       return "Course";
     }
-    if (userGoal.goalType === "distance") return "Objectif distance";
-    if (userGoal.goalType === "weight") return "Objectif poids";
+    if (normalizedGoalType === "distance") return "Objectif distance";
+    if (normalizedGoalType === "weight") return "Objectif poids";
     return null;
-  }, [userGoal]);
-  const targetDistanceKm = userGoal?.goalType === "race" ? userGoal.raceDistanceKm : userGoal?.distanceKm;
+  }, [normalizedGoalType, normalizedRaceType, userGoal]);
+  const targetDistanceKm = normalizedGoalType === "race" ? userGoal?.raceDistanceKm : userGoal?.distanceKm;
   const targetTime = userGoal?.raceTargetTime;
   const now = new Date();
   const runsThisWeek = useMemo(() => {
@@ -96,26 +112,47 @@ export default function PlanPage() {
       return d >= weekStart && d <= weekEnd;
     });
   }, [recentRuns, now]);
-  const nextSessionSuggestion = useMemo(() => {
-    if (!recentRuns?.length || !recentRuns[0]?.started_at) return null;
-    const lastRun = recentRuns[0];
-    const daysSinceLastRun = differenceInDays(new Date(), new Date(lastRun.started_at));
-    if (daysSinceLastRun === 0) {
-      return { type: "rest", label: "Recuperation", description: "Vous avez couru aujourd'hui, reposez-vous !" };
+  const selectedPlan = useMemo((): TrainingPlan | null => {
+    if (!normalizedGoalType) return null;
+
+    let planId: string | null = null;
+    if (normalizedGoalType === "marathon" || normalizedRaceType === "marathon" || numericTargetDistance >= 40) {
+      planId = "marathon_beginner_4days_16weeks";
+    } else if (normalizedGoalType === "semi" || normalizedRaceType === "semi" || numericTargetDistance >= 20) {
+      planId = "semi_beginner_3days_16weeks";
+    } else if (numericTargetDistance >= 10) {
+      planId = "distance_10k_beginner_3days_12weeks";
+    } else if (normalizedGoalType === "weight") {
+      planId = "weight_beginner_3days_8weeks";
     }
-    if (daysSinceLastRun >= 3) {
-      return {
-        type: "easy",
-        label: "Course facile",
-        description: `${Math.min(8, (lastRun.distance_km ?? 5) * 0.8).toFixed(0)} km en endurance fondamentale`,
-      };
-    }
-    return {
-      type: "tempo",
-      label: "Sortie tempo",
-      description: `${Math.min(10, lastRun.distance_km ?? 6).toFixed(0)} km a allure marathon`,
-    };
-  }, [recentRuns]);
+
+    const exactPlan = planId ? getPlanById(planId) : null;
+    const basePlan =
+      exactPlan ??
+      TRAINING_PLANS.find((plan) => {
+        if (normalizedGoalType === "weight") return plan.goal === "weight";
+        if (normalizedGoalType === "distance") return plan.goal === "distance";
+        if (normalizedRaceType === "marathon" || numericTargetDistance >= 40) return plan.targetDistance === "marathon";
+        if (normalizedRaceType === "semi" || numericTargetDistance >= 20) return plan.targetDistance === "semi";
+        if (numericTargetDistance >= 10) return plan.targetDistance === "10k";
+        return plan.goal === "distance";
+      }) ??
+      null;
+
+    if (!basePlan) return null;
+    return availableDays.length > 0 ? mapSessionsToDays(basePlan, availableDays) : basePlan;
+  }, [availableDays, normalizedGoalType, normalizedRaceType, numericTargetDistance]);
+
+  const currentPlanWeek = useMemo((): number => {
+    if (!targetDate || !selectedPlan) return 1;
+    const weeksUntilRace = Math.ceil(differenceInDays(new Date(targetDate), new Date()) / 7);
+    const week = selectedPlan.durationWeeks - weeksUntilRace + 1;
+    return Math.max(1, Math.min(week, selectedPlan.durationWeeks));
+  }, [targetDate, selectedPlan]);
+
+  const currentWeekData = selectedPlan?.weeklySchedule[currentPlanWeek - 1];
+  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const todayShort = dayNames[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
   return (
     <div className="space-y-6">
@@ -126,7 +163,7 @@ export default function PlanPage() {
         </div>
       </ScrollReveal>
 
-      {userGoal?.goalType && userGoal.goalType !== "none" ? (
+      {normalizedGoalType && normalizedGoalType !== "none" ? (
         <ScrollReveal>
           <AppCard className="relative overflow-hidden border-accent/20">
             <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/10" />
@@ -191,19 +228,107 @@ export default function PlanPage() {
         </AppCard>
       </ScrollReveal>
 
-      {nextSessionSuggestion ? (
+      {selectedPlan && currentWeekData ? (
         <ScrollReveal>
-          <AppCard className="border-accent/20">
-            <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Prochaine seance suggeree</p>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent/15">
-                <Zap className="h-5 w-5 text-accent" />
-              </div>
+          <AppCard>
+            <div className="mb-4 flex items-center justify-between">
               <div>
-                <p className="font-semibold text-foreground">{nextSessionSuggestion.label}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{nextSessionSuggestion.description}</p>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">{selectedPlan.name}</p>
+                <p className="font-semibold text-foreground">
+                  Semaine {currentPlanWeek}/{selectedPlan.durationWeeks}
+                </p>
+                <p className="mt-0.5 text-xs text-accent">{currentWeekData.focus}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-metric text-2xl font-black text-foreground">{currentWeekData.totalDistance}</p>
+                <p className="text-xs text-muted-foreground">km cette semaine</p>
               </div>
             </div>
+
+            <div className="space-y-3">
+              {currentWeekData.sessions.map((session, i) => {
+                const intensityColors: Record<string, string> = {
+                  easy: "#4ade80",
+                  moderate: "#60a5fa",
+                  tempo: "#fb923c",
+                  interval: "#f43f5e",
+                  race: "#1DB954",
+                };
+                const color = intensityColors[session.intensity] ?? "#9CA3AF";
+                const normalizedDay = session.day.toLowerCase();
+                const isToday =
+                  normalizedDay.startsWith(todayShort.toLowerCase()) ||
+                  (todayShort === "Lun" && normalizedDay.startsWith("lundi")) ||
+                  (todayShort === "Mar" && normalizedDay.startsWith("mardi")) ||
+                  (todayShort === "Mer" && normalizedDay.startsWith("mercredi")) ||
+                  (todayShort === "Jeu" && normalizedDay.startsWith("jeudi")) ||
+                  (todayShort === "Ven" && normalizedDay.startsWith("vendredi")) ||
+                  (todayShort === "Sam" && normalizedDay.startsWith("samedi")) ||
+                  (todayShort === "Dim" && normalizedDay.startsWith("dimanche"));
+
+                return (
+                  <div
+                    key={`${session.day}-${session.type}-${i}`}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl p-3 transition-all",
+                      isToday ? "border border-accent/20 bg-accent/10" : "bg-muted/30",
+                    )}
+                  >
+                    <div className="h-12 w-1 flex-shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{session.type}</p>
+                        {isToday ? (
+                          <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-medium text-white">
+                            Aujourd&apos;hui
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {session.day} · {session.description}
+                      </p>
+                    </div>
+                    <div className="flex-shrink-0 text-right">
+                      <p className="font-metric text-sm font-bold text-foreground">{session.distance} km</p>
+                      <p className="text-xs text-muted-foreground">{session.pace}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </AppCard>
+        </ScrollReveal>
+      ) : null}
+
+      {selectedPlan && currentPlanWeek < selectedPlan.durationWeeks ? (
+        <ScrollReveal>
+          <AppCard>
+            <p className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">Prochaines semaines</p>
+            <div className="space-y-2">
+              {selectedPlan.weeklySchedule.slice(currentPlanWeek, currentPlanWeek + 3).map((week, i) => (
+                <div
+                  key={`next-week-${week.week}-${i}`}
+                  className="flex items-center justify-between border-b border-border py-2 last:border-0"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Semaine {currentPlanWeek + 1 + i}</p>
+                    <p className="max-w-[200px] truncate text-xs text-muted-foreground">{week.focus}</p>
+                  </div>
+                  <p className="font-metric text-sm font-bold text-foreground">{week.totalDistance} km</p>
+                </div>
+              ))}
+            </div>
+          </AppCard>
+        </ScrollReveal>
+      ) : null}
+
+      {!selectedPlan && normalizedGoalType ? (
+        <ScrollReveal>
+          <AppCard className="py-6 text-center">
+            <p className="text-sm text-muted-foreground">Aucun plan disponible pour cet objectif.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Modifiez votre objectif pour accéder aux plans d&apos;entraînement.
+            </p>
           </AppCard>
         </ScrollReveal>
       ) : null}
