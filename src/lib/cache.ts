@@ -1,5 +1,12 @@
-const CACHE_VERSION = "v1";
-const TTL_MS = 5 * 60 * 1000;
+const CACHE_VERSION = "v2";
+const DEFAULT_TTL_MS = 5 * 60 * 1000;
+const TTL_BY_KEY: Record<string, number> = {
+  runs: 15 * 60 * 1000,
+  runsStats: 15 * 60 * 1000,
+  profile: 30 * 60 * 1000,
+  social: 5 * 60 * 1000,
+  health: 15 * 60 * 1000,
+};
 
 interface CacheEntry<T> {
   data: T;
@@ -21,7 +28,9 @@ export const cache = {
       if (!raw) return null;
       const entry: CacheEntry<T> = JSON.parse(raw);
       if (entry.version !== CACHE_VERSION) return null;
-      if (Date.now() - entry.timestamp > TTL_MS) return null;
+      const prefix = key.split("_")[0] ?? "";
+      const ttl = TTL_BY_KEY[prefix] ?? DEFAULT_TTL_MS;
+      if (Date.now() - entry.timestamp > ttl) return null;
       return entry.data;
     } catch {
       return null;

@@ -24,6 +24,7 @@ import {
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
+import { cache } from "@/lib/cache";
 import { useToast } from "@/hooks/use-toast";
 import { useProgressiveList } from "@/hooks/useProgressiveList";
 import { useAuth } from "@/contexts/AuthContext";
@@ -532,7 +533,9 @@ export default function Social() {
 
         if (pageNum === 0) {
           setPosts(mappedPosts);
-          setActivities(newPosts.filter((post) => post.run).map((post) => post.run as RunRow));
+          const nextActivities = newPosts.filter((post) => post.run).map((post) => post.run as RunRow);
+          setActivities(nextActivities);
+          cache.set(`social_${user.id}`, { posts: mappedPosts, activities: nextActivities });
           setPage(0);
         } else {
           setPosts((prev) => [...prev, ...mappedPosts]);
@@ -564,20 +567,35 @@ export default function Social() {
       return;
     }
 
+    const cachedSocial = cache.get<{ posts: FeedPost[]; activities: RunRow[] }>(`social_${user.id}`);
+    if (cachedSocial) {
+      setPosts(cachedSocial.posts);
+      setActivities(cachedSocial.activities);
+      setIsLoadingPosts(false);
+    }
+
     setPage(0);
     setHasMore(true);
-    setIsLoadingPosts(true);
+    if (!cachedSocial) setIsLoadingPosts(true);
     setPostsError(null);
 
     try {
-      const [followingList, suggested] = await Promise.all([
+      const [followingList, suggested, feed] = await Promise.all([
         getFollowing(user.id),
         getSuggestedUsersToFollow(user.id, 5),
+        getPersonalizedFeed(user.id, FEED_PAGE_SIZE, 0),
       ]);
 
       setFollowingIds(new Set(followingList));
       setFollowingAnyone(followingList.length > 0);
       setSuggestions(suggested);
+      const mappedPosts = feed.map(mapPersonalizedPostToFeedPost);
+      const nextActivities = feed.filter((post) => post.run).map((post) => post.run as RunRow);
+      setPosts(mappedPosts);
+      setActivities(nextActivities);
+      setPage(0);
+      setHasMore(feed.length >= FEED_PAGE_SIZE);
+      cache.set(`social_${user.id}`, { posts: mappedPosts, activities: nextActivities });
     } catch {
       setActivities([]);
       setPosts([]);
@@ -585,9 +603,8 @@ export default function Social() {
       setIsLoadingPosts(false);
       return;
     }
-
-    await loadFeed(0);
-  }, [user?.id, loadFeed]);
+    setIsLoadingPosts(false);
+  }, [user?.id]);
 
   useEffect(() => {
     if (hasLoadedRef.current) return;
@@ -631,13 +648,13 @@ export default function Social() {
 
     setNotifLoading(true);
     try {
-      const list = await getNotifications(user.id);
+      const [list] = await Promise.all([
+        getNotifications(user.id),
+        markNotificationsRead(user.id),
+      ]);
       setNotifications(list);
-      await markNotificationsRead(user.id);
       setUnreadNotifCount(0);
       window.dispatchEvent(new Event("pace-notifications-updated"));
-      const cleared = await getNotifications(user.id);
-      setNotifications(cleared);
     } catch {
       setNotifications([]);
     } finally {

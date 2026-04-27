@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
+import { cache } from "@/lib/cache";
 
 type Issue = {
   name: string;
@@ -713,7 +714,15 @@ const Health = () => {
   useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
+    const cachedState = cache.get<{ searchQuery: string }>("health_state");
+    if (cachedState?.searchQuery) {
+      setSearchQuery(cachedState.searchQuery);
+    }
   }, []);
+
+  useEffect(() => {
+    cache.set("health_state", { searchQuery });
+  }, [searchQuery]);
 
   useEffect(() => {
     if (issueKey && !issueDetails) {

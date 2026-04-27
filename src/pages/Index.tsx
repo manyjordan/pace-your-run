@@ -8,7 +8,9 @@ import {
   getProfile,
   getRuns,
   getAllRunsForStats,
+  getPersonalizedFeed,
   getRunWithGps,
+  type PersonalizedFeedPost,
   type ProfileRow,
   type RunGpsPoint,
   type RunRow,
@@ -34,6 +36,14 @@ const PerformanceSection = lazy(() =>
 );
 const ActivitySection = lazy(() =>
   import("@/components/dashboard/ActivitySection").then((module) => ({ default: module.ActivitySection })),
+);
+
+const SkeletonCard = () => (
+  <div className="animate-pulse rounded-xl border border-border bg-card p-5">
+    <div className="mb-3 h-3 w-1/3 rounded bg-muted" />
+    <div className="mb-2 h-7 w-1/2 rounded bg-muted" />
+    <div className="h-3 w-2/3 rounded bg-muted" />
+  </div>
 );
 
 type ProfileGoalData = {
@@ -81,6 +91,7 @@ const Dashboard = () => {
   const [runCount, setRunCount] = useState(0);
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
+  const [showSkeletons, setShowSkeletons] = useState(true);
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
   const [period, setPeriod] = useState<DashboardPeriod>("3m");
@@ -126,6 +137,12 @@ const Dashboard = () => {
       localStorage.setItem("pace_user_id", session.user.id);
     }
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    if (!isLoading || recentRuns.length > 0 || athleteName !== "Coureur") {
+      setShowSkeletons(false);
+    }
+  }, [athleteName, isLoading, recentRuns.length]);
 
   const loadUserData = useCallback(async () => {
     if (!session?.user.id) {
@@ -262,6 +279,31 @@ const Dashboard = () => {
     }
   }, [location.pathname, loadUserData]);
 
+  useEffect(() => {
+    if (!session?.user?.id || recentRuns.length === 0) return;
+
+    const preload = () => {
+      const userId = session.user.id;
+      if (!cache.get(`socialFeed_${userId}`)) {
+        void getPersonalizedFeed(userId, 10, 0)
+          .then((posts) => {
+            cache.set<PersonalizedFeedPost[]>(`socialFeed_${userId}`, posts);
+          })
+          .catch(() => {});
+      }
+      if (!cache.get(`health_${userId}`)) {
+        cache.set(`health_${userId}`, { warmedAt: Date.now() });
+      }
+    };
+
+    if ("requestIdleCallback" in window) {
+      (window as Window & { requestIdleCallback: (cb: () => void, opts?: { timeout: number }) => number })
+        .requestIdleCallback(preload, { timeout: 3000 });
+    } else {
+      window.setTimeout(preload, 2000);
+    }
+  }, [recentRuns.length, session?.user?.id]);
+
   const handleCloseActivityDetail = () => {
     setSelectedRunForDetail(null);
     setSelectedDetailTrace(undefined);
@@ -327,7 +369,7 @@ const Dashboard = () => {
 
       <PageContainer>
         <ScrollReveal>
-        {isLoading ? (
+        {showSkeletons ? (
           <SkeletonHeroBanner />
         ) : (
           <AppCard className="relative overflow-hidden border-border">
@@ -342,7 +384,7 @@ const Dashboard = () => {
         )}
       </ScrollReveal>
 
-      {!isLoading && runCount < 3 && (
+      {!showSkeletons && runCount < 3 && (
         <ScrollReveal>
           <AppCard className="border-accent/30 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -382,11 +424,11 @@ const Dashboard = () => {
         </ScrollReveal>
 
         <TabsContent value="dashboard">
-          {isLoading ? (
+          {showSkeletons ? (
             <div className="space-y-6">
-              <SkeletonMetricCard />
-              <SkeletonMetricCard />
-              <SkeletonMetricCard />
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
             </div>
           ) : (
             <DashboardSection
@@ -399,8 +441,11 @@ const Dashboard = () => {
           )}
         </TabsContent>
         <TabsContent value="performance">
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Chargement...</p>
+          {showSkeletons ? (
+            <div className="space-y-4">
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+            </div>
           ) : (
             <Suspense fallback={<div className="h-32 animate-pulse rounded-xl bg-muted" />}>
               <PerformanceSection runs={recentRuns} runsForStats={runsForStats} />
@@ -408,8 +453,11 @@ const Dashboard = () => {
           )}
         </TabsContent>
         <TabsContent value="activities">
-          {isLoading ? (
-            <p className="text-sm text-muted-foreground">Chargement...</p>
+          {showSkeletons ? (
+            <div className="space-y-4">
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+            </div>
           ) : (
             <Suspense fallback={<div className="h-32 animate-pulse rounded-xl bg-muted" />}>
               <ActivitySection runs={recentRuns} athleteName={athleteName} onOpenActivityDetail={openRunDetail} />
