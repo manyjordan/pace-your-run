@@ -2,6 +2,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Activity, List, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { differenceInDays } from "date-fns";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -28,6 +29,8 @@ import {
   getAggregationUnit,
   type MetricChartPeriod,
 } from "@/lib/dashboardHelpers";
+import { calculateTrainingLoad } from "@/lib/trainingLoad";
+import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 
 type DashboardPeriod = Extract<MetricChartPeriod, "3m" | "6m" | "1y" | "all">;
 
@@ -358,6 +361,31 @@ const Dashboard = () => {
     if (!userGoal) return false;
     return userGoal.goalType !== "none";
   }, [userGoal]);
+  const trainingLoad = useMemo(
+    () =>
+      runsForStats?.length
+        ? calculateTrainingLoad(
+            runsForStats
+              .map((run) => ({
+                started_at: run.started_at ?? run.created_at ?? "",
+                duration_seconds: run.duration_seconds ?? 0,
+                average_heartrate: run.average_heartrate ?? undefined,
+                distance_km: run.distance_km ?? 0,
+              }))
+              .filter((run) => run.started_at.length > 0 && run.duration_seconds > 0 && run.distance_km > 0),
+          )
+        : null,
+    [runsForStats],
+  );
+  const lastRunDaysAgo = useMemo(() => {
+    const lastRun = recentRuns.find((run) => Boolean(run.started_at));
+    if (!lastRun?.started_at) return 99;
+    return Math.max(0, differenceInDays(new Date(), new Date(lastRun.started_at)));
+  }, [recentRuns]);
+  const dailyRec = useMemo(
+    () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
+    [trainingLoad, lastRunDaysAgo],
+  );
 
   return (
     <>
@@ -387,6 +415,20 @@ const Dashboard = () => {
           </AppCard>
         )}
       </ScrollReveal>
+
+      {dailyRec ? (
+        <ScrollReveal>
+          <AppCard className="border-l-4 py-3" style={{ borderLeftColor: dailyRec.color }}>
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{dailyRec.emoji}</span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">{dailyRec.title}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{dailyRec.description}</p>
+              </div>
+            </div>
+          </AppCard>
+        </ScrollReveal>
+      ) : null}
 
       {!showSkeletons && runCount < 3 && (
         <ScrollReveal>
