@@ -98,12 +98,12 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
+          "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-ui": [
             "@radix-ui/react-dialog",
             "@radix-ui/react-tabs",
             "@radix-ui/react-select",
           ],
-          "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-dates": ["date-fns"],
           "vendor-sentry": ["@sentry/react"],
           "plans-weight": ["./src/lib/plans/weightPlans"],
