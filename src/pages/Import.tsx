@@ -6,9 +6,8 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRuns, saveRun } from "@/lib/database";
 import { parseAppleHealthFile } from "@/lib/parsers/appleHealthParser";
-import { parseFitFile } from "@/lib/parsers/fitParser";
-import { parseGpxFile, type ImportedRun } from "@/lib/parsers/gpxParser";
-import { parseStravaZipFile, type StravaZipParseResult } from "@/lib/parsers/stravaZipParser";
+import type { ImportedRun } from "@/lib/parsers/gpxParser";
+import type { StravaZipParseResult } from "@/lib/parsers/stravaZipParser";
 import { parseStravaCSV } from "@/lib/parsers/stravaCSVParser";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -52,19 +51,23 @@ async function parseImportedRuns(source: ImportSource, file: File): Promise<Pars
     if (!lowerName.endsWith(".zip")) {
       throw new Error("Strava attend une archive ZIP complete.");
     }
+    const { parseStravaZipFile } = await import("@/lib/parsers/stravaZipParser");
     const zipResult: StravaZipParseResult = await parseStravaZipFile(file);
     return { runs: zipResult.runs, parserSkipped: zipResult.skipped };
   }
 
   if (lowerName.endsWith(".zip")) {
+    const { parseStravaZipFile } = await import("@/lib/parsers/stravaZipParser");
     const zipResult: StravaZipParseResult = await parseStravaZipFile(file);
     return { runs: zipResult.runs, parserSkipped: zipResult.skipped };
   }
   if (lowerName.endsWith(".gpx")) {
+    const { parseGpxFile } = await import("@/lib/parsers/gpxParser");
     return { runs: [await parseGpxFile(file)] };
   }
 
   if (lowerName.endsWith(".fit")) {
+    const { parseFitFile } = await import("@/lib/parsers/fitParser");
     const parsed = await parseFitFile(file);
     if (!parsed) {
       throw new Error("Le fichier FIT n'a pas pu être lu. Vérifiez qu'il s'agit bien d'un export Garmin valide.");
