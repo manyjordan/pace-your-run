@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { differenceInDays, endOfWeek, startOfWeek } from "date-fns";
-import { Calendar, Footprints, Target } from "lucide-react";
+import { Calendar, Check, Footprints, Target } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
@@ -32,6 +32,19 @@ type PlanGoal = {
 };
 
 const DAYS = ["L", "M", "M", "J", "V", "S", "D"];
+
+/** Monday = 0 … Sunday = 6 (aligned with `runsThisWeek` day index). */
+function sessionDayIndex(session: Session): number {
+  const n = session.day.trim().toLowerCase();
+  if (n.startsWith("lun")) return 0;
+  if (n.startsWith("mer")) return 2;
+  if (n.startsWith("mar")) return 1;
+  if (n.startsWith("jeu")) return 3;
+  if (n.startsWith("ven")) return 4;
+  if (n.startsWith("sam")) return 5;
+  if (n.startsWith("dim")) return 6;
+  return -1;
+}
 
 export default function PlanPage() {
   const [searchParams] = useSearchParams();
@@ -105,15 +118,37 @@ export default function PlanPage() {
   const targetDistanceKm = normalizedGoalType === "race" ? userGoal?.raceDistanceKm : userGoal?.distanceKm;
   const targetTime = userGoal?.raceTargetTime;
   const now = new Date();
+  const weekStart = useMemo(() => startOfWeek(now, { weekStartsOn: 1 }), [now]);
+  const weekEnd = useMemo(() => endOfWeek(now, { weekStartsOn: 1 }), [now]);
   const runsThisWeek = useMemo(() => {
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
     return recentRuns.filter((run) => {
       if (!run.started_at) return false;
       const d = new Date(run.started_at);
       return d >= weekStart && d <= weekEnd;
     });
-  }, [recentRuns, now]);
+  }, [recentRuns, weekStart, weekEnd]);
+
+  const isSessionCompleted = useCallback(
+    (session: Session, _weekNumber: number): boolean => {
+      if (!recentRuns?.length) return false;
+      const sessionIdx = sessionDayIndex(session);
+      if (sessionIdx < 0) return false;
+      const planDist = session.distance;
+      if (!Number.isFinite(planDist) || planDist <= 0) return false;
+
+      return recentRuns.some((run) => {
+        if (!run.started_at) return false;
+        const runDate = new Date(run.started_at);
+        if (runDate < weekStart || runDate > weekEnd) return false;
+        const runDayIndex = runDate.getDay() === 0 ? 6 : runDate.getDay() - 1;
+        const sameDay = runDayIndex === sessionIdx;
+        const runKm = run.distance_km ?? 0;
+        const similarDistance = Math.abs(runKm - planDist) / planDist < 0.3;
+        return sameDay && similarDistance;
+      });
+    },
+    [recentRuns, weekStart, weekEnd],
+  );
   const trainingLoad = useMemo(
     () =>
       recentRuns?.length
@@ -333,16 +368,32 @@ export default function PlanPage() {
                   (todayShort === "Ven" && normalizedDay.startsWith("vendredi")) ||
                   (todayShort === "Sam" && normalizedDay.startsWith("samedi")) ||
                   (todayShort === "Dim" && normalizedDay.startsWith("dimanche"));
+                const completed = isSessionCompleted(session, currentPlanWeek);
 
                 return (
                   <div
                     key={`${session.day}-${session.type}-${i}`}
                     className={cn(
                       "flex items-center gap-3 rounded-xl p-3 transition-all",
-                      isToday ? "border border-accent/20 bg-accent/10" : "bg-muted/30",
+                      completed
+                        ? "border border-accent/20 bg-accent/10 opacity-75"
+                        : isToday
+                          ? "border border-accent/20 bg-accent/10"
+                          : "bg-muted/30",
                     )}
                   >
-                    <div className="h-12 w-1 flex-shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                    <div
+                      className={cn(
+                        "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full",
+                        completed ? "bg-accent" : "bg-muted",
+                      )}
+                    >
+                      {completed ? (
+                        <Check className="h-3.5 w-3.5 text-white" />
+                      ) : (
+                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                      )}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-semibold text-foreground">{session.type}</p>
