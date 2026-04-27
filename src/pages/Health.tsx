@@ -3,6 +3,7 @@ import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
+import { subWeeks } from "date-fns";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +11,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
 import { cache } from "@/lib/cache";
+import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
+import { getAllRunsForStats, type RunRow } from "@/lib/database";
+import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
+import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
+import { formatDuration } from "@/lib/runFormatters";
 
 type Issue = {
   name: string;
@@ -706,9 +713,11 @@ function resolveIssueKeyFromUrl(issueKey: string | undefined): string | null {
 const Health = () => {
   const { issueKey } = useParams<{ issueKey: string }>();
   const navigate = useNavigate();
+  const { session } = useAuth();
   const resolvedIssueKey = useMemo(() => resolveIssueKeyFromUrl(issueKey), [issueKey]);
   const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
+  const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -723,6 +732,28 @@ const Health = () => {
   useEffect(() => {
     cache.set("health_state", { searchQuery });
   }, [searchQuery]);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId) {
+      setRunsForStats([]);
+      return;
+    }
+
+    const cachedRuns = cache.get<RunRow[]>(`healthRuns_${userId}`);
+    if (cachedRuns) {
+      setRunsForStats(cachedRuns);
+    }
+
+    void getAllRunsForStats(userId)
+      .then((runs) => {
+        setRunsForStats(runs ?? []);
+        cache.set(`healthRuns_${userId}`, runs ?? []);
+      })
+      .catch(() => {
+        if (!cachedRuns) setRunsForStats([]);
+      });
+  }, [session?.user?.id]);
 
   useEffect(() => {
     if (issueKey && !issueDetails) {
@@ -773,6 +804,49 @@ const Health = () => {
   }, [normalizedSearch]);
 
   const visibleIssuesCount = filteredZones.reduce((count, zone) => count + zone.issues.length, 0);
+  const fitnessScore = useMemo(() => {
+    if (!runsForStats || runsForStats.length === 0) return null;
+    const now = new Date();
+    const last4Weeks = runsForStats.filter((run) => {
+      if (!run.started_at) return false;
+      return new Date(run.started_at) >= subWeeks(now, 4);
+    });
+    const prev4Weeks = runsForStats.filter((run) => {
+      if (!run.started_at) return false;
+      const d = new Date(run.started_at);
+      return d >= subWeeks(now, 8) && d < subWeeks(now, 4);
+    });
+
+    const recentKm = last4Weeks.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const prevKm = prev4Weeks.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const trend = prevKm > 0 ? ((recentKm - prevKm) / prevKm) * 100 : 0;
+    const runsPerWeek = last4Weeks.length / 4;
+    return { recentKm, trend, runsPerWeek };
+  }, [runsForStats]);
+  const totals = useMemo(() => {
+    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const totalSeconds = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0);
+    const totalElevation = runsForStats.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
+    return { totalKm, totalSeconds, totalElevation };
+  }, [runsForStats]);
+  const personalRecords = useMemo(() => {
+    if (!runsForStats?.length) return null;
+    const pacedRuns = runsForStats
+      .filter((run) => (run.distance_km ?? 0) >= 3 && (run.duration_seconds ?? 0) > 0)
+      .map((run) => (run.duration_seconds ?? 0) / Math.max(run.distance_km ?? 1, 0.001) / 60);
+    return {
+      bestPace: pacedRuns.length ? Math.min(...pacedRuns) : 0,
+      longestRun: Math.max(...runsForStats.map((run) => run.distance_km ?? 0), 0),
+      longestTime: Math.max(...runsForStats.map((run) => run.duration_seconds ?? 0), 0),
+    };
+  }, [runsForStats]);
+  const formatPaceMinPerKm = (paceMinPerKm: number) => {
+    if (!paceMinPerKm || paceMinPerKm <= 0) return "--:--";
+    const minutes = Math.floor(paceMinPerKm);
+    const seconds = Math.round((paceMinPerKm - minutes) * 60);
+    const safeSeconds = seconds === 60 ? 59 : seconds;
+    return `${minutes}:${String(safeSeconds).padStart(2, "0")}`;
+  };
 
   const issueDetailBulletList = (items: string[]) => (
     <ul className="mt-1 list-disc space-y-2 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-accent">
@@ -826,6 +900,84 @@ const Health = () => {
     <PageContainer>
       <ScrollReveal>
         <PageHeader title="Santé et blessures" subtitle="Suivez votre récupération et gérez les blessures" />
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <AppCard className="border-accent/20">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">Forme actuelle</p>
+              <p className="mt-0.5 text-2xl font-bold text-foreground">
+                {fitnessScore ? `${fitnessScore.runsPerWeek.toFixed(1)} sorties/sem` : "--"}
+              </p>
+            </div>
+            <div
+              className={cn(
+                "rounded-full px-3 py-1.5 text-sm font-bold",
+                (fitnessScore?.trend ?? 0) >= 0 ? "bg-accent/15 text-accent" : "bg-orange-100 text-orange-600",
+              )}
+            >
+              {(fitnessScore?.trend ?? 0) >= 0 ? "↑" : "↓"} {Math.abs(fitnessScore?.trend ?? 0).toFixed(0)}%
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            vs les 4 semaines précédentes · {fitnessScore ? `${fitnessScore.recentKm.toFixed(0)} km sur 4 semaines` : "Aucune donnée récente"}
+          </p>
+        </AppCard>
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <VO2maxCard runs={runsForStats} />
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <RacePredictionsCard runs={runsForStats} />
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <AppCard>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Synthèse totale</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">{totals.totalKm.toFixed(0)}</div>
+              <div className="mt-1 text-xs text-muted-foreground">Km totaux</div>
+            </div>
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">{(totals.totalSeconds / 3600).toFixed(1)}</div>
+              <div className="mt-1 text-xs text-muted-foreground">Heures totales</div>
+            </div>
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">{Math.round(totals.totalElevation)}</div>
+              <div className="mt-1 text-xs text-muted-foreground">Dénivelé total (m)</div>
+            </div>
+          </div>
+        </AppCard>
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <AppCard>
+          <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Records personnels
+          </h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-accent">
+                {formatPaceMinPerKm(personalRecords?.bestPace ?? 0)}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">Meilleure allure</div>
+            </div>
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">{personalRecords?.longestRun.toFixed(1) ?? "0.0"}</div>
+              <div className="mt-1 text-xs text-muted-foreground">Plus longue sortie (km)</div>
+            </div>
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">
+                {formatDuration(personalRecords?.longestTime ?? 0)}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">Plus longue durée</div>
+            </div>
+          </div>
+        </AppCard>
       </ScrollReveal>
 
       <ScrollReveal>
