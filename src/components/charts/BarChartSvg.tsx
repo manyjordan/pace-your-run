@@ -19,7 +19,7 @@ interface BarChartSvgProps {
 export function BarChartSvg({
   data,
   height = 120,
-  color = "#E5E7EB",
+  color = "hsl(var(--accent))",
   highlightLast = false,
   formatValue,
   formatLabel,
@@ -92,6 +92,13 @@ export function BarChartSvg({
   );
 
   const handleTouchEnd = useCallback(() => setActiveIndex(null), []);
+  const barColor = useCallback(
+    (i: number, isActive: boolean): string => {
+      if (isActive || i === bars.length - 1) return "hsl(var(--accent))";
+      return "hsl(var(--accent) / 0.45)";
+    },
+    [bars.length],
+  );
 
   return (
     <svg
@@ -130,6 +137,9 @@ export function BarChartSvg({
         const barH = Math.max(2, (bar.value / maxValue) * chartHeight);
         const y = paddingTop + chartHeight - barH;
         const isLastHighlighted = highlightLast && i === bars.length - 1;
+        const isActive = activeIndex === i;
+        const drawnBarWidth = isActive || isLastHighlighted ? barWidth + 1.5 : barWidth;
+        const drawnX = x - (drawnBarWidth - barWidth) / 2;
         const label = formatLabel ? formatLabel(bar.label) : bar.label;
         const isSignificant = bar.value >= maxValue * 0.12;
         const canShowTopLabel = showBarLabel(i, bars.length) && bar.value > 0 && barH >= 14 && isSignificant;
@@ -138,13 +148,13 @@ export function BarChartSvg({
         return (
           <g key={`bar-${bar.label}-${i}`}>
             <rect
-              x={x}
+              x={drawnX}
               y={y}
-              width={barWidth}
+              width={drawnBarWidth}
               height={barH}
               rx={2}
-              fill={isLastHighlighted ? "hsl(var(--accent))" : color}
-              opacity={isLastHighlighted ? 1 : 0.95}
+              fill={highlightLast ? barColor(i, isActive) : color}
+              opacity={highlightLast ? 1 : 0.95}
             />
             {canShowTopLabel ? (
               <text
@@ -178,16 +188,16 @@ export function BarChartSvg({
       {activeIndex !== null && bars[activeIndex] ? (
         <g>
           <rect
-            x={paddingLeft + gap + activeIndex * (barWidth + gap)}
+            x={paddingLeft + gap + activeIndex * (barWidth + gap) - 0.75}
             y={
               paddingTop +
               chartHeight -
               Math.max(2, (bars[activeIndex].value / maxValue) * chartHeight)
             }
-            width={barWidth}
+            width={barWidth + 1.5}
             height={Math.max(2, (bars[activeIndex].value / maxValue) * chartHeight)}
             rx={2}
-            fill={color}
+            fill={"hsl(var(--accent))"}
             opacity={1}
           />
           <rect

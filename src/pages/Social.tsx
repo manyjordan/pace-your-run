@@ -32,6 +32,7 @@ import {
   getFollowing,
   getNotifications,
   getPersonalizedFeed,
+  getRunWithGps,
   getSuggestedUsersToFollow,
   getUnreadNotificationsCount,
   markNotificationsRead,
@@ -81,6 +82,8 @@ type FeedPost = CommunityPost & {
   feedReason?: PersonalizedFeedPost["feedReason"];
   friendWhoLiked?: PersonalizedFeedPost["friendWhoLiked"];
 };
+
+type GpsCardTracePoint = { lat: number; lng: number; time: number };
 
 function hashStringToNumber(value: string) {
   let hash = 0;
@@ -167,6 +170,207 @@ function mapPersonalizedPostToFeedPost(post: PersonalizedFeedPost): FeedPost {
     feedReason: post.feedReason,
     friendWhoLiked: post.friendWhoLiked,
   };
+}
+
+function FeedActivityCard({
+  post,
+  onOpenActivity,
+  onToggleLike,
+  onShare,
+  likeBusyId,
+  userId,
+}: {
+  post: FeedPost;
+  onOpenActivity: (post: FeedPost) => void;
+  onToggleLike: (post: FeedPost) => Promise<void>;
+  onShare: (post: FeedPost) => Promise<void>;
+  likeBusyId: string | null;
+  userId?: string;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [gpsTrace, setGpsTrace] = useState<GpsCardTracePoint[] | null>(
+    Array.isArray(post.gpsTrace) && post.gpsTrace.length > 1 ? (post.gpsTrace as GpsCardTracePoint[]) : null,
+  );
+  const [isVisible, setIsVisible] = useState(false);
+  const runId = post.sourceRun?.id;
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      },
+      { threshold: 0.1 },
+    );
+
+    if (cardRef.current) observer.observe(cardRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible || !runId || !userId || gpsTrace !== null) return;
+
+    let cancelled = false;
+    void getRunWithGps(userId, runId)
+      .then((run) => {
+        if (cancelled) return;
+        if (Array.isArray(run?.gps_trace)) {
+          const trace = run.gps_trace.filter(
+            (point): point is GpsCardTracePoint =>
+              typeof point === "object" &&
+              point !== null &&
+              typeof (point as { lat?: unknown }).lat === "number" &&
+              typeof (point as { lng?: unknown }).lng === "number" &&
+              typeof (point as { time?: unknown }).time === "number",
+          );
+          setGpsTrace(trace);
+          return;
+        }
+        setGpsTrace([]);
+      })
+      .catch(() => {
+        if (!cancelled) setGpsTrace([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gpsTrace, isVisible, runId, userId]);
+
+  const ranWithLine = ranWithBadgeText(post.description ?? "");
+
+  return (
+    <Card ref={cardRef} className="cursor-pointer overflow-hidden" onClick={() => onOpenActivity(post)}>
+      {gpsTrace && gpsTrace.length > 1 ? (
+        <div className="mb-3 overflow-hidden rounded-t-xl">
+          <GpsTraceSvg trace={gpsTrace} height={160} className="w-full" />
+        </div>
+      ) : isVisible && gpsTrace === null ? (
+        <div className="mb-3 h-[160px] animate-pulse rounded-xl bg-muted/30" />
+      ) : null}
+      <CardContent className="space-y-3 p-4">
+        {post.feedReason === "friend_liked" && post.friendWhoLiked ? (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Heart className="h-3 w-3 shrink-0" />
+            <span>
+              👍 {post.friendWhoLiked.name} a aimé cette publication
+            </span>
+          </div>
+        ) : null}
+        <div className="flex items-center gap-3">
+          <Avatar className="h-10 w-10">
+            <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
+              {post.initials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-semibold">{post.user}</span>
+              {post.type === "race" && (
+                <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
+                  <Trophy className="mr-0.5 h-3 w-3" /> Course
+                </Badge>
+              )}
+            </div>
+            <span className="text-xs text-muted-foreground">{post.time}</span>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-sm font-semibold">{post.title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{post.description}</p>
+        </div>
+
+        <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+              <MapPin className="h-3 w-3" /> Dist.
+            </div>
+            <div className="mt-0.5 text-sm font-bold">{post.stats.distance}</div>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+              <Zap className="h-3 w-3" /> Allure
+            </div>
+            <div className="mt-0.5 text-sm font-bold">{post.stats.pace}</div>
+          </div>
+          <div className="text-center">
+            <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+              <Clock className="h-3 w-3" /> Durée
+            </div>
+            <div className="mt-0.5 text-sm font-bold">{post.stats.duration}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-muted-foreground">D+</div>
+            <div className="mt-0.5 text-sm font-bold">{post.stats.elevation}</div>
+          </div>
+        </div>
+
+        {ranWithLine ? (
+          <div className="flex items-center gap-1.5 text-xs font-medium text-accent">
+            <Users className="h-3.5 w-3.5 shrink-0" />
+            <span>{ranWithLine}</span>
+          </div>
+        ) : null}
+
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={(event) => {
+            event.stopPropagation();
+            onOpenActivity(post);
+          }}
+        >
+          Voir les détails de l&apos;activité
+        </Button>
+
+        <div className="flex items-center gap-1 border-t border-border pt-1">
+          <button
+            type="button"
+            disabled={likeBusyId === post.dbId}
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onToggleLike(post);
+            }}
+          >
+            <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
+              <div className="relative z-[1]">
+                <Heart
+                  className={cn(
+                    "h-4 w-4 transition-all duration-200",
+                    post.liked ? "fill-red-500 text-red-500 scale-110" : "text-muted-foreground hover:text-red-400 hover:scale-105",
+                  )}
+                />
+              </div>
+            </div>
+            <span
+              className={cn(
+                "tabular-nums transition-colors duration-200",
+                post.liked ? "text-red-500" : "text-muted-foreground",
+              )}
+            >
+              {post.likes}
+            </span>
+          </button>
+          <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={(event) => event.stopPropagation()}>
+            <MessageCircle className="mr-1 h-4 w-4" /> {post.comments}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto text-muted-foreground"
+            onClick={(event) => {
+              event.stopPropagation();
+              void onShare(post);
+            }}
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 }
 
 function suggestionDisplayName(profile: ProfileRow) {
@@ -689,144 +893,18 @@ export default function Social() {
                 </ScrollReveal>
               ) : (
                 <>
-                  {visibleItems.map((post) => {
-                    const ranWithLine = ranWithBadgeText(post.description ?? "");
-                    return (
-                      <ScrollReveal key={post.dbId ?? post.activityId}>
-                        <Card className="cursor-pointer overflow-hidden" onClick={() => handleOpenActivity(post)}>
-                          <CardContent className="space-y-3 p-4">
-                            {post.feedReason === "friend_liked" && post.friendWhoLiked ? (
-                              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                <Heart className="h-3 w-3 shrink-0" />
-                                <span>
-                                  👍 {post.friendWhoLiked.name} a aimé cette publication
-                                </span>
-                              </div>
-                            ) : null}
-                            <div className="flex items-center gap-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarFallback className="bg-secondary text-xs font-bold text-secondary-foreground">
-                                  {post.initials}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-semibold">{post.user}</span>
-                                  {post.type === "race" && (
-                                    <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">
-                                      <Trophy className="mr-0.5 h-3 w-3" /> Course
-                                    </Badge>
-                                  )}
-                                </div>
-                                <span className="text-xs text-muted-foreground">{post.time}</span>
-                              </div>
-                            </div>
-
-                            <div>
-                              <h3 className="text-sm font-semibold">{post.title}</h3>
-                              <p className="mt-1 text-sm text-muted-foreground">{post.description}</p>
-                            </div>
-
-                            <div className="grid grid-cols-4 gap-2 rounded-lg bg-secondary/50 p-3">
-                              <div className="text-center">
-                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                  <MapPin className="h-3 w-3" /> Dist.
-                                </div>
-                                <div className="mt-0.5 text-sm font-bold">{post.stats.distance}</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                  <Zap className="h-3 w-3" /> Allure
-                                </div>
-                                <div className="mt-0.5 text-sm font-bold">{post.stats.pace}</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                  <Clock className="h-3 w-3" /> Durée
-                                </div>
-                                <div className="mt-0.5 text-sm font-bold">{post.stats.duration}</div>
-                              </div>
-                              <div className="text-center">
-                                <div className="text-xs text-muted-foreground">D+</div>
-                                <div className="mt-0.5 text-sm font-bold">{post.stats.elevation}</div>
-                              </div>
-                            </div>
-
-                            {ranWithLine ? (
-                              <div className="flex items-center gap-1.5 text-xs font-medium text-accent">
-                                <Users className="h-3.5 w-3.5 shrink-0" />
-                                <span>{ranWithLine}</span>
-                              </div>
-                            ) : null}
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handleOpenActivity(post);
-                              }}
-                            >
-                              Voir les détails de l&apos;activité
-                            </Button>
-
-                            <div className="flex items-center gap-1 border-t border-border pt-1">
-                              <button
-                                type="button"
-                                disabled={likeBusyId === post.dbId}
-                                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted/60 disabled:opacity-50"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void handleToggleLike(post);
-                                }}
-                              >
-                                <div className="relative flex h-4 w-4 shrink-0 items-center justify-center">
-                                  <div className="relative z-[1]">
-                                    <Heart
-                                      className={cn(
-                                        "h-4 w-4 transition-all duration-200",
-                                        post.liked
-                                          ? "fill-red-500 text-red-500 scale-110"
-                                          : "text-muted-foreground hover:text-red-400 hover:scale-105",
-                                      )}
-                                    />
-                                  </div>
-                                </div>
-                                <span
-                                  className={cn(
-                                    "tabular-nums transition-colors duration-200",
-                                    post.liked ? "text-red-500" : "text-muted-foreground",
-                                  )}
-                                >
-                                  {post.likes}
-                                </span>
-                              </button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-muted-foreground"
-                                onClick={(event) => event.stopPropagation()}
-                              >
-                                <MessageCircle className="mr-1 h-4 w-4" /> {post.comments}
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="ml-auto text-muted-foreground"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  void handleShare(post);
-                                }}
-                              >
-                                <Share2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </ScrollReveal>
-                    );
-                  })}
+                  {visibleItems.map((post) => (
+                    <ScrollReveal key={post.dbId ?? post.activityId}>
+                      <FeedActivityCard
+                        post={post}
+                        userId={user?.id}
+                        likeBusyId={likeBusyId}
+                        onOpenActivity={handleOpenActivity}
+                        onToggleLike={handleToggleLike}
+                        onShare={handleShare}
+                      />
+                    </ScrollReveal>
+                  ))}
                   <div ref={loaderRef} className="h-4" />
                 </>
               )}

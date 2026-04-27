@@ -23,7 +23,6 @@ import { SkeletonMetricCard } from "@/components/dashboard/SkeletonMetricCard";
 import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import {
   buildMetricData,
-  buildGoalAwareWeeklyInsight,
   getAggregationUnit,
   type MetricChartPeriod,
 } from "@/lib/dashboardHelpers";
@@ -314,11 +313,6 @@ const Dashboard = () => {
 
   const filteredMetrics = useMemo(() => metricCards, [metricCards]);
 
-  const weeklyInsight = useMemo(
-    () => buildGoalAwareWeeklyInsight(metricCards, userGoal),
-    [metricCards, userGoal],
-  );
-
   return (
     <>
       {selectedRunForDetail && session?.user?.id ? (
@@ -343,7 +337,6 @@ const Dashboard = () => {
               <h2 className="text-2xl font-bold tracking-tight md:text-3xl">
                 Bonjour <span className="text-foreground">{athleteName}</span>
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">{weeklyInsight}</p>
             </div>
           </AppCard>
         )}

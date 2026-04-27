@@ -1,8 +1,11 @@
+import { useEffect, useRef, useState } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { GpsTraceSvg } from "@/components/GpsTraceSvg";
+import { useAuth } from "@/contexts/AuthContext";
+import { getRunWithGps } from "@/lib/database";
 import type { CommunityPost } from "@/lib/runFormatters";
 import { Clock, MapPin, MessageCircle, Share2, Trophy, Zap } from "lucide-react";
 
@@ -12,6 +15,7 @@ type ActivityPostCardProps = {
   showActions?: boolean;
   onCommentClick?: () => void;
   onShareClick?: () => void;
+  runId?: string;
 };
 
 export function ActivityPostCard({
@@ -20,9 +24,55 @@ export function ActivityPostCard({
   showActions = false,
   onCommentClick,
   onShareClick,
+  runId,
 }: ActivityPostCardProps) {
+  const { session } = useAuth();
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+  const [gpsTrace, setGpsTrace] = useState(post.gpsTrace ?? null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) setIsVisible(true);
+      },
+      { threshold: 0.1 },
+    );
+    if (cardRef.current) observer.observe(cardRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!isVisible || !runId || !session?.user?.id || gpsTrace !== null) return;
+
+    let cancelled = false;
+    void getRunWithGps(session.user.id, runId)
+      .then((run) => {
+        if (cancelled) return;
+        if (run?.gps_trace && Array.isArray(run.gps_trace)) {
+          setGpsTrace(run.gps_trace);
+          return;
+        }
+        setGpsTrace([]);
+      })
+      .catch(() => {
+        if (!cancelled) setGpsTrace([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [gpsTrace, isVisible, runId, session?.user?.id]);
+
   return (
-    <Card className={`overflow-hidden ${onOpen ? "cursor-pointer" : ""}`} onClick={onOpen}>
+    <Card ref={cardRef} className={`overflow-hidden ${onOpen ? "cursor-pointer" : ""}`} onClick={onOpen}>
+      {gpsTrace && gpsTrace.length > 1 ? (
+        <div className="mb-3 overflow-hidden rounded-t-xl">
+          <GpsTraceSvg trace={gpsTrace} height={160} className="w-full" />
+        </div>
+      ) : isVisible && gpsTrace === null ? (
+        <div className="mb-3 h-[160px] animate-pulse rounded-xl bg-muted/30" />
+      ) : null}
       <CardContent className="space-y-3 p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10">
@@ -72,12 +122,6 @@ export function ActivityPostCard({
             <div className="mt-0.5 text-sm font-bold">{post.stats.elevation}</div>
           </div>
         </div>
-
-        {post.gpsTrace && post.gpsTrace.length > 0 ? (
-          <div className="overflow-hidden rounded-xl border border-accent/20 bg-muted/30">
-            <GpsTraceSvg trace={post.gpsTrace} height={180} />
-          </div>
-        ) : null}
 
         {showActions && (
           <div className="flex items-center gap-1 border-t border-border pt-1">
