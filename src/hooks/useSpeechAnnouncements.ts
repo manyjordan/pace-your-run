@@ -1,8 +1,9 @@
 import { useRef, useEffect, useCallback, type MutableRefObject } from "react";
 import type { RouteRow, RunGpsPoint } from "@/lib/database";
-import { convertPaceFromMinutesPerKm, type RunPreferences } from "@/lib/runPreferences";
+import { type RunPreferences } from "@/lib/runPreferences";
 import type { ActiveSession } from "@/lib/activeSession";
 import type { SessionSegment } from "@/hooks/useSessionProgram";
+import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
 import { haversineDistanceKm } from "@/lib/parsers/gpxParser";
 
 /** Minutes per km over the trace from kilometre (endKm - 1) to endKm; null if GPS data is insufficient. */
@@ -55,6 +56,8 @@ type UseSpeechAnnouncementsParams = {
   activeRoute: RouteRow | null;
   routeProgress: number;
   routeArrivalAnnouncedRef: MutableRefObject<boolean>;
+  heartRate?: number;
+  isBluetoothConnected?: boolean;
   isProgrammedSessionActive?: boolean;
   programmedSegments?: SessionSegment[];
   currentProgramSegmentIndex?: number;
@@ -75,6 +78,8 @@ export function useSpeechAnnouncements({
   activeRoute,
   routeProgress,
   routeArrivalAnnouncedRef,
+  heartRate = 0,
+  isBluetoothConnected = false,
   isProgrammedSessionActive = false,
   programmedSegments = [],
   currentProgramSegmentIndex = 0,
@@ -84,8 +89,11 @@ export function useSpeechAnnouncements({
 }: UseSpeechAnnouncementsParams) {
   const lastAnnouncedKmRef = useRef(0);
   const lastPaceAlertRef = useRef(0);
+  const lastFinishAnnouncementSecRef = useRef(0);
+  const lastHrZoneAnnouncementSecRef = useRef(0);
   const prevStatusRef = useRef<RunStatus>(status);
   const thirtySecondTick = Math.floor(elapsed / 30);
+  const maxHR = typeof window !== "undefined" ? parseInt(localStorage.getItem("pace_max_hr") ?? "190", 10) : 190;
 
   const speak = useCallback((message: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
@@ -103,6 +111,22 @@ export function useSpeechAnnouncements({
     const seconds = Math.round(secondsPerKm % 60);
     return `${minutes}:${String(seconds).padStart(2, "0")}`;
   }, []);
+
+  const announceKilometre = useCallback(
+    (km: number, paceSecPerKm: number, _elapsed: number) => {
+      const paceMin = Math.floor(paceSecPerKm / 60);
+      const paceSec = Math.round(paceSecPerKm % 60);
+      const paceStr = `${paceMin} minutes ${paceSec > 0 ? `${paceSec} secondes` : ""} au kilomètre`;
+
+      let encouragement = "";
+      if (km === 5) encouragement = " Continuez, vous êtes en forme !";
+      else if (km === 10) encouragement = " Excellent effort, continuez !";
+      else if (km === 21) encouragement = " Vous avez fait la moitié d'un marathon !";
+
+      speak(`Kilomètre ${km}. Allure : ${paceStr}.${encouragement}`);
+    },
+    [speak],
+  );
 
   useEffect(() => {
     const prev = prevStatusRef.current;
@@ -199,20 +223,13 @@ export function useSpeechAnnouncements({
 
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
-    const messages: string[] = [];
-
     if (prefs.announceSplitSpeed && currentKm > 0) {
-      const splitMinPerKm =
-        paceMinutesPerKmForLastKm(gpsTrace, currentKm) ?? (distance > 0 ? elapsed / 60 / distance : 0);
-      const paceForUnit = convertPaceFromMinutesPerKm(splitMinPerKm, prefs.distanceUnit);
-      const paceMinutes = Math.floor(paceForUnit);
-      const paceSeconds = Math.round((paceForUnit % 1) * 60);
-      const unit = prefs.distanceUnit === "mi" ? "mile" : "kilomètre";
-      const pacePart =
-        paceSeconds > 0
-          ? `Allure ${paceMinutes} minutes ${paceSeconds} secondes par ${unit}.`
-          : `Allure ${paceMinutes} minutes par ${unit}.`;
-      messages.push(`Kilomètre ${currentKm}. ${pacePart}`);
+      const splitMinPerKm = paceMinutesPerKmForLastKm(gpsTrace, currentKm);
+      const fallbackPaceSec = rollingPaceSecondsPerKm > 0 ? rollingPaceSecondsPerKm : distance > 0 ? elapsed / distance : 0;
+      const paceSecPerKm = splitMinPerKm !== null ? splitMinPerKm * 60 : fallbackPaceSec;
+      if (paceSecPerKm > 0) {
+        announceKilometre(currentKm, paceSecPerKm, elapsed);
+      }
     }
 
     const cumInterval = parseInt(prefs.cumulativeTimeAnnouncement, 10);
@@ -223,18 +240,9 @@ export function useSpeechAnnouncements({
         totalSeconds > 0
           ? `Temps total : ${totalMinutes} minutes ${totalSeconds} secondes.`
           : `Temps total : ${totalMinutes} minutes.`;
-      messages.push(timePart);
+      speak(timePart);
     }
-
-    if (messages.length === 0) return;
-
-    const utterance = new SpeechSynthesisUtterance(messages.join(" "));
-    utterance.lang = "fr-FR";
-    utterance.rate = 1.0;
-    utterance.volume = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
-  }, [distance, elapsed, gpsTrace, speechPrefsRef, status]);
+  }, [announceKilometre, distance, elapsed, gpsTrace, rollingPaceSecondsPerKm, speak, speechPrefsRef, status]);
 
   useEffect(() => {
     const prefs = speechPrefsRef.current;
@@ -295,9 +303,44 @@ export function useSpeechAnnouncements({
     lastPaceAlertRef.current = now;
   }, [activeSession, currentProgramSegmentIndex, isProgrammedSessionActive, pace, programmedSegments, speechPrefsRef, status]);
 
+  useEffect(() => {
+    if (status !== "running" || elapsed === 0 || elapsed % 300 !== 0) return;
+    if (lastFinishAnnouncementSecRef.current === elapsed) return;
+    if (rollingPaceSecondsPerKm <= 0 || distance <= 0) return;
+
+    const raceDistances = [
+      { label: "5 kilomètres", km: 5 },
+      { label: "10 kilomètres", km: 10 },
+      { label: "le semi-marathon", km: 21.097 },
+      { label: "le marathon", km: 42.195 },
+    ];
+    const next = raceDistances.find((d) => d.km > distance);
+    if (!next) return;
+
+    const remainingSeconds = (next.km - distance) * rollingPaceSecondsPerKm;
+    const remainMin = Math.floor(remainingSeconds / 60);
+    speak(`À ce rythme, vous terminerez ${next.label} dans ${remainMin} minutes.`);
+    lastFinishAnnouncementSecRef.current = elapsed;
+  }, [distance, elapsed, rollingPaceSecondsPerKm, speak, status]);
+
+  useEffect(() => {
+    if (status !== "running" || elapsed === 0 || elapsed % 300 !== 0) return;
+    if (lastHrZoneAnnouncementSecRef.current === elapsed) return;
+    if (!isBluetoothConnected || !heartRate || heartRate <= 0) return;
+
+    const zones = getHRZones(Number.isFinite(maxHR) ? maxHR : 190);
+    const currentZone = getZoneForBpm(heartRate, zones);
+    if (!currentZone) return;
+
+    speak(`Fréquence cardiaque : ${heartRate} battements. Zone ${currentZone.zone}, ${currentZone.name}.`);
+    lastHrZoneAnnouncementSecRef.current = elapsed;
+  }, [elapsed, heartRate, isBluetoothConnected, maxHR, speak, status]);
+
   const resetAnnouncementRefs = useCallback(() => {
     lastAnnouncedKmRef.current = 0;
     lastPaceAlertRef.current = 0;
+    lastFinishAnnouncementSecRef.current = 0;
+    lastHrZoneAnnouncementSecRef.current = 0;
   }, []);
 
   /** Match Run.tsx stop(): only reset km split counter, keep pace-alert cooldown. */
