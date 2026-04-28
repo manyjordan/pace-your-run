@@ -33,6 +33,15 @@ type PlanGoal = {
 };
 
 const DAYS = ["L", "M", "M", "J", "V", "S", "D"];
+const DAY_ORDER: Record<string, number> = {
+  lun: 0,
+  mar: 1,
+  mer: 2,
+  jeu: 3,
+  ven: 4,
+  sam: 5,
+  dim: 6,
+};
 
 /** Monday = 0 … Sunday = 6 (aligned with `runsThisWeek` day index). */
 function sessionDayIndex(session: Session): number {
@@ -236,44 +245,46 @@ export default function PlanPage() {
   }, [targetDate, selectedPlan]);
 
   const currentWeekData = selectedPlan?.weeklySchedule[currentPlanWeek - 1];
+  const isLastWeek = Boolean(selectedPlan && currentPlanWeek === selectedPlan.durationWeeks);
+  const raceDaySession = useMemo<Session>(
+    () => ({
+      day: targetDate ? format(new Date(targetDate), "EEE", { locale: fr }) : "Dim",
+      type: "Jour de course",
+      distance: (() => {
+        const parsed = Number.parseFloat(String(targetDistanceKm ?? "").replace(",", "."));
+        return (Number.isFinite(parsed) && parsed > 0 ? parsed : null) ?? (numericTargetDistance > 0 ? numericTargetDistance : 42.195);
+      })(),
+      pace: "--:--",
+      duration: 0,
+      description: `🏁 ${raceLabel ?? "Course"} — Bonne course !`,
+      intensity: "race",
+    }),
+    [numericTargetDistance, raceLabel, targetDate, targetDistanceKm],
+  );
   const sessionsToShow = useMemo((): Session[] => {
     if (!currentWeekData?.sessions?.length) return [];
     const list = [...currentWeekData.sessions];
-    if (
-      selectedPlan &&
-      currentPlanWeek === selectedPlan.durationWeeks &&
-      targetDate &&
-      !Number.isNaN(new Date(targetDate).getTime())
-    ) {
-      const parsed = Number.parseFloat(String(targetDistanceKm ?? "").replace(",", "."));
-      const raceKm =
-        (Number.isFinite(parsed) && parsed > 0 ? parsed : null) ??
-        (numericTargetDistance > 0 ? numericTargetDistance : 42.195);
-      list.push({
-        day: format(new Date(targetDate), "EEE", { locale: fr }),
-        type: "Jour de course",
-        distance: raceKm,
-        pace: "--:--",
-        duration: 0,
-        description: `🏁 ${raceLabel ?? "Course"} — Bonne course !`,
-        intensity: "race",
-      });
+
+    if (isLastWeek && targetDate && !Number.isNaN(new Date(targetDate).getTime())) {
+      list.push(raceDaySession);
     }
-    return list;
+
+    return list.sort((a, b) => {
+      const dayA = DAY_ORDER[a.day.trim().toLowerCase().slice(0, 3)] ?? 99;
+      const dayB = DAY_ORDER[b.day.trim().toLowerCase().slice(0, 3)] ?? 99;
+      return dayA - dayB;
+    });
   }, [
-    currentPlanWeek,
     currentWeekData?.sessions,
-    numericTargetDistance,
-    raceLabel,
-    selectedPlan,
+    isLastWeek,
+    raceDaySession,
     targetDate,
-    targetDistanceKm,
   ]);
   const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   const todayShort = dayNames[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
   return (
-    <div className="space-y-6">
+    <Tabs key={mainTab} defaultValue={mainTab} className="space-y-6">
       <ScrollReveal>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Plan</h1>
@@ -281,7 +292,22 @@ export default function PlanPage() {
         </div>
       </ScrollReveal>
 
-      {normalizedGoalType && normalizedGoalType !== "none" ? (
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
+        <TabsList className="w-full">
+          <TabsTrigger value="goal" className="flex-1">
+            Objectif
+          </TabsTrigger>
+          <TabsTrigger value="training" className="flex-1">
+            Plan
+          </TabsTrigger>
+          <TabsTrigger value="equipment" className="flex-1">
+            Équipement
+          </TabsTrigger>
+        </TabsList>
+      </div>
+
+      <TabsContent value="goal" className="space-y-6">
+        {normalizedGoalType && normalizedGoalType !== "none" ? (
         <ScrollReveal>
           <AppCard className="relative overflow-hidden border-accent/20">
             <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/10" />
@@ -318,9 +344,9 @@ export default function PlanPage() {
             ) : null}
           </AppCard>
         </ScrollReveal>
-      ) : null}
+        ) : null}
 
-      {dailyRec ? (
+        {dailyRec ? (
         <ScrollReveal>
           <AppCard className="border-l-4" style={{ borderLeftColor: dailyRec.color }}>
             <div className="flex items-start gap-3">
@@ -337,9 +363,9 @@ export default function PlanPage() {
             </div>
           </AppCard>
         </ScrollReveal>
-      ) : null}
+        ) : null}
 
-      {targetDate && daysUntilGoal !== null && daysUntilGoal <= 7 ? (
+        {targetDate && daysUntilGoal !== null && daysUntilGoal <= 7 ? (
         <ScrollReveal>
           <AppCard className="border-2 border-accent">
             <div className="flex items-center gap-3">
@@ -358,9 +384,9 @@ export default function PlanPage() {
             </div>
           </AppCard>
         </ScrollReveal>
-      ) : null}
+        ) : null}
 
-      <ScrollReveal>
+        <ScrollReveal>
         <AppCard>
           <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Cette semaine</h3>
           <div className="flex justify-between">
@@ -384,9 +410,9 @@ export default function PlanPage() {
             })}
           </div>
         </AppCard>
-      </ScrollReveal>
+        </ScrollReveal>
 
-      {selectedPlan && currentWeekData ? (
+        {selectedPlan && currentWeekData ? (
         <ScrollReveal>
           <AppCard>
             <div className="mb-4 flex items-center justify-between">
@@ -472,9 +498,9 @@ export default function PlanPage() {
             </div>
           </AppCard>
         </ScrollReveal>
-      ) : null}
+        ) : null}
 
-      {selectedPlan && currentPlanWeek < selectedPlan.durationWeeks ? (
+        {selectedPlan && currentPlanWeek < selectedPlan.durationWeeks ? (
         <ScrollReveal>
           <AppCard>
             <p className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">Prochaines semaines</p>
@@ -494,9 +520,9 @@ export default function PlanPage() {
             </div>
           </AppCard>
         </ScrollReveal>
-      ) : null}
+        ) : null}
 
-      {!selectedPlan && normalizedGoalType ? (
+        {!selectedPlan && normalizedGoalType ? (
         <ScrollReveal>
           <AppCard className="py-6 text-center">
             <p className="text-sm text-muted-foreground">Aucun plan disponible pour cet objectif.</p>
@@ -505,21 +531,15 @@ export default function PlanPage() {
             </p>
           </AppCard>
         </ScrollReveal>
-      ) : null}
+        ) : null}
+      </TabsContent>
 
-      <Tabs key={mainTab} defaultValue={mainTab} className="space-y-4">
-        <ScrollReveal>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="goal"><Target className="mr-1 h-4 w-4" /> Objectif</TabsTrigger>
-            <TabsTrigger value="training"><Calendar className="mr-1 h-4 w-4" /> Plan</TabsTrigger>
-            <TabsTrigger value="equipment"><Footprints className="mr-1 h-4 w-4" /> Equip.</TabsTrigger>
-          </TabsList>
-        </ScrollReveal>
-
-        <TabsContent value="goal"><GoalTab /></TabsContent>
-        <TabsContent value="training"><TrainingTab /></TabsContent>
-        <TabsContent value="equipment"><EquipmentTab /></TabsContent>
-      </Tabs>
-    </div>
+      <TabsContent value="training">
+        <TrainingTab />
+      </TabsContent>
+      <TabsContent value="equipment">
+        <EquipmentTab />
+      </TabsContent>
+    </Tabs>
   );
 }

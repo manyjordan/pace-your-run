@@ -1,5 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import "leaflet/dist/leaflet.css";
+import { useId, useMemo } from "react";
 import { simplifyGpsTrace } from "@/lib/gpsSimplify";
 
 type Point = { lat: number; lng: number };
@@ -11,21 +10,18 @@ interface GpsTraceSvgProps {
 }
 
 export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps) {
-  const mapContainerRef = useRef<HTMLDivElement>(null);
-  const leafletMapRef = useRef<import("leaflet").Map | null>(null);
-  const [leafletFailed, setLeafletFailed] = useState(false);
-  const gridPatternId = `gps-grid-${useId().replace(/:/g, "")}`;
+  const id = useId().replace(/:/g, "");
 
   const displayTrace = useMemo(
     () => (trace.length > 200 ? simplifyGpsTrace(trace, 0.00003) : trace),
     [trace],
   );
 
-  const svgPath = useMemo(() => {
-    if (displayTrace.length < 2) return "";
-    const pad = 16;
-    const w = 400;
-    const h = height;
+  const { pathPoints, startX, startY, endX, endY } = useMemo(() => {
+    if (displayTrace.length < 2) {
+      return { pathPoints: "", startX: 0, startY: 0, endX: 0, endY: 0 };
+    }
+
     const lats = displayTrace.map((p) => p.lat);
     const lngs = displayTrace.map((p) => p.lng);
     const minLat = Math.min(...lats);
@@ -34,158 +30,105 @@ export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps
     const maxLng = Math.max(...lngs);
     const latSpan = Math.max(maxLat - minLat, 1e-6);
     const lngSpan = Math.max(maxLng - minLng, 1e-6);
-    return displayTrace
-      .map((p) => {
-        const x = pad + ((p.lng - minLng) / lngSpan) * (w - 2 * pad);
-        const y = pad + (1 - (p.lat - minLat) / latSpan) * (h - 2 * pad);
-        return `${x},${y}`;
-      })
-      .join(" ");
+    const pad = 24;
+    const w = 400;
+    const h = height;
+
+    const pts = displayTrace.map((p) => ({
+      x: pad + ((p.lng - minLng) / lngSpan) * (w - 2 * pad),
+      y: pad + (1 - (p.lat - minLat) / latSpan) * (h - 2 * pad),
+    }));
+
+    const pathPoints = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+
+    return {
+      pathPoints,
+      startX: pts[0].x,
+      startY: pts[0].y,
+      endX: pts[pts.length - 1].x,
+      endY: pts[pts.length - 1].y,
+    };
   }, [displayTrace, height]);
 
-  useEffect(() => {
-    void import("leaflet");
-  }, []);
-
-  useEffect(() => {
-    if (leafletFailed) return;
-    if (!mapContainerRef.current || !displayTrace || displayTrace.length < 2) return;
-    if (leafletMapRef.current) {
-      leafletMapRef.current.remove();
-      leafletMapRef.current = null;
-    }
-
-    void import("leaflet")
-      .then((L) => {
-        try {
-          if (!mapContainerRef.current) return;
-
-          const map = L.map(mapContainerRef.current, {
-            zoomControl: false,
-            dragging: false,
-            touchZoom: false,
-            scrollWheelZoom: false,
-            doubleClickZoom: false,
-            boxZoom: false,
-            keyboard: false,
-            attributionControl: false,
-          });
-
-          const stadiaLayer = L.tileLayer(
-            "https://tiles.stadiamaps.com/tiles/alidade_smooth/{z}/{x}/{y}{r}.png",
-            {
-              maxZoom: 20,
-              attribution: "",
-              crossOrigin: "anonymous",
-            },
-          );
-          let tilesLoaded = false;
-          stadiaLayer.on("tileload", () => {
-            tilesLoaded = true;
-          });
-          stadiaLayer.on("tileerror", () => {
-            if (!tilesLoaded) {
-              stadiaLayer.off("tileerror");
-              if (map.hasLayer(stadiaLayer)) map.removeLayer(stadiaLayer);
-              L.tileLayer("https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png", {
-                maxZoom: 20,
-                subdomains: "abcd",
-                attribution: "",
-                crossOrigin: "anonymous",
-              }).addTo(map);
-            }
-          });
-          stadiaLayer.addTo(map);
-
-          const latLngs = displayTrace.map((p) => [p.lat, p.lng] as [number, number]);
-
-          L.polyline(latLngs, {
-            color: "#B4DC5A",
-            weight: 6,
-            opacity: 0.3,
-            smoothFactor: 1,
-            lineCap: "round",
-            lineJoin: "round",
-          }).addTo(map);
-
-          L.polyline(latLngs, {
-            color: "#B4DC5A",
-            weight: 3,
-            opacity: 1,
-            smoothFactor: 1,
-            lineCap: "round",
-            lineJoin: "round",
-          }).addTo(map);
-
-          L.circleMarker(latLngs[0], {
-            radius: 6,
-            fillColor: "#B4DC5A",
-            color: "#B4DC5A",
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 1,
-          }).addTo(map);
-
-          L.circleMarker(latLngs[latLngs.length - 1], {
-            radius: 6,
-            fillColor: "#ffffff",
-            color: "#B4DC5A",
-            weight: 2,
-            opacity: 1,
-            fillOpacity: 1,
-          }).addTo(map);
-
-          const bounds = L.latLngBounds(latLngs);
-          map.fitBounds(bounds, { padding: [20, 20] });
-
-          leafletMapRef.current = map;
-        } catch {
-          setLeafletFailed(true);
-        }
-      })
-      .catch(() => {
-        setLeafletFailed(true);
-      });
-
-    return () => {
-      leafletMapRef.current?.remove();
-      leafletMapRef.current = null;
-    };
-  }, [displayTrace, leafletFailed]);
-
-  if (!displayTrace || displayTrace.length < 2) return null;
-
-  if (leafletFailed && svgPath) {
-    return (
-      <div
-        className={`relative overflow-hidden rounded-xl bg-slate-900 ${className ?? ""}`}
-        style={{ height, width: "100%" }}
-      >
-        <svg viewBox={`0 0 400 ${height}`} width="100%" height={height} className="absolute inset-0">
-          <defs>
-            <pattern id={gridPatternId} width="30" height="30" patternUnits="userSpaceOnUse">
-              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#ffffff" strokeWidth="0.3" opacity="0.15" />
-            </pattern>
-          </defs>
-          <rect width="400" height={height} fill={`url(#${gridPatternId})`} />
-          <polyline
-            points={svgPath}
-            fill="none"
-            stroke="#B4DC5A"
-            strokeWidth="3"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-    );
-  }
+  if (!pathPoints) return null;
 
   return (
     <div
-      ref={mapContainerRef}
-      className={`overflow-hidden rounded-xl ${className ?? ""}`}
-      style={{ height, width: "100%" }}
-    />
+      className={`relative overflow-hidden rounded-xl ${className ?? ""}`}
+      style={{
+        height,
+        width: "100%",
+        background: "linear-gradient(135deg, #0f1923 0%, #1a2d1a 50%, #0f1923 100%)",
+      }}
+    >
+      <svg viewBox={`0 0 400 ${height}`} width="100%" height={height} style={{ position: "absolute", inset: 0 }}>
+        <defs>
+          <pattern id={`grid-${id}`} width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="1" />
+          </pattern>
+          <filter id={`glow-${id}`} x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+          <linearGradient id={`traceGrad-${id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#1DB954" stopOpacity="0.7" />
+            <stop offset="100%" stopColor="#B4DC5A" stopOpacity="1" />
+          </linearGradient>
+        </defs>
+
+        <rect width="400" height={height} fill={`url(#grid-${id})`} />
+
+        {Array.from({ length: 6 }, (_, i) => (
+          <line
+            key={`h${i}`}
+            x1="0"
+            y1={(height * (i + 1)) / 7}
+            x2="400"
+            y2={(height * (i + 1)) / 7}
+            stroke="rgba(255,255,255,0.03)"
+            strokeWidth="1.5"
+          />
+        ))}
+        {Array.from({ length: 8 }, (_, i) => (
+          <line
+            key={`v${i}`}
+            x1={(400 * (i + 1)) / 9}
+            y1="0"
+            x2={(400 * (i + 1)) / 9}
+            y2={height}
+            stroke="rgba(255,255,255,0.03)"
+            strokeWidth="1.5"
+          />
+        ))}
+
+        <path
+          d={pathPoints}
+          fill="none"
+          stroke="#1DB954"
+          strokeWidth="8"
+          strokeOpacity="0.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          filter={`url(#glow-${id})`}
+        />
+
+        <path
+          d={pathPoints}
+          fill="none"
+          stroke={`url(#traceGrad-${id})`}
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        <circle cx={startX} cy={startY} r="5" fill="#1DB954" opacity="0.9" />
+        <circle cx={startX} cy={startY} r="9" fill="none" stroke="#1DB954" strokeWidth="1.5" opacity="0.4" />
+
+        <circle cx={endX} cy={endY} r="5" fill="white" stroke="#1DB954" strokeWidth="2" />
+      </svg>
+    </div>
   );
 }
