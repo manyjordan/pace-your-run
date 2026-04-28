@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.0.7</string>
 	<key>CFBundleVersion</key>
-	<string>36</string>
+	<string>37</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -64,12 +64,13 @@
 		<string>audio</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activité.</string>
+	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activitÃ©.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course, même lorsque l'écran est verrouillé.</string>
+	<string>Pace utilise votre position GPS pour enregistrer votre course, mÃªme lorsque l'Ã©cran est verrouillÃ©.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course, même lorsque l'écran est verrouillé.</string>
+	<string>Pace utilise votre position GPS pour enregistrer votre course, mÃªme lorsque l'Ã©cran est verrouillÃ©.</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
 </plist>
+
