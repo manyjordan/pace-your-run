@@ -618,16 +618,27 @@ export default function Social() {
     setIsLoadingPosts(false);
   }, [user?.id]);
 
+  const loadCommunityPostsRef = useRef(loadCommunityPosts);
+  const refreshUnreadCountRef = useRef(refreshUnreadCount);
+
+  useEffect(() => {
+    loadCommunityPostsRef.current = loadCommunityPosts;
+  }, [loadCommunityPosts]);
+
+  useEffect(() => {
+    refreshUnreadCountRef.current = refreshUnreadCount;
+  }, [refreshUnreadCount]);
+
   useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
-    void loadCommunityPosts();
-    void refreshUnreadCount();
+    void loadCommunityPostsRef.current();
+    void refreshUnreadCountRef.current();
     const handleReload = () => {
-      void loadCommunityPosts();
+      void loadCommunityPostsRef.current();
     };
     const handleNotif = () => {
-      void refreshUnreadCount();
+      void refreshUnreadCountRef.current();
     };
 
     window.addEventListener("pace-community-updated", handleReload);
@@ -636,7 +647,7 @@ export default function Social() {
       window.removeEventListener("pace-community-updated", handleReload);
       window.removeEventListener("pace-notifications-updated", handleNotif);
     };
-  }, [loadCommunityPosts, refreshUnreadCount]);
+  }, []);
 
   const handleFollowSuggestion = async (profileId: string) => {
     if (!user?.id) return;

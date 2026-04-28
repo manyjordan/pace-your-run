@@ -1,7 +1,5 @@
 import { useMemo } from "react";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
-import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
 import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { TrendingUp, Route, BarChart3, Award } from "lucide-react";
 import type { RunRow } from "@/lib/database";
@@ -128,9 +126,6 @@ export const PerformanceSection = ({
 
   return (
     <div className="space-y-6">
-      <div>
-        <VO2maxCard runs={runsForStats} />
-      </div>
       <ScrollReveal>
         <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
           <div className="mb-4 flex items-start gap-4">
@@ -238,10 +233,6 @@ export const PerformanceSection = ({
             </div>
           </div>
         </div>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <RacePredictionsCard runs={runsForStats} />
       </ScrollReveal>
     </div>
   );
