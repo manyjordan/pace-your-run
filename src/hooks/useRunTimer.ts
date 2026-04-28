@@ -6,7 +6,8 @@ export function useRunTimer() {
   const [elapsed, internalSetElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
-  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  const keepAliveSourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const keepAliveEnabledRef = useRef(false);
   const startTimeRef = useRef<number | null>(null);
   const pausedElapsedRef = useRef<number>(0);
 
@@ -21,6 +22,7 @@ export function useRunTimer() {
   const startKeepAlive = useCallback(() => {
     if (!Capacitor.isNativePlatform()) return;
     if (audioContextRef.current) {
+      keepAliveEnabledRef.current = true;
       if (audioContextRef.current.state === "suspended") {
         void audioContextRef.current.resume().catch(() => {});
       }
@@ -28,35 +30,55 @@ export function useRunTimer() {
     }
     try {
       const ctx = new AudioContext();
+      const bufferSize = ctx.sampleRate * 2;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      keepAliveEnabledRef.current = true;
+
+      const playBuffer = () => {
+        if (!keepAliveEnabledRef.current || !audioContextRef.current) return;
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const gainNode = ctx.createGain();
+        gainNode.gain.value = 0.001;
+        source.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        source.onended = () => {
+          if (!keepAliveEnabledRef.current) return;
+          playBuffer();
+        };
+        keepAliveSourceRef.current = source;
+        source.start();
+      };
+
       if (ctx.state === "suspended") {
-        void ctx.resume();
+        void ctx.resume().catch(() => {});
       }
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      gainNode.gain.value = 0.00001;
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      oscillator.frequency.value = 1;
-      oscillator.start();
       audioContextRef.current = ctx;
-      oscillatorRef.current = oscillator;
+      playBuffer();
     } catch (e) {
       logger.error("AudioContext keepalive failed", e);
+      keepAliveEnabledRef.current = false;
+      try {
+        keepAliveSourceRef.current?.stop();
+      } catch {
+        /* already stopped */
+      }
+      keepAliveSourceRef.current = null;
       void audioContextRef.current?.close().catch(() => {});
       audioContextRef.current = null;
-      oscillatorRef.current = null;
     }
   }, []);
 
   const stopKeepAlive = useCallback(() => {
+    keepAliveEnabledRef.current = false;
     try {
-      oscillatorRef.current?.stop();
+      keepAliveSourceRef.current?.stop();
     } catch {
       /* already stopped */
     }
+    keepAliveSourceRef.current = null;
     void audioContextRef.current?.close().catch(() => {});
     audioContextRef.current = null;
-    oscillatorRef.current = null;
   }, []);
 
   const tick = useCallback(() => {
@@ -88,13 +110,18 @@ export function useRunTimer() {
 
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "visible" && audioContextRef.current?.state === "suspended") {
-        void audioContextRef.current.resume().catch(() => {});
+      if (document.visibilityState === "visible") {
+        if (audioContextRef.current?.state === "suspended") {
+          void audioContextRef.current.resume().catch(() => {});
+        }
+        if (intervalRef.current === null && startTimeRef.current !== null) {
+          intervalRef.current = window.setInterval(tick, 1000);
+        }
       }
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, []);
+  }, [tick]);
 
   useEffect(() => {
     return () => {
