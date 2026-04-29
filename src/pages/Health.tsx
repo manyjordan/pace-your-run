@@ -3,7 +3,7 @@ import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
-import { differenceInDays, subWeeks } from "date-fns";
+import { differenceInDays, getWeek, subWeeks } from "date-fns";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getAllRunsForStats, type RunRow } from "@/lib/database";
 import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import { calculateTrainingLoad } from "@/lib/trainingLoad";
+import { ACHIEVEMENTS, getEarnedAchievements, getNextAchievements } from "@/lib/achievements";
 
 type Issue = {
   name: string;
@@ -847,6 +848,66 @@ const Health = () => {
     () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
     [trainingLoad, lastRunDaysAgo],
   );
+  const lifetimeStats = useMemo(() => {
+    if (!runsForStats?.length) return null;
+
+    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const totalHours = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0) / 3600;
+    const totalRuns = runsForStats.length;
+    const longestRun = Math.max(...runsForStats.map((run) => run.distance_km ?? 0));
+
+    const validRuns = runsForStats.filter((run) => (run.distance_km ?? 0) > 0 && (run.duration_seconds ?? 0) > 0);
+    const bestPaceSecPerKm = validRuns.length
+      ? Math.min(...validRuns.map((run) => (run.duration_seconds ?? 0) / Math.max(run.distance_km ?? 0, 0.001)))
+      : 0;
+
+    const weekKeys = new Set(
+      runsForStats
+        .filter((run) => Boolean(run.started_at))
+        .map((run) => {
+          const d = new Date(run.started_at as string);
+          const year = d.getFullYear();
+          const week = getWeek(d, { weekStartsOn: 1 });
+          return `${year}-W${String(week).padStart(2, "0")}`;
+        }),
+    );
+
+    let weeklyStreak = 0;
+    let checkDate = new Date();
+    for (let i = 0; i < 104; i += 1) {
+      const year = checkDate.getFullYear();
+      const week = getWeek(checkDate, { weekStartsOn: 1 });
+      const key = `${year}-W${String(week).padStart(2, "0")}`;
+      if (weekKeys.has(key)) {
+        weeklyStreak += 1;
+        checkDate = subWeeks(checkDate, 1);
+      } else {
+        break;
+      }
+    }
+
+    return {
+      totalKm,
+      totalHours,
+      totalRuns,
+      longestRun,
+      weeklyStreak,
+      bestPaceSecPerKm,
+    };
+  }, [runsForStats]);
+  const achievementStats = useMemo(
+    () => ({
+      totalKm: lifetimeStats?.totalKm ?? 0,
+      totalRuns: lifetimeStats?.totalRuns ?? 0,
+      longestRun: lifetimeStats?.longestRun ?? 0,
+      weeklyStreak: lifetimeStats?.weeklyStreak ?? 0,
+      bestPaceSecPerKm: lifetimeStats?.bestPaceSecPerKm ?? 0,
+      totalHours: lifetimeStats?.totalHours ?? 0,
+    }),
+    [lifetimeStats],
+  );
+  const earnedAchievements = useMemo(() => getEarnedAchievements(achievementStats), [achievementStats]);
+  const nextAchievements = useMemo(() => getNextAchievements(achievementStats), [achievementStats]);
 
   const issueDetailBulletList = (items: string[]) => (
     <ul className="mt-1 list-disc space-y-2 pl-4 text-xs leading-relaxed text-muted-foreground marker:text-accent">
@@ -1102,6 +1163,40 @@ const Health = () => {
                 )}
               </CardContent>
             </Card>
+          </AppCard>
+        </ScrollReveal>
+      )}
+
+      {earnedAchievements.length > 0 && (
+        <ScrollReveal>
+          <AppCard>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Mes badges ({earnedAchievements.length}/{ACHIEVEMENTS.length})
+            </h3>
+            <div className="mb-4 flex flex-wrap gap-2">
+              {earnedAchievements.map((achievement) => (
+                <div key={achievement.id} className="flex w-16 flex-col items-center gap-1 rounded-xl bg-muted/50 p-2">
+                  <span className="text-2xl">{achievement.emoji}</span>
+                  <span className="text-center text-[10px] leading-tight text-muted-foreground">{achievement.title}</span>
+                </div>
+              ))}
+            </div>
+            {nextAchievements.length > 0 && (
+              <>
+                <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Prochains badges</p>
+                <div className="space-y-2">
+                  {nextAchievements.map((achievement) => (
+                    <div key={achievement.id} className="flex items-center gap-3 opacity-50">
+                      <span className="text-xl">{achievement.emoji}</span>
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{achievement.title}</p>
+                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </AppCard>
         </ScrollReveal>
       )}
