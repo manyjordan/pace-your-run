@@ -1,6 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, List, Play, TrendingUp } from "lucide-react";
+import { Activity, List, Play, TrendingUp, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { differenceInDays, getWeek, subWeeks } from "date-fns";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -41,6 +41,19 @@ import {
 } from "@/lib/pushNotifications";
 
 type DashboardPeriod = Extract<MetricChartPeriod, "3m" | "6m" | "1y" | "all">;
+const APP_OPEN_KEY = "pace_app_open_count";
+
+const getAppOpenCount = (): number => {
+  if (typeof window === "undefined") return 0;
+  return Number.parseInt(localStorage.getItem(APP_OPEN_KEY) ?? "0", 10);
+};
+
+const incrementAppOpenCount = (): number => {
+  if (typeof window === "undefined") return 0;
+  const count = getAppOpenCount() + 1;
+  localStorage.setItem(APP_OPEN_KEY, String(count));
+  return count;
+};
 
 const PerformanceSection = lazy(() =>
   import("@/components/dashboard/PerformanceSection").then((module) => ({ default: module.PerformanceSection })),
@@ -108,6 +121,7 @@ const Dashboard = () => {
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
   const [period, setPeriod] = useState<DashboardPeriod>("3m");
+  const [showImportBanner, setShowImportBanner] = useState(false);
   const isLoadingRef = useRef(false);
   const lastFetchRef = useRef<number>(0);
   const hasMountedRef = useRef(false);
@@ -153,6 +167,11 @@ const Dashboard = () => {
       localStorage.setItem("pace_user_id", session.user.id);
     }
   }, [session?.user?.id]);
+
+  useEffect(() => {
+    const count = incrementAppOpenCount();
+    setShowImportBanner(count <= 3);
+  }, []);
 
   useEffect(() => {
     if (!isLoading || recentRuns.length > 0 || athleteName !== "Coureur") {
@@ -567,9 +586,19 @@ const Dashboard = () => {
         </ScrollReveal>
       ) : null}
 
-      {!showSkeletons && runCount < 3 && (
+      {showImportBanner && recentRuns.length === 0 && (
         <ScrollReveal>
-          <AppCard className="border-accent/30 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+          <AppCard className="relative border-accent/30 py-4 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem(APP_OPEN_KEY, "99");
+                setShowImportBanner(false);
+              }}
+              className="absolute right-2 top-2 text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="text-sm font-semibold">Importez votre historique de courses pour voir vos statistiques</p>
