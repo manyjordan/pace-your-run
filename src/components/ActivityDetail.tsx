@@ -408,6 +408,21 @@ export function ActivityDetail({
   const displayTrace = analysis.trace;
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
   const hasGpsTrace = Array.isArray(fullRun?.gps_trace) && fullRun.gps_trace.length > 0;
+  const averageCadence = useMemo(() => {
+    const cadenceFromRun = (fullRun as RunRow & { average_cadence?: number | null } | null)?.average_cadence;
+    if (typeof cadenceFromRun === "number" && Number.isFinite(cadenceFromRun) && cadenceFromRun > 0) {
+      return Math.round(cadenceFromRun);
+    }
+
+    const trace = Array.isArray(fullRun?.gps_trace) ? fullRun.gps_trace : [];
+    const cadenceValues = trace
+      .map((point) => point.cadence)
+      .filter((value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0);
+
+    if (cadenceValues.length === 0) return null;
+    const sum = cadenceValues.reduce((acc, value) => acc + value, 0);
+    return Math.round(sum / cadenceValues.length);
+  }, [fullRun]);
 
   const handleExportGpx = useCallback(() => {
     if (!Array.isArray(fullRun?.gps_trace) || fullRun.gps_trace.length === 0) return;
@@ -542,6 +557,15 @@ export function ActivityDetail({
             </div>
             <p className="mt-2 text-lg font-bold">{Math.round(resolvedActivity.total_elevation_gain ?? 0)} m</p>
           </div>
+          {averageCadence ? (
+            <div className="rounded-lg border border-accent/20 bg-card p-3">
+              <div className="flex items-center gap-1.5">
+                <Zap className="h-4 w-4 text-lime" />
+                <span className="text-xs text-muted-foreground">Cadence moyenne</span>
+              </div>
+              <p className="font-metric mt-2 text-lg font-bold">{averageCadence} spm</p>
+            </div>
+          ) : null}
         </div>
 
         {weather ? (

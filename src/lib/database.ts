@@ -34,6 +34,7 @@ export type RunGpsPoint = {
   altitude?: number;
   accuracy?: number;
   heart_rate?: number;
+  cadence?: number;
 };
 
 export type RunRow = {

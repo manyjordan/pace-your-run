@@ -3,6 +3,7 @@ import { Pause, Play, Square, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
+import { useCadence } from "@/hooks/useCadence";
 
 type RunStatus = "idle" | "running" | "paused";
 
@@ -52,6 +53,7 @@ export function RunMainTimerCard({
   isProgramActive,
   estimatedFinishTimes,
 }: Props) {
+  const { cadence } = useCadence(status === "running");
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
   const heartRate = bluetooth.heartRate ?? 0;
   const maxHR = useMemo(() => {
@@ -98,6 +100,16 @@ export function RunMainTimerCard({
             <div className="font-metric text-3xl font-bold text-accent">{formattedPace}</div>
             <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">/{distanceUnitShortLabel}</div>
           </div>
+
+          {cadence > 0 && (
+            <>
+              <div className="h-10 w-px bg-border" />
+              <div className="text-center">
+                <div className="font-metric text-3xl font-bold text-foreground">{cadence}</div>
+                <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">spm</div>
+              </div>
+            </>
+          )}
 
           {isBluetoothConnected && heartRate > 0 && currentZone && (
             <>
