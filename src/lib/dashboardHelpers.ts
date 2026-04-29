@@ -1,5 +1,6 @@
 import type { RunRow } from "@/lib/database";
 import { Route, Clock, Mountain } from "lucide-react";
+import { startOfWeek, subWeeks } from "date-fns";
 
 export type MetricKind = "distance" | "duration" | "elevation";
 
@@ -104,6 +105,44 @@ export function getMetricAmountForKind(kind: MetricKind, runs: RunRow[]) {
 
 export function getMetricAmountForTitle(title: string, runs: RunRow[]) {
   return getMetricAmountForKind(inferMetricKind(title), runs);
+}
+
+export function getWeekOverWeekChange(
+  runs: RunRow[],
+  metric: "distance" | "duration" | "count" | "elevation",
+): { value: number; percent: number; trend: "up" | "down" | "neutral" } {
+  const now = new Date();
+  const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const lastWeekStart = subWeeks(thisWeekStart, 1);
+  const lastWeekEnd = thisWeekStart;
+
+  const thisWeekRuns = runs.filter((run) => {
+    if (!run.started_at) return false;
+    return new Date(run.started_at) >= thisWeekStart;
+  });
+  const lastWeekRuns = runs.filter((run) => {
+    if (!run.started_at) return false;
+    const d = new Date(run.started_at);
+    return d >= lastWeekStart && d < lastWeekEnd;
+  });
+
+  const getValue = (arr: RunRow[]) => {
+    if (metric === "distance") return arr.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    if (metric === "duration") return arr.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0);
+    if (metric === "elevation") return arr.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
+    return arr.length;
+  };
+
+  const current = getValue(thisWeekRuns);
+  const previous = getValue(lastWeekRuns);
+
+  if (previous === 0) return { value: current, percent: 0, trend: "neutral" };
+  const percent = Math.round(((current - previous) / previous) * 100);
+  return {
+    value: current,
+    percent,
+    trend: percent > 0 ? "up" : percent < 0 ? "down" : "neutral",
+  };
 }
 
 export function formatWeeklyGrowthSummary(kind: MetricKind, runs: RunRow[]) {

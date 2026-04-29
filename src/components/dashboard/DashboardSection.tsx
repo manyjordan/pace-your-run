@@ -4,7 +4,7 @@ import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { Calendar, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
-import { formatXLabel, getMetricPeriodLabel } from "@/lib/dashboardHelpers";
+import { formatXLabel, getMetricPeriodLabel, getWeekOverWeekChange } from "@/lib/dashboardHelpers";
 import { getPlanById } from "@/lib/trainingPlans";
 import { cn } from "@/lib/utils";
 
@@ -176,6 +176,14 @@ export const DashboardSection = ({
 
       {filteredMetrics.map((metric, index) => {
         const Icon = metric.icon;
+        const metricChange = getWeekOverWeekChange(
+          recentRuns,
+          metric.metricKind === "distance"
+            ? "distance"
+            : metric.metricKind === "duration"
+              ? "duration"
+              : "elevation",
+        );
         return (
           <ScrollReveal key={metric.title} delay={index === 0 ? 0 : index < 3 ? 0.05 : 0}>
             <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
@@ -189,7 +197,22 @@ export const DashboardSection = ({
                 </div>
               </div>
               <div className="mb-4">
-                <span className="font-metric text-3xl font-bold">{metric.currentValue}</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-metric text-3xl font-bold text-foreground">{metric.currentValue}</span>
+                  {metricChange.percent !== 0 && (
+                    <span
+                      className={cn(
+                        "rounded-full px-2 py-0.5 text-xs font-semibold",
+                        metricChange.trend === "up"
+                          ? "bg-accent/15 text-accent"
+                          : "bg-orange-100 text-orange-600",
+                      )}
+                    >
+                      {metricChange.trend === "up" ? "+" : ""}
+                      {metricChange.percent}% vs S-1
+                    </span>
+                  )}
+                </div>
                 <p className="mt-1 text-xs text-muted-foreground">{getMetricPeriodLabel(metric.period ?? period)}</p>
               </div>
               <div className="h-44">
