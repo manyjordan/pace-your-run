@@ -1,9 +1,9 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, List, TrendingUp } from "lucide-react";
+import { Activity, List, Play, TrendingUp } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { differenceInDays, getWeek, subWeeks } from "date-fns";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getProfile,
@@ -87,6 +87,7 @@ function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | und
 
 const Dashboard = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { session } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [athleteName, setAthleteName] = useState("Coureur");
@@ -360,6 +361,23 @@ const Dashboard = () => {
     if (!userGoal) return false;
     return userGoal.goalType !== "none";
   }, [userGoal]);
+  const goalTargetDate = useMemo(() => {
+    if (!userGoal) return "";
+    return userGoal.raceTargetDate || userGoal.distanceTargetDate || userGoal.weightTargetDate || "";
+  }, [userGoal]);
+  const goalLabel = useMemo(() => {
+    if (!userGoal) return "";
+    if (userGoal.goalType === "race") {
+      return userGoal.raceType || "Objectif course";
+    }
+    if (userGoal.goalType === "distance") {
+      return userGoal.distanceKm ? `${userGoal.distanceKm} km` : "Objectif distance";
+    }
+    if (userGoal.goalType === "weight") {
+      return userGoal.targetWeightKg ? `${userGoal.targetWeightKg} kg` : "Objectif poids";
+    }
+    return "Objectif";
+  }, [userGoal]);
   const trainingLoad = useMemo(
     () =>
       runsForStats?.length
@@ -454,6 +472,35 @@ const Dashboard = () => {
                 Bonjour <span className="text-foreground">{athleteName}</span>
               </h2>
             </div>
+            {hasDefinedGoal && goalTargetDate ? (
+              <div className="mt-3 border-t border-border/50 pt-3">
+                <div className="mb-1.5 flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">{goalLabel}</span>
+                  <span className="font-semibold text-accent">
+                    J-{Math.max(0, differenceInDays(new Date(goalTargetDate), new Date()))}
+                  </span>
+                </div>
+                <div className="h-1 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-accent"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.max(5, 100 - (differenceInDays(new Date(goalTargetDate), new Date()) / 180) * 100),
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => navigate("/run")}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-semibold text-white transition-all active:scale-95"
+            >
+              <Play className="h-4 w-4 fill-white" />
+              Lancer une course
+            </button>
           </AppCard>
         )}
       </ScrollReveal>
@@ -523,39 +570,39 @@ const Dashboard = () => {
               {lifetimeStats ? (
                 <div className="space-y-2">
                   <p className="text-sm font-semibold text-foreground">Mes statistiques</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <AppCard className="py-4 text-center">
-                      <p className="font-metric text-2xl font-black text-foreground">
+                  <div className="grid grid-cols-3 gap-2">
+                    <AppCard className="py-3 text-center">
+                      <p className="font-metric text-xl font-black text-foreground">
                         {Math.round(lifetimeStats.totalKm).toLocaleString("fr")}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">km au total</p>
                     </AppCard>
 
-                    <AppCard className="py-4 text-center">
-                      <p className="font-metric text-2xl font-black text-foreground">{lifetimeStats.totalRuns}</p>
+                    <AppCard className="py-3 text-center">
+                      <p className="font-metric text-xl font-black text-foreground">{lifetimeStats.totalRuns}</p>
                       <p className="mt-1 text-xs text-muted-foreground">courses</p>
                     </AppCard>
 
-                    <AppCard className="py-4 text-center">
-                      <p className="font-metric text-2xl font-black text-accent">{Math.round(lifetimeStats.totalHours)}h</p>
+                    <AppCard className="py-3 text-center">
+                      <p className="font-metric text-xl font-black text-accent">{Math.round(lifetimeStats.totalHours)}h</p>
                       <p className="mt-1 text-xs text-muted-foreground">heures de course</p>
                     </AppCard>
 
-                    <AppCard className="py-4 text-center">
-                      <p className="font-metric text-2xl font-black text-foreground">{lifetimeStats.longestRun.toFixed(1)}</p>
+                    <AppCard className="py-3 text-center">
+                      <p className="font-metric text-xl font-black text-foreground">{lifetimeStats.longestRun.toFixed(1)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">km (plus longue)</p>
                     </AppCard>
 
-                    <AppCard className="py-4 text-center">
-                      <p className="font-metric text-2xl font-black text-foreground">
+                    <AppCard className="py-3 text-center">
+                      <p className="font-metric text-xl font-black text-foreground">
                         {Math.round(lifetimeStats.totalElevation).toLocaleString("fr")}m
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">dénivelé total</p>
                     </AppCard>
 
-                    <AppCard className="py-4 text-center">
+                    <AppCard className="py-3 text-center">
                       <p
-                        className="text-2xl font-black text-accent"
+                        className="text-xl font-black text-accent"
                         style={{ fontFamily: "var(--font-mono-display)" }}
                       >
                         {lifetimeStats.streak}🔥
