@@ -30,6 +30,7 @@ export function useSessionProgram({ elapsed, status }: { elapsed: number; status
   const [programSource, setProgramSource] = useState<"custom" | "template">("custom");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [segments, setSegments] = useState<SessionSegment[]>([]);
+  const [templates, setTemplates] = useState<typeof import("./sessionProgramTemplates") | null>(null);
   const [currentSegmentIndex, setCurrentSegmentIndex] = useState(0);
   const thirtySecondAnnouncedRef = useRef<Set<number>>(new Set());
   const segmentTransitionAnnouncedRef = useRef<Set<number>>(new Set());
@@ -58,6 +59,12 @@ export function useSessionProgram({ elapsed, status }: { elapsed: number; status
   const elapsedInCurrentSegment = Math.max(0, elapsed - elapsedUntilCurrentSegmentStart);
   const currentSegmentDurationSeconds = segmentDurationsSeconds[currentSegmentIndex] ?? 0;
   const secondsRemainingInCurrentSegment = Math.max(0, currentSegmentDurationSeconds - elapsedInCurrentSegment);
+
+  useEffect(() => {
+    void import("./sessionProgramTemplates")
+      .then(setTemplates)
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!isProgramActive || status === "idle") {
@@ -92,15 +99,30 @@ export function useSessionProgram({ elapsed, status }: { elapsed: number; status
     );
   };
 
-  const loadTemplate = useCallback((templateId: string) => {
-    void import("./sessionProgramTemplates").then(({ INTERVAL_TEMPLATES }) => {
-      const template = INTERVAL_TEMPLATES.find((item) => item.id === templateId);
-      if (!template) return;
-      setSelectedTemplateId(template.id);
-      setProgramSource("template");
-      setSegments(template.segments.map((segment) => makeSegment(segment)));
-    });
-  }, []);
+  const loadTemplate = useCallback(
+    (templateId: string) => {
+      const applyTemplate = (module: typeof import("./sessionProgramTemplates")) => {
+        const template = module.INTERVAL_TEMPLATES.find((item) => item.id === templateId);
+        if (!template) return;
+        setSelectedTemplateId(template.id);
+        setProgramSource("template");
+        setSegments(template.segments.map((segment) => makeSegment(segment)));
+      };
+
+      if (templates) {
+        applyTemplate(templates);
+        return;
+      }
+
+      void import("./sessionProgramTemplates")
+        .then((module) => {
+          setTemplates(module);
+          applyTemplate(module);
+        })
+        .catch(() => {});
+    },
+    [templates],
+  );
 
   const resetProgramProgress = () => {
     setCurrentSegmentIndex(0);
