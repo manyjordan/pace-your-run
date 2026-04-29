@@ -1,5 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
+import { InfoTooltip } from "@/components/InfoTooltip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
@@ -999,7 +1000,13 @@ const Health = () => {
           <AppCard className="border-l-4" style={{ borderLeftColor: trainingLoad.statusColor }}>
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Forme du moment</p>
+                <div className="mb-1 flex items-center gap-1.5 text-xs uppercase tracking-wider text-muted-foreground">
+                  <span>Forme du moment</span>
+                  <InfoTooltip
+                    title="Charge d'entraînement"
+                    content="Basé sur votre volume et intensité récents. 'Pic de forme' = équilibre idéal entre fatigue et forme pour performer."
+                  />
+                </div>
                 <p className="text-xl font-bold" style={{ color: trainingLoad.statusColor }}>
                   {trainingLoad.statusLabel}
                 </p>

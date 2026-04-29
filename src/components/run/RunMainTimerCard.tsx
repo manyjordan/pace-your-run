@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useMemo } from "react";
 import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
 import { useCadence } from "@/hooks/useCadence";
+import { InfoTooltip } from "@/components/InfoTooltip";
 
 type RunStatus = "idle" | "running" | "paused";
 
@@ -237,6 +238,9 @@ export function RunMainTimerCard({
                   <span className="text-xs font-semibold" style={{ color: currentZone.color }}>
                     Zone {currentZone.zone} - {currentZone.name}
                   </span>
+                  <InfoTooltip
+                    content={`Zone ${currentZone.zone} : ${currentZone.description}. Plage : ${currentZone.minBpm}-${currentZone.maxBpm} bpm.`}
+                  />
                 </div>
               </div>
             </>
