@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
+import { ChevronLeft, Loader2, Calendar, TrendingUp, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,7 +129,7 @@ const Onboarding = () => {
   };
 
   const handleNext = () => {
-    if (step < 5) {
+    if (step < 6) {
       setStep(step + 1);
       scrollStepIntoView();
     }
@@ -155,7 +155,7 @@ const Onboarding = () => {
   };
 
   const handleSkipToSummary = () => {
-    setStep(5);
+    setStep(6);
     scrollStepIntoView();
   };
 
@@ -201,8 +201,8 @@ const Onboarding = () => {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <span className="text-sm font-semibold text-muted-foreground">{step}/5</span>
-        {step < 5 ? (
+        <span className="text-sm font-semibold text-muted-foreground">{step}/6</span>
+        {step < 6 ? (
           <button
             onClick={handleSkipToSummary}
             className="rounded-lg px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent/10 hover:text-accent transition-colors"
@@ -216,7 +216,7 @@ const Onboarding = () => {
 
       {/* Progress indicator dots */}
       <div className="flex shrink-0 justify-center gap-2 px-4 py-4">
-        {[1, 2, 3, 4, 5].map((dotStep) => (
+        {[1, 2, 3, 4, 5, 6].map((dotStep) => (
           <div
             key={dotStep}
             className="h-1.5 rounded-full transition-all duration-200"
@@ -235,29 +235,35 @@ const Onboarding = () => {
       >
         {step === 1 ? (
           <div className="space-y-8 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
-            <Step1Welcome onNext={handleNext} />
+            <Step1Features onNext={handleNext} />
           </div>
         ) : null}
 
         {step === 2 ? (
           <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
-            <Step2Profile data={data} setData={setData} onNext={handleNext} />
+            <Step1Welcome onNext={handleNext} />
           </div>
         ) : null}
 
         {step === 3 ? (
           <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
-            <Step3Level data={data} setData={setData} onNext={handleNext} />
+            <Step2Profile data={data} setData={setData} onNext={handleNext} />
           </div>
         ) : null}
 
         {step === 4 ? (
           <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
-            <Step4Goal data={data} setData={setData} onNext={handleNext} />
+            <Step3Level data={data} setData={setData} onNext={handleNext} />
           </div>
         ) : null}
 
         {step === 5 ? (
+          <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
+            <Step4Goal data={data} setData={setData} onNext={handleNext} />
+          </div>
+        ) : null}
+
+        {step === 6 ? (
           <div className="space-y-6 py-8 animate-in fade-in slide-in-from-right-2 duration-200">
             <Step5Summary
               data={data}
@@ -271,6 +277,60 @@ const Onboarding = () => {
     </div>
   );
 };
+
+function Step1Features({ onNext }: { onNext: () => void }) {
+  return (
+    <div className="flex flex-col items-center px-6 py-8 text-center space-y-8">
+      <div>
+        <div className="w-20 h-20 rounded-2xl bg-accent/20 flex items-center justify-center mx-auto mb-4">
+          <img src="/PaceL2.png" alt="Pace" className="w-14 h-14 object-contain" />
+        </div>
+        <h1 className="text-3xl font-black text-foreground">Bienvenue sur Pace</h1>
+        <p className="text-muted-foreground mt-2">L&apos;app qui s&apos;adapte à votre forme du moment</p>
+      </div>
+
+      <div className="w-full space-y-3">
+        {[
+          {
+            emoji: "📊",
+            title: "Charge d'entraînement",
+            description: "Sachez chaque jour si vous êtes en forme pour une séance intense ou si vous devez récupérer",
+            color: "#1DB954",
+          },
+          {
+            emoji: "📅",
+            title: "Plan personnalisé",
+            description: "Un plan semaine par semaine adapté à votre objectif et votre niveau actuel",
+            color: "#60a5fa",
+          },
+          {
+            emoji: "❤️",
+            title: "Zones FC en temps réel",
+            description: "Entraînez-vous dans la bonne zone pour progresser sans vous blesser",
+            color: "#ef4444",
+          },
+        ].map((feature) => (
+          <div key={feature.title} className="flex items-center gap-4 bg-muted/50 rounded-xl p-4 text-left">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+              style={{ backgroundColor: `${feature.color}20` }}
+            >
+              {feature.emoji}
+            </div>
+            <div>
+              <p className="font-semibold text-sm text-foreground">{feature.title}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{feature.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Button onClick={onNext} className="w-full bg-accent text-accent-foreground hover:bg-accent/90 md:w-auto">
+        Continuer
+      </Button>
+    </div>
+  );
+}
 
 /* Step 1 — Welcome */
 function Step1Welcome({ onNext }: { onNext: () => void }) {
