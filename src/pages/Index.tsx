@@ -33,6 +33,12 @@ import {
 } from "@/lib/dashboardHelpers";
 import { calculateTrainingLoad } from "@/lib/trainingLoad";
 import { getDailyRecommendation } from "@/lib/dailyRecommendation";
+import {
+  scheduleStreakNotification,
+  getLastNotifiedStreak,
+  setLastNotifiedStreak,
+  requestNotificationPermission,
+} from "@/lib/pushNotifications";
 
 type DashboardPeriod = Extract<MetricChartPeriod, "3m" | "6m" | "1y" | "all">;
 
@@ -474,6 +480,20 @@ const Dashboard = () => {
 
     return { totalKm, totalHours, totalRuns, totalElevation, avgPaceSecPerKm, longestRun, streak };
   }, [lifetimeStatsDb, runsForStats]);
+  const weeklyStreak = lifetimeStats?.streak ?? 0;
+
+  useEffect(() => {
+    if (!weeklyStreak) return;
+    const last = getLastNotifiedStreak();
+    if (weeklyStreak > last) {
+      void requestNotificationPermission().then((granted) => {
+        if (!granted) return;
+        void scheduleStreakNotification(weeklyStreak).then(() => {
+          setLastNotifiedStreak(weeklyStreak);
+        });
+      });
+    }
+  }, [weeklyStreak]);
 
   return (
     <>
