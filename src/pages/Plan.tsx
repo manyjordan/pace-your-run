@@ -10,8 +10,6 @@ import { AppCard } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
 import { cache } from "@/lib/cache";
 import { getProfile, getRuns, type RunRow } from "@/lib/database";
-import { calculateTrainingLoad } from "@/lib/trainingLoad";
-import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import GoalTab from "@/components/plan/GoalTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
 import type { Session, TrainingPlan } from "@/lib/plans/types";
@@ -157,32 +155,6 @@ export default function PlanPage() {
     },
     [recentRuns, weekStart, weekEnd],
   );
-  const trainingLoad = useMemo(
-    () =>
-      recentRuns?.length
-        ? calculateTrainingLoad(
-            recentRuns
-              .map((run) => ({
-                started_at: run.started_at ?? run.created_at ?? "",
-                duration_seconds: run.duration_seconds ?? 0,
-                average_heartrate: run.average_heartrate ?? undefined,
-                distance_km: run.distance_km ?? 0,
-              }))
-              .filter((run) => run.started_at.length > 0 && run.duration_seconds > 0 && run.distance_km > 0),
-          )
-        : null,
-    [recentRuns],
-  );
-  const lastRunDaysAgo = useMemo(() => {
-    const lastRun = recentRuns.find((run) => Boolean(run.started_at));
-    if (!lastRun?.started_at) return 99;
-    return Math.max(0, differenceInDays(new Date(), new Date(lastRun.started_at)));
-  }, [recentRuns]);
-  const dailyRec = useMemo(
-    () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
-    [trainingLoad, lastRunDaysAgo],
-  );
-
   useEffect(() => {
     let cancelled = false;
     if (!normalizedGoalType || normalizedGoalType === "none") {
@@ -303,25 +275,6 @@ export default function PlanPage() {
 
       <TabsContent value="goal" className="space-y-6">
         <GoalTab />
-
-        {dailyRec ? (
-        <ScrollReveal>
-          <AppCard className="border-l-4" style={{ borderLeftColor: dailyRec.color }}>
-            <div className="flex items-start gap-3">
-              <span className="text-3xl">{dailyRec.emoji}</span>
-              <div className="flex-1">
-                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Recommandation du jour</p>
-                <p className="font-bold text-foreground">{dailyRec.title}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{dailyRec.description}</p>
-                <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5">
-                  <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: dailyRec.color }} />
-                  <span className="text-xs font-medium text-foreground">{dailyRec.maxIntensity}</span>
-                </div>
-              </div>
-            </div>
-          </AppCard>
-        </ScrollReveal>
-        ) : null}
 
         {targetDate && daysUntilGoal !== null && daysUntilGoal <= 7 ? (
         <ScrollReveal>
