@@ -423,6 +423,16 @@ export function ActivityDetail({
     const sum = cadenceValues.reduce((acc, value) => acc + value, 0);
     return Math.round(sum / cadenceValues.length);
   }, [fullRun]);
+  const elevationData = useMemo(() => {
+    if (!fullRun?.gps_trace) return [];
+    const trace = fullRun.gps_trace as Array<{ lat: number; lng: number; altitude?: number; time: number }>;
+    return trace
+      .filter((point) => point.altitude !== undefined)
+      .map((point, index) => ({
+        label: `${index}`,
+        value: Math.round(point.altitude as number),
+      }));
+  }, [fullRun?.gps_trace]);
 
   const handleExportGpx = useCallback(() => {
     if (!Array.isArray(fullRun?.gps_trace) || fullRun.gps_trace.length === 0) return;
@@ -637,6 +647,22 @@ export function ActivityDetail({
                 );
               })}
             </div>
+          </div>
+        ) : null}
+
+        {elevationData.length > 5 ? (
+          <div className="rounded-lg border border-accent/20 bg-card p-3">
+            <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Profil d&apos;élévation
+            </h3>
+            <LineChartSvg
+              data={elevationData}
+              height={80}
+              color="hsl(var(--accent))"
+              showArea
+              showDots={false}
+              formatValue={(value) => `${value}m`}
+            />
           </div>
         ) : null}
 

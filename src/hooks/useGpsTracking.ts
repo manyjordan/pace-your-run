@@ -16,10 +16,17 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsError, setGpsError] = useState("");
   const [rollingPaceSecondsPerKm, setRollingPaceSecondsPerKm] = useState(0);
+  const [elevationGain, setElevationGain] = useState(0);
+  const [gradeAdjustedPace, setGradeAdjustedPace] = useState(0);
   const watchIdRef = useRef<WatchId | null>(null);
   const lastGpsPointRef = useRef<RunGpsPoint | null>(null);
   const watchEpochRef = useRef(0);
   const smoothedPaceRef = useRef<number>(0);
+
+  const gradeAdjustmentFactor = useCallback((gradePct: number): number => {
+    const g = Math.max(-0.45, Math.min(0.45, gradePct / 100));
+    return 1 + g * 2.0;
+  }, []);
 
   const calculateRollingPace = useCallback((points: RunGpsPoint[]): number => {
     if (points.length < 2) return 0;
@@ -123,10 +130,24 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
         );
 
         if (dist >= 0.005) {
+          if (lastGpsPointRef.current.altitude !== undefined && altitude !== null && altitude !== undefined) {
+            const diff = altitude - lastGpsPointRef.current.altitude;
+            if (diff > 0.5) {
+              setElevationGain((prev) => prev + diff);
+            }
+          }
+
           onDistanceDelta(dist);
           setGpsTrace((t) => {
             const nextTrace = [...t, newPoint];
             resolvePace(nextTrace, speed);
+            const prevAltitude = lastGpsPointRef.current?.altitude;
+            const altDiff =
+              altitude !== null && altitude !== undefined && prevAltitude !== undefined ? altitude - prevAltitude : 0;
+            const gradePct = dist > 0.001 ? (altDiff / (dist * 1000)) * 100 : 0;
+            const gapFactor = gradeAdjustmentFactor(gradePct);
+            const gapSecondsPerKm = smoothedPaceRef.current > 0 ? smoothedPaceRef.current / gapFactor : 0;
+            setGradeAdjustedPace(gapSecondsPerKm > 0 ? gapSecondsPerKm : 0);
             return nextTrace;
           });
           lastGpsPointRef.current = newPoint;
@@ -143,6 +164,8 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
   const startGpsTracking = useCallback(async (): Promise<boolean> => {
     const epoch = ++watchEpochRef.current;
     smoothedPaceRef.current = 0;
+    setElevationGain(0);
+    setGradeAdjustedPace(0);
 
     if (Capacitor.isNativePlatform()) {
       try {
@@ -255,6 +278,10 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
     setGpsError,
     rollingPaceSecondsPerKm,
     setRollingPaceSecondsPerKm,
+    elevationGain,
+    setElevationGain,
+    gradeAdjustedPace,
+    setGradeAdjustedPace,
     lastGpsPointRef,
     startGpsTracking,
     stopGpsTracking,

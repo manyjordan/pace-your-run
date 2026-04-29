@@ -173,6 +173,10 @@ export function useRunSession({
     setGpsError,
     rollingPaceSecondsPerKm,
     setRollingPaceSecondsPerKm,
+    elevationGain,
+    setElevationGain,
+    gradeAdjustedPace,
+    setGradeAdjustedPace,
     lastGpsPointRef,
     startGpsTracking,
     stopGpsTracking,
@@ -276,6 +280,8 @@ export function useRunSession({
     setDistance(0);
     setGpsTrace([]);
     setRollingPaceSecondsPerKm(0);
+    setElevationGain(0);
+    setGradeAdjustedPace(0);
     setGpsAccuracy(null);
     setRunSummary(null);
     setCompletedActivity(null);
@@ -463,6 +469,8 @@ export function useRunSession({
     setDistance(0);
     setGpsTrace([]);
     setRollingPaceSecondsPerKm(0);
+    setElevationGain(0);
+    setGradeAdjustedPace(0);
     lastGpsPointRef.current = null;
     runStartedAtRef.current = null;
     bluetooth.heartRateSamplesRef.current = [];
@@ -538,6 +546,8 @@ export function useRunSession({
     resumeKeepAlive,
     routeProgress,
     setRouteProgress,
+    elevationGain,
+    gradeAdjustedPace,
     start,
     pause,
     resume,

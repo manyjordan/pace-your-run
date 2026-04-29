@@ -102,6 +102,8 @@ export default function Run() {
     elapsed,
     pace,
     rollingPaceSecondsPerKm,
+    elevationGain,
+    gradeAdjustedPace,
     estimatedFinishTimes,
     gpsTrace,
     gpsAccuracy,
@@ -476,6 +478,8 @@ export default function Run() {
             distanceUnitShortLabel={distanceUnitShortLabel}
             displayPace={displayPace}
             formatPace={formatPace}
+            gradeAdjustedPace={gradeAdjustedPace}
+            elevationGain={elevationGain}
             bluetooth={{
               isBluetoothConnected: bluetooth.isBluetoothConnected,
               heartRate: bluetooth.heartRate,

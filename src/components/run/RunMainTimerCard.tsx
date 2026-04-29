@@ -19,6 +19,8 @@ type Props = {
   distanceUnitShortLabel: string;
   displayPace: number;
   formatPace: (p: number) => string;
+  gradeAdjustedPace?: number;
+  elevationGain?: number;
   bluetooth: BluetoothState;
   gpsAccuracy: number | null;
   status: RunStatus;
@@ -42,6 +44,8 @@ export function RunMainTimerCard({
   distanceUnitShortLabel,
   displayPace,
   formatPace,
+  gradeAdjustedPace = 0,
+  elevationGain = 0,
   bluetooth,
   gpsAccuracy,
   status,
@@ -68,6 +72,8 @@ export function RunMainTimerCard({
   }, [heartRate, hrZones]);
   const formattedElapsed = formatTime(elapsed);
   const formattedPace = displayPace > 0 ? formatPace(displayPace).replace(` /${distanceUnitShortLabel}`, "") : "--:--";
+  const formattedGap =
+    gradeAdjustedPace > 0 ? formatPace(gradeAdjustedPace / 60).replace(` /${distanceUnitShortLabel}`, "") : null;
   const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
   const isGpsMedium = gpsAccuracy !== null && gpsAccuracy < 30;
 
@@ -107,6 +113,26 @@ export function RunMainTimerCard({
               <div className="text-center">
                 <div className="font-metric text-3xl font-bold text-foreground">{cadence}</div>
                 <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">spm</div>
+              </div>
+            </>
+          )}
+
+          {elevationGain > 0 && (
+            <>
+              <div className="h-10 w-px bg-border" />
+              <div className="text-center">
+                <div className="font-metric text-2xl font-bold text-foreground">+{Math.round(elevationGain)}m</div>
+                <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">D+</div>
+              </div>
+            </>
+          )}
+
+          {formattedGap && (
+            <>
+              <div className="h-10 w-px bg-border" />
+              <div className="text-center">
+                <div className="font-metric text-3xl font-bold text-foreground">{formattedGap}</div>
+                <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">GAP</div>
               </div>
             </>
           )}
