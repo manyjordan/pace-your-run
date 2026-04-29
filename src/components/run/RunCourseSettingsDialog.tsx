@@ -44,6 +44,9 @@ type Props = {
   isTreadmill: boolean;
   setIsTreadmill: (value: boolean) => void;
   programmed: ProgrammedProps;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
 };
 
 export function RunCourseSettingsDialog({
@@ -55,6 +58,9 @@ export function RunCourseSettingsDialog({
   isTreadmill,
   setIsTreadmill,
   programmed,
+  open,
+  onOpenChange,
+  hideTrigger = false,
 }: Props) {
   const initialTargetPace = useMemo(() => {
     if (!runPreferences.targetPaceSecPerKm || runPreferences.targetPaceSecPerKm <= 0) return "";
@@ -85,13 +91,15 @@ export function RunCourseSettingsDialog({
 
   return (
     <ScrollReveal>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="outline" className="h-12 w-full justify-center gap-2 border-accent/30 bg-card/95 text-sm font-semibold">
-            <Settings2 className="h-4 w-4" />
-            Réglages
-          </Button>
-        </DialogTrigger>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        {!hideTrigger ? (
+          <DialogTrigger asChild>
+            <Button variant="outline" className="h-12 w-full justify-center gap-2 border-accent/30 bg-card/95 text-sm font-semibold">
+              <Settings2 className="h-4 w-4" />
+              Réglages
+            </Button>
+          </DialogTrigger>
+        ) : null}
         <DialogContent className="flex max-h-[85vh] max-w-md flex-col gap-0 overflow-hidden p-0 sm:max-w-md">
           <DialogHeader className="shrink-0 border-b border-border px-6 py-4 text-left">
             <DialogTitle>Réglages de course</DialogTitle>

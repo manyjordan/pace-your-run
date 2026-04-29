@@ -36,6 +36,10 @@ type Props = {
     remainingSeconds: number;
   }> | null;
   isLandscape?: boolean;
+  showControls?: boolean;
+  showStatusBadge?: boolean;
+  showGpsStatus?: boolean;
+  showEstimatedFinish?: boolean;
 };
 
 export function RunMainTimerCard({
@@ -58,6 +62,10 @@ export function RunMainTimerCard({
   isProgramActive,
   estimatedFinishTimes,
   isLandscape = false,
+  showControls = true,
+  showStatusBadge = true,
+  showGpsStatus = true,
+  showEstimatedFinish = true,
 }: Props) {
   const { cadence } = useCadence(status === "running");
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
@@ -141,7 +149,7 @@ export function RunMainTimerCard({
   return (
     <ScrollReveal>
       <div className="flex w-full flex-col items-center px-4 pb-2 pt-1">
-        {status === "running" && (
+        {showStatusBadge && status === "running" && (
           <div className="mb-6 flex items-center gap-2">
             <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
             <span className="text-xs font-semibold uppercase tracking-widest text-accent">Course en cours</span>
@@ -220,7 +228,7 @@ export function RunMainTimerCard({
           )}
         </div>
 
-        {status === "running" && (
+        {showGpsStatus && status === "running" && (
           <div className="mb-6 flex items-center gap-1.5">
             <div
               className={cn(
@@ -234,7 +242,7 @@ export function RunMainTimerCard({
           </div>
         )}
 
-        {status === "running" && estimatedFinishTimes && estimatedFinishTimes.length > 0 && (
+        {showEstimatedFinish && status === "running" && estimatedFinishTimes && estimatedFinishTimes.length > 0 && (
           <div className="mt-4 w-full px-2">
             <p className="mb-2 text-center text-xs uppercase tracking-wider text-muted-foreground">A ce rythme</p>
             <div className="flex justify-center gap-3">
@@ -251,7 +259,7 @@ export function RunMainTimerCard({
           </div>
         )}
 
-        {status === "idle" && (
+        {showControls && status === "idle" && (
           <button
             type="button"
             onClick={start}
@@ -265,7 +273,7 @@ export function RunMainTimerCard({
           </button>
         )}
 
-        {status === "running" && (
+        {showControls && status === "running" && (
           <div className="flex gap-6">
             <button
               type="button"
@@ -284,7 +292,7 @@ export function RunMainTimerCard({
           </div>
         )}
 
-        {status === "paused" && (
+        {showControls && status === "paused" && (
           <div className="flex gap-6">
             <button
               type="button"
