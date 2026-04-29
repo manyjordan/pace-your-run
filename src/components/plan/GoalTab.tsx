@@ -575,22 +575,29 @@ export default function GoalTab() {
         </ScrollReveal>
       )}
 
-      {/* État : Objectif en cours */}
-      {savedAt && !isDefining && !isChanging && (
+      {/* État : objectif enregistré — résumé toujours visible pendant une modification */}
+      {savedAt && !hasNoGoalDefined && formData.goalType && formData.goalType !== "none" && (
         <ScrollReveal>
-          {!isDefining && !isChanging && formData.goalType && formData.goalType !== "none" && (
-            <div className="mb-2 flex justify-end">
+          <div className="mb-2 flex justify-end">
+            {isChanging ? (
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsChanging(false)}>
+                Annuler la modification
+              </Button>
+            ) : (
               <button
+                type="button"
                 onClick={handleChangeGoal}
                 className="flex items-center gap-1.5 rounded-xl border border-accent/30 px-3 py-1.5 text-sm font-medium text-accent transition-all hover:bg-accent/10 active:scale-95"
               >
                 <Pencil className="h-3.5 w-3.5" />
                 Modifier mon objectif
               </button>
-            </div>
-          )}
-          <Card className={`border-2 ${goalOptions.find(g => g.type === formData.goalType)?.borderColor || "border-border"}`}>
-            <CardContent className={`p-4 space-y-3 ${goalOptions.find(g => g.type === formData.goalType)?.bgColor || ""}`}>
+            )}
+          </div>
+          <Card className={`border-2 ${goalOptions.find((g) => g.type === formData.goalType)?.borderColor || "border-border"}`}>
+            <CardContent
+              className={`space-y-3 p-4 ${goalOptions.find((g) => g.type === formData.goalType)?.bgColor || ""}`}
+            >
               <div className="space-y-1">
                 <p className="text-sm font-bold">{activeGoalSummary}</p>
                 {activeGoalDetails.length > 0 && (
@@ -602,17 +609,21 @@ export default function GoalTab() {
                     ))}
                   </div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  Cliquez sur changer d'objectif pour revenir aux options poids, course et distance.
-                </p>
+                {!isChanging ? (
+                  <p className="text-xs text-muted-foreground">
+                    Cliquez sur changer d&apos;objectif pour revenir aux options poids, course et distance.
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    Votre objectif actuel reste affiché pendant que vous choisissez les modifications ci-dessous.
+                  </p>
+                )}
               </div>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={handleChangeGoal}
-              >
-                Changer d'objectif
-              </Button>
+              {!isChanging ? (
+                <Button variant="outline" className="w-full" onClick={handleChangeGoal}>
+                  Changer d&apos;objectif
+                </Button>
+              ) : null}
             </CardContent>
           </Card>
         </ScrollReveal>

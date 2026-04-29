@@ -7,7 +7,7 @@ import { RunSplitsCard } from "@/components/run/RunSplitsCard";
 import { RunTreadmillSpeedPanel } from "@/components/run/RunTreadmillSpeedPanel";
 import { Card, CardContent } from "@/components/ui/card";
 import { Map, AlertCircle, Settings, Play, ClipboardList, Pause, Square } from "lucide-react";
-import { lazy, Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useBluetoothHR, type RunBluetoothStatus } from "@/hooks/useBluetoothHR";
@@ -171,13 +171,6 @@ export default function Run() {
   const displayPace = convertPaceFromMinutesPerKm(pace, runPreferences.distanceUnit);
   const isRunActive = status === "running" || status === "paused";
   const hasLiveGpsTrace = gpsTrace.length > 0;
-  const dailyRec = useMemo(() => {
-    if (activeSession) {
-      return { emoji: "🎯", title: "Session du jour prête" };
-    }
-    return { emoji: "💪", title: "Construisez votre forme aujourd'hui" };
-  }, [activeSession]);
-
   const handlePersistCompletedRun = useCallback(() => {
     if (!runSummary) return;
     void persistCompletedRun({
@@ -362,12 +355,6 @@ export default function Run() {
               <p className="text-xs uppercase tracking-widest text-muted-foreground">
                 {format(new Date(), "EEEE dd MMMM", { locale: fr })}
               </p>
-              {dailyRec ? (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-lg">{dailyRec.emoji}</span>
-                  <p className="text-sm font-medium text-foreground">{dailyRec.title}</p>
-                </div>
-              ) : null}
             </div>
 
             <div className="flex flex-1 flex-col items-center justify-center gap-6">

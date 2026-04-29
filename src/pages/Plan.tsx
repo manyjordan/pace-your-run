@@ -253,6 +253,23 @@ export default function PlanPage() {
   const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   const todayShort = dayNames[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1];
 
+  const raceIsThisWeek = useMemo(() => {
+    if (!targetDate) return false;
+    const race = new Date(targetDate);
+    if (Number.isNaN(race.getTime())) return false;
+    return race >= weekStart && race <= weekEnd;
+  }, [targetDate, weekStart, weekEnd]);
+
+  const displayTotalKm = useMemo(() => {
+    const base = currentWeekData?.totalDistance ?? 0;
+    if (!raceIsThisWeek || normalizedGoalType !== "race") return base;
+    const parsed = Number.parseFloat(
+      String(userGoal?.target_distance_km ?? userGoal?.raceDistanceKm ?? "").replace(",", "."),
+    );
+    const raceKm = Number.isFinite(parsed) && parsed > 0 ? parsed : numericTargetDistance > 0 ? numericTargetDistance : 0;
+    return base + raceKm;
+  }, [currentWeekData?.totalDistance, raceIsThisWeek, normalizedGoalType, userGoal, numericTargetDistance]);
+
   return (
     <Tabs key={mainTab} defaultValue={mainTab} className="space-y-6">
       <ScrollReveal>
@@ -335,7 +352,7 @@ export default function PlanPage() {
                 <p className="mt-0.5 text-xs text-accent">{currentWeekData.focus}</p>
               </div>
               <div className="text-right">
-                <p className="font-metric text-2xl font-black text-foreground">{currentWeekData.totalDistance}</p>
+                <p className="font-metric text-2xl font-black text-foreground">{displayTotalKm}</p>
                 <p className="text-xs text-muted-foreground">km cette semaine</p>
               </div>
             </div>

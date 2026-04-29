@@ -709,13 +709,6 @@ export default function Social() {
           <div className="flex items-center justify-between px-4 py-3">
             <h1 className="text-xl font-bold text-foreground">Social</h1>
             <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => navigate("/import")}
-                className="text-xs font-medium text-accent"
-              >
-                + Importer
-              </button>
               <Sheet open={notifOpen} onOpenChange={(o) => void handleNotifOpenChange(o)}>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon" className="relative" aria-label="Notifications">

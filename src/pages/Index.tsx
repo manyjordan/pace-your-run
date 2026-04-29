@@ -1,9 +1,9 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, List, Play, TrendingUp, X } from "lucide-react";
+import { Activity, List, TrendingUp, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { differenceInDays, getWeek, subWeeks } from "date-fns";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getProfile,
@@ -31,8 +31,6 @@ import {
   getAggregationUnit,
   type MetricChartPeriod,
 } from "@/lib/dashboardHelpers";
-import { calculateTrainingLoad } from "@/lib/trainingLoad";
-import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import {
   scheduleStreakNotification,
   getLastNotifiedStreak,
@@ -108,7 +106,6 @@ function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | und
 
 const Dashboard = () => {
   const location = useLocation();
-  const navigate = useNavigate();
   const { session } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [athleteName, setAthleteName] = useState("Coureur");
@@ -420,31 +417,6 @@ const Dashboard = () => {
     }
     return "Objectif";
   }, [userGoal]);
-  const trainingLoad = useMemo(
-    () =>
-      runsForStats?.length
-        ? calculateTrainingLoad(
-            runsForStats
-              .map((run) => ({
-                started_at: run.started_at ?? run.created_at ?? "",
-                duration_seconds: run.duration_seconds ?? 0,
-                average_heartrate: run.average_heartrate ?? undefined,
-                distance_km: run.distance_km ?? 0,
-              }))
-              .filter((run) => run.started_at.length > 0 && run.duration_seconds > 0 && run.distance_km > 0),
-          )
-        : null,
-    [runsForStats],
-  );
-  const lastRunDaysAgo = useMemo(() => {
-    const lastRun = recentRuns.find((run) => Boolean(run.started_at));
-    if (!lastRun?.started_at) return 99;
-    return Math.max(0, differenceInDays(new Date(), new Date(lastRun.started_at)));
-  }, [recentRuns]);
-  const dailyRec = useMemo(
-    () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
-    [trainingLoad, lastRunDaysAgo],
-  );
   const lifetimeStats = useMemo(() => {
     const weekKeys = new Set(
       runsForStats
@@ -560,31 +532,9 @@ const Dashboard = () => {
                 </div>
               </div>
             ) : null}
-            <button
-              type="button"
-              onClick={() => navigate("/run")}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3 font-semibold text-white transition-all active:scale-95"
-            >
-              <Play className="h-4 w-4 fill-white" />
-              Lancer une course
-            </button>
           </AppCard>
         )}
       </ScrollReveal>
-
-      {dailyRec ? (
-        <ScrollReveal>
-          <AppCard className="border-l-4 py-3" style={{ borderLeftColor: dailyRec.color }}>
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">{dailyRec.emoji}</span>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-foreground">{dailyRec.title}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{dailyRec.description}</p>
-              </div>
-            </div>
-          </AppCard>
-        </ScrollReveal>
-      ) : null}
 
       {showImportBanner && recentRuns.length === 0 && (
         <ScrollReveal>
