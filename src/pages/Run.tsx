@@ -53,6 +53,9 @@ export default function Run() {
   const [isUpdatingAudience, setIsUpdatingAudience] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [currentWeather, setCurrentWeather] = useState<RunWeather | null>(null);
+  const [isLandscape, setIsLandscape] = useState(
+    typeof window !== "undefined" ? window.innerWidth > window.innerHeight : false,
+  );
 
   const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
@@ -254,6 +257,19 @@ export default function Run() {
       { timeout: 5000, maximumAge: 300_000 },
     );
   }, [status]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLandscape(window.innerWidth > window.innerHeight);
+    };
+
+    window.addEventListener("resize", handleResize);
+    screen.orientation?.addEventListener("change", handleResize);
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      screen.orientation?.removeEventListener("change", handleResize);
+    };
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -493,6 +509,7 @@ export default function Run() {
             isProgrammedMode={isProgrammedMode}
             isProgramActive={isProgramActive}
             estimatedFinishTimes={estimatedFinishTimes}
+            isLandscape={isLandscape}
           />
         )}
 

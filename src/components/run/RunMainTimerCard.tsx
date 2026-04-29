@@ -35,6 +35,7 @@ type Props = {
     totalSeconds: number;
     remainingSeconds: number;
   }> | null;
+  isLandscape?: boolean;
 };
 
 export function RunMainTimerCard({
@@ -56,6 +57,7 @@ export function RunMainTimerCard({
   isProgrammedMode,
   isProgramActive,
   estimatedFinishTimes,
+  isLandscape = false,
 }: Props) {
   const { cadence } = useCadence(status === "running");
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
@@ -76,6 +78,65 @@ export function RunMainTimerCard({
     gradeAdjustedPace > 0 ? formatPace(gradeAdjustedPace / 60).replace(` /${distanceUnitShortLabel}`, "") : null;
   const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
   const isGpsMedium = gpsAccuracy !== null && gpsAccuracy < 30;
+
+  if (isLandscape && status === "running") {
+    return (
+      <div className="flex h-screen w-full items-center justify-between px-8 py-4">
+        <div className="flex flex-col items-center">
+          <div className="font-metric text-7xl font-black leading-none text-foreground">{formattedElapsed}</div>
+          <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">durée</div>
+        </div>
+
+        <div className="flex flex-col items-center gap-4">
+          <div className="text-center">
+            <div className="font-metric text-5xl font-bold text-foreground">{displayDistance.toFixed(2)}</div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">{distanceUnitShortLabel}</div>
+          </div>
+          <div className="text-center">
+            <div className="font-metric text-4xl font-bold text-accent">{formattedPace}</div>
+            <div className="text-xs uppercase tracking-wider text-muted-foreground">/{distanceUnitShortLabel}</div>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-4">
+          {cadence > 0 && (
+            <div className="text-center">
+              <div className="font-metric text-3xl font-bold text-foreground">{cadence}</div>
+              <div className="text-xs uppercase text-muted-foreground">spm</div>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={pause}
+              className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-muted active:scale-95"
+            >
+              <Pause className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void stop()}
+              className="flex h-14 w-14 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 active:scale-95"
+            >
+              <Square className="h-5 w-5 fill-destructive text-destructive" />
+            </button>
+          </div>
+          {elevationGain > 0 ? (
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">+{Math.round(elevationGain)}m</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">D+</div>
+            </div>
+          ) : null}
+          {formattedGap ? (
+            <div className="text-center">
+              <div className="font-metric text-xl font-bold text-foreground">{formattedGap}</div>
+              <div className="text-xs uppercase tracking-wider text-muted-foreground">GAP</div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <ScrollReveal>
