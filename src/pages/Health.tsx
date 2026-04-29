@@ -3,13 +3,14 @@ import { CollapsibleDisclaimer } from "@/components/CollapsibleDisclaimer";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
-import { differenceInDays, getWeek, subWeeks } from "date-fns";
+import { differenceInDays, format, getWeek, startOfWeek, subWeeks } from "date-fns";
+import { fr } from "date-fns/locale";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
+import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { cache } from "@/lib/cache";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -823,6 +824,30 @@ const Health = () => {
     const runsPerWeek = last4Weeks.length / 4;
     return { recentKm, trend, runsPerWeek };
   }, [runsForStats]);
+  const weeklyView = useMemo(() => {
+    if (!runsForStats?.length) return null;
+    const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const lastWeekStart = subWeeks(thisWeekStart, 1);
+    const thisWeekRuns = runsForStats.filter((run) => {
+      if (!run.started_at) return false;
+      return new Date(run.started_at) >= thisWeekStart;
+    });
+    const lastWeekRuns = runsForStats.filter((run) => {
+      if (!run.started_at) return false;
+      const date = new Date(run.started_at);
+      return date >= lastWeekStart && date < thisWeekStart;
+    });
+
+    const thisWeekKm = thisWeekRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const lastWeekKm = lastWeekRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const trend = lastWeekKm > 0 ? Math.round(((thisWeekKm - lastWeekKm) / lastWeekKm) * 100) : 0;
+
+    return {
+      thisWeekRuns: thisWeekRuns.length,
+      thisWeekKm,
+      trend,
+    };
+  }, [runsForStats]);
   const trainingLoad = useMemo(
     () =>
       runsForStats?.length
@@ -959,9 +984,15 @@ const Health = () => {
 
   return (
     <PageContainer>
-      <ScrollReveal>
-        <PageHeader title="Santé et blessures" subtitle="Suivez votre récupération et gérez les blessures" />
-      </ScrollReveal>
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+        <div className="pt-safe" />
+        <div className="px-4 py-3">
+          <h1 className="text-xl font-bold text-foreground">Santé</h1>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {format(new Date(), "EEEE dd MMMM yyyy", { locale: fr })}
+          </p>
+        </div>
+      </div>
 
       <ScrollReveal>
         {trainingLoad ? (
@@ -1026,30 +1057,6 @@ const Health = () => {
         ) : null}
       </ScrollReveal>
 
-      <ScrollReveal>
-        <AppCard className="border-accent/20">
-          <div className="mb-3 flex items-center justify-between">
-            <div>
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">Forme actuelle</p>
-              <p className="mt-0.5 text-2xl font-bold text-foreground">
-                {fitnessScore ? `${fitnessScore.runsPerWeek.toFixed(1)} sorties/sem` : "--"}
-              </p>
-            </div>
-            <div
-              className={cn(
-                "rounded-full px-3 py-1.5 text-sm font-bold",
-                (fitnessScore?.trend ?? 0) >= 0 ? "bg-accent/15 text-accent" : "bg-orange-100 text-orange-600",
-              )}
-            >
-              {(fitnessScore?.trend ?? 0) >= 0 ? "↑" : "↓"} {Math.abs(fitnessScore?.trend ?? 0).toFixed(0)}%
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            vs les 4 semaines précédentes · {fitnessScore ? `${fitnessScore.recentKm.toFixed(0)} km sur 4 semaines` : "Aucune donnée récente"}
-          </p>
-        </AppCard>
-      </ScrollReveal>
-
       {dailyRec ? (
         <ScrollReveal>
           <AppCard className="border-l-4 py-3" style={{ borderLeftColor: dailyRec.color }}>
@@ -1061,6 +1068,97 @@ const Health = () => {
               </div>
             </div>
           </AppCard>
+        </ScrollReveal>
+      ) : null}
+
+      <ScrollReveal>
+        {fitnessScore ? (
+          <AppCard className="border-accent/20">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-wider text-muted-foreground">Forme actuelle</p>
+                <p className="mt-0.5 text-2xl font-bold text-foreground">{fitnessScore.runsPerWeek.toFixed(1)} sorties/sem</p>
+              </div>
+              <div
+                className={cn(
+                  "rounded-full px-3 py-1.5 text-sm font-bold",
+                  fitnessScore.trend >= 0 ? "bg-accent/15 text-accent" : "bg-orange-100 text-orange-600",
+                )}
+              >
+                {fitnessScore.trend >= 0 ? "↑" : "↓"} {Math.abs(fitnessScore.trend).toFixed(0)}%
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              vs les 4 semaines précédentes · {fitnessScore.recentKm.toFixed(0)} km sur 4 semaines
+            </p>
+          </AppCard>
+        ) : null}
+      </ScrollReveal>
+
+      <ScrollReveal>
+        {weeklyView ? (
+          <AppCard className="border-accent/20">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Vue hebdomadaire</h3>
+              <span className={cn("text-xs font-semibold", weeklyView.trend >= 0 ? "text-accent" : "text-orange-600")}>
+                {weeklyView.trend >= 0 ? "+" : ""}
+                {weeklyView.trend}% vs S-1
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-lg bg-muted/40 p-3 text-center">
+                <p className="font-metric text-xl font-bold text-foreground">{weeklyView.thisWeekRuns}</p>
+                <p className="text-xs text-muted-foreground">sorties cette semaine</p>
+              </div>
+              <div className="rounded-lg bg-muted/40 p-3 text-center">
+                <p className="font-metric text-xl font-bold text-foreground">{weeklyView.thisWeekKm.toFixed(1)} km</p>
+                <p className="text-xs text-muted-foreground">distance cumulée</p>
+              </div>
+            </div>
+          </AppCard>
+        ) : null}
+      </ScrollReveal>
+
+      {earnedAchievements.length > 0 ? (
+        <ScrollReveal>
+          <Accordion type="single" collapsible defaultValue="badges">
+            <AccordionItem value="badges" className="border-none">
+              <AppCard>
+                <AccordionTrigger className="p-0 hover:no-underline">
+                  <div className="mb-3 flex w-full items-center justify-between">
+                    <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Mes badges</h3>
+                    <span className="text-xs font-semibold text-accent">
+                      {earnedAchievements.length}/{ACHIEVEMENTS.length}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pb-0">
+                  <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1">
+                    {earnedAchievements.map((achievement) => (
+                      <div key={achievement.id} className="flex shrink-0 flex-col items-center gap-1">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 text-2xl">
+                          {achievement.emoji}
+                        </div>
+                        <span className="w-12 truncate text-center text-[10px] leading-tight text-muted-foreground">
+                          {achievement.title}
+                        </span>
+                      </div>
+                    ))}
+                    {nextAchievements.slice(0, 2).map((achievement) => (
+                      <div key={achievement.id} className="flex shrink-0 flex-col items-center gap-1 opacity-30">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 text-2xl grayscale">
+                          {achievement.emoji}
+                        </div>
+                        <span className="w-12 truncate text-center text-[10px] leading-tight text-muted-foreground">
+                          {achievement.title}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AppCard>
+            </AccordionItem>
+          </Accordion>
         </ScrollReveal>
       ) : null}
 
@@ -1167,39 +1265,6 @@ const Health = () => {
         </ScrollReveal>
       )}
 
-      {earnedAchievements.length > 0 && (
-        <ScrollReveal>
-          <AppCard>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Mes badges ({earnedAchievements.length}/{ACHIEVEMENTS.length})
-            </h3>
-            <div className="mb-4 flex flex-wrap gap-2">
-              {earnedAchievements.map((achievement) => (
-                <div key={achievement.id} className="flex w-16 flex-col items-center gap-1 rounded-xl bg-muted/50 p-2">
-                  <span className="text-2xl">{achievement.emoji}</span>
-                  <span className="text-center text-[10px] leading-tight text-muted-foreground">{achievement.title}</span>
-                </div>
-              ))}
-            </div>
-            {nextAchievements.length > 0 && (
-              <>
-                <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Prochains badges</p>
-                <div className="space-y-2">
-                  {nextAchievements.map((achievement) => (
-                    <div key={achievement.id} className="flex items-center gap-3 opacity-50">
-                      <span className="text-xl">{achievement.emoji}</span>
-                      <div>
-                        <p className="text-sm font-medium text-foreground">{achievement.title}</p>
-                        <p className="text-xs text-muted-foreground">{achievement.description}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </AppCard>
-        </ScrollReveal>
-      )}
     </PageContainer>
   );
 };
