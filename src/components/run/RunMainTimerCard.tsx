@@ -40,6 +40,12 @@ type Props = {
   showStatusBadge?: boolean;
   showGpsStatus?: boolean;
   showEstimatedFinish?: boolean;
+  currentKmSplit?: {
+    kmNumber: number;
+    elapsedAtKmStart: number;
+    distanceAtKmStart: number;
+  } | null;
+  currentKmPaceSec?: number;
 };
 
 export function RunMainTimerCard({
@@ -66,6 +72,8 @@ export function RunMainTimerCard({
   showStatusBadge = true,
   showGpsStatus = true,
   showEstimatedFinish = true,
+  currentKmSplit = null,
+  currentKmPaceSec = 0,
 }: Props) {
   const { cadence } = useCadence(status === "running");
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
@@ -84,6 +92,13 @@ export function RunMainTimerCard({
   const formattedPace = displayPace > 0 ? formatPace(displayPace).replace(` /${distanceUnitShortLabel}`, "") : "--:--";
   const formattedGap =
     gradeAdjustedPace > 0 ? formatPace(gradeAdjustedPace / 60).replace(` /${distanceUnitShortLabel}`, "") : null;
+  const formatPaceFromSeconds = (paceSec: number): string => {
+    if (!paceSec || paceSec <= 0) return "--:--";
+    const wholeMin = Math.floor(paceSec / 60);
+    const secs = Math.round(paceSec % 60);
+    const safeSecs = secs === 60 ? 59 : secs;
+    return `${wholeMin}:${String(safeSecs).padStart(2, "0")}`;
+  };
   const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
   const isGpsMedium = gpsAccuracy !== null && gpsAccuracy < 30;
 
@@ -256,6 +271,18 @@ export function RunMainTimerCard({
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {status === "running" && currentKmSplit && currentKmPaceSec > 0 && (
+          <div className="mt-4 flex w-full items-center justify-between rounded-xl bg-muted/50 px-4 py-2.5">
+            <div className="flex items-center gap-2">
+              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
+              <span className="text-xs font-medium text-muted-foreground">Km {currentKmSplit.kmNumber} en cours</span>
+            </div>
+            <span className="font-metric text-sm font-bold text-foreground">
+              {formatPaceFromSeconds(currentKmPaceSec)} /km
+            </span>
           </div>
         )}
 

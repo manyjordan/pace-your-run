@@ -90,6 +90,11 @@ type EstimatedFinishTime = {
   totalSeconds: number;
   remainingSeconds: number;
 };
+type CurrentKmSplit = {
+  kmNumber: number;
+  elapsedAtKmStart: number;
+  distanceAtKmStart: number;
+};
 
 const RACE_DISTANCES = [
   { label: "5km", km: 5 },
@@ -156,6 +161,7 @@ export function useRunSession({
   const [status, setStatus] = useState<RunStatus>("idle");
   const [distance, setDistance] = useState(0);
   const [routeProgress, setRouteProgress] = useState(0);
+  const [currentKmSplit, setCurrentKmSplit] = useState<CurrentKmSplit | null>(null);
 
   const runStartedAtRef = useRef<string | null>(null);
   const prevStatusRef = useRef<RunStatus>("idle");
@@ -227,6 +233,24 @@ export function useRunSession({
   const calories: number | undefined = undefined;
 
   useEffect(() => {
+    const kmNumber = Math.floor(distance) + 1;
+    if (!currentKmSplit || currentKmSplit.kmNumber !== kmNumber) {
+      setCurrentKmSplit({
+        kmNumber,
+        elapsedAtKmStart: elapsed - (distance % 1) * (elapsed / Math.max(distance, 0.001)),
+        distanceAtKmStart: Math.floor(distance),
+      });
+    }
+  }, [currentKmSplit, distance, elapsed]);
+
+  const currentKmPaceSec = useMemo(() => {
+    if (!currentKmSplit || distance <= currentKmSplit.distanceAtKmStart) return 0;
+    const kmProgress = distance - currentKmSplit.distanceAtKmStart;
+    const timeInKm = elapsed - currentKmSplit.elapsedAtKmStart;
+    return kmProgress > 0.05 ? timeInKm / kmProgress : 0;
+  }, [currentKmSplit, distance, elapsed]);
+
+  useEffect(() => {
     statusRef.current = status;
   }, [status, statusRef]);
 
@@ -278,6 +302,7 @@ export function useRunSession({
   const start = useCallback(() => {
     setElapsed(0);
     setDistance(0);
+    setCurrentKmSplit(null);
     setGpsTrace([]);
     setRollingPaceSecondsPerKm(0);
     setElevationGain(0);
@@ -467,6 +492,7 @@ export function useRunSession({
     setStatus("idle");
     setElapsed(0);
     setDistance(0);
+    setCurrentKmSplit(null);
     setGpsTrace([]);
     setRollingPaceSecondsPerKm(0);
     setElevationGain(0);
@@ -546,6 +572,8 @@ export function useRunSession({
     resumeKeepAlive,
     routeProgress,
     setRouteProgress,
+    currentKmSplit,
+    currentKmPaceSec,
     elevationGain,
     gradeAdjustedPace,
     start,

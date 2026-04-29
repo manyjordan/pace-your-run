@@ -118,6 +118,8 @@ export default function Run() {
     formatTime,
     routeProgress,
     setRouteProgress,
+    currentKmSplit,
+    currentKmPaceSec,
     start,
     pause,
     resume,
@@ -492,6 +494,8 @@ export default function Run() {
               showControls={false}
               showStatusBadge={false}
               showGpsStatus={false}
+              currentKmSplit={currentKmSplit}
+              currentKmPaceSec={currentKmPaceSec}
             />
 
             <div className="flex justify-center gap-6 pb-6 pb-safe">
@@ -593,6 +597,8 @@ export default function Run() {
             isProgramActive={isProgramActive}
             estimatedFinishTimes={estimatedFinishTimes}
             isLandscape={isLandscape}
+            currentKmSplit={currentKmSplit}
+            currentKmPaceSec={currentKmPaceSec}
           />
         )}
 
