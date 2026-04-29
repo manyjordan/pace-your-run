@@ -77,6 +77,28 @@ export type RouteRow = {
   created_at: string | null;
 };
 
+export type RunStatsLifetimeRow = {
+  user_id: string;
+  total_distance_km: number;
+  total_duration_seconds: number;
+  total_runs: number;
+  total_elevation_gain: number;
+  longest_run_km: number;
+  best_pace_sec_per_km: number;
+  updated_at: string | null;
+};
+
+export type RunStatsWeeklyRow = {
+  id: string;
+  user_id: string;
+  week_start: string;
+  total_distance_km: number;
+  total_duration_seconds: number;
+  run_count: number;
+  total_elevation_gain: number;
+  updated_at: string | null;
+};
+
 export type RunInput = {
   average_heartrate?: number | null;
   average_pace?: number | null;
@@ -450,6 +472,29 @@ export async function getAllRunsForStats(userId: string) {
 
   if (error) throw error;
   return (data ?? []) as RunRow[];
+}
+
+export async function getRunStatsLifetime(userId: string) {
+  await requireCurrentUserId(userId);
+  const { data, error } = await supabase
+    .from("run_stats_lifetime")
+    .select("*")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as RunStatsLifetimeRow | null;
+}
+
+export async function getRunStatsWeekly(userId: string, weeks = 52) {
+  await requireCurrentUserId(userId);
+  const { data, error } = await supabase
+    .from("run_stats_weekly")
+    .select("*")
+    .eq("user_id", userId)
+    .order("week_start", { ascending: false })
+    .limit(weeks);
+  if (error) throw error;
+  return (data ?? []) as RunStatsWeeklyRow[];
 }
 
 export async function getRunWithGps(userId: string, runId: string) {

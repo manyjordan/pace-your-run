@@ -9,11 +9,13 @@ import {
   getProfile,
   getRuns,
   getAllRunsForStats,
+  getRunStatsLifetime,
   getPersonalizedFeed,
   getRunWithGps,
   type PersonalizedFeedPost,
   type ProfileRow,
   type RunGpsPoint,
+  type RunStatsLifetimeRow,
   type RunRow,
 } from "@/lib/database";
 import { logger } from "@/lib/logger";
@@ -95,6 +97,7 @@ const Dashboard = () => {
   const [runCount, setRunCount] = useState(0);
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
+  const [lifetimeStatsDb, setLifetimeStatsDb] = useState<RunStatsLifetimeRow | null>(null);
   const [showSkeletons, setShowSkeletons] = useState(true);
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
@@ -111,6 +114,7 @@ const Dashboard = () => {
     const cachedRuns = cache.get<RunRow[]>(`runs_${storedUserId}`);
     const cachedRunsStats = cache.get<RunRow[]>(`runsStats_${storedUserId}`);
     const cachedProfile = cache.get<ProfileRow>(`profile_${storedUserId}`);
+    const cachedLifetimeStats = cache.get<RunStatsLifetimeRow>(`lifetimeStats_${storedUserId}`);
 
     if (cachedRuns || cachedProfile) {
       if (cachedRuns) {
@@ -129,6 +133,9 @@ const Dashboard = () => {
         ) {
           setUserGoal(normalizeGoalData(cachedProfile.goal_data as ProfileGoalData) as ProfileGoalData);
         }
+      }
+      if (cachedLifetimeStats) {
+        setLifetimeStatsDb(cachedLifetimeStats);
       }
       setIsLoading(false);
       setShowSkeletons(false);
@@ -153,6 +160,7 @@ const Dashboard = () => {
       setRunCount(0);
       setRecentRuns([]);
       setRunsForStats([]);
+      setLifetimeStatsDb(null);
       setAthleteName("Coureur");
       setIsLoading(false);
       return;
@@ -164,6 +172,7 @@ const Dashboard = () => {
     const cachedRuns = cache.get<RunRow[]>(`runs_${userId}`);
     const cachedRunsStats = cache.get<RunRow[]>(`runsStats_${userId}`);
     const cachedProfile = cache.get<ProfileRow>(`profile_${userId}`);
+    const cachedLifetimeStats = cache.get<RunStatsLifetimeRow>(`lifetimeStats_${userId}`);
 
     if (cachedRuns) {
       setRecentRuns(cachedRuns);
@@ -182,6 +191,10 @@ const Dashboard = () => {
         setUserGoal(null);
       }
     }
+    if (cachedLifetimeStats) {
+      setLifetimeStatsDb(cachedLifetimeStats);
+      setIsLoading(false);
+    }
 
     // Guard concurrent and too-frequent refetches.
     if (isLoadingRef.current) return;
@@ -190,24 +203,27 @@ const Dashboard = () => {
     isLoadingRef.current = true;
     lastFetchRef.current = now;
 
-    if (!cachedRuns && !cachedRunsStats && !cachedProfile) {
+    if (!cachedRuns && !cachedRunsStats && !cachedProfile && !cachedLifetimeStats) {
       setIsLoading(true);
     }
 
     try {
-      const [profile, runs, runsStats] = await Promise.all([
+      const [profile, runs, runsStats, lifetimeDb] = await Promise.all([
         getProfile(userId),
         getRuns(userId),
         getAllRunsForStats(userId),
+        getRunStatsLifetime(userId),
       ]);
 
       if (runs) cache.set(`runs_${userId}`, runs);
       if (runsStats) cache.set(`runsStats_${userId}`, runsStats);
       if (profile) cache.set(`profile_${userId}`, profile);
+      if (lifetimeDb) cache.set(`lifetimeStats_${userId}`, lifetimeDb);
 
       setRunCount(runs?.length ?? 0);
       setRecentRuns(runs ?? []);
       setRunsForStats(runsStats ?? []);
+      setLifetimeStatsDb(lifetimeDb ?? null);
 
       if (profile?.first_name?.trim()) {
         setAthleteName(profile.first_name.trim());
@@ -225,6 +241,7 @@ const Dashboard = () => {
       setRunCount(0);
       setRecentRuns([]);
       setRunsForStats([]);
+      setLifetimeStatsDb(null);
     } finally {
       setIsLoading(false);
       isLoadingRef.current = false;
@@ -404,20 +421,6 @@ const Dashboard = () => {
     [trainingLoad, lastRunDaysAgo],
   );
   const lifetimeStats = useMemo(() => {
-    if (!runsForStats?.length) return null;
-
-    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const totalHours = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0) / 3600;
-    const totalRuns = runsForStats.length;
-    const totalElevation = runsForStats.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
-
-    const validRuns = runsForStats.filter((run) => (run.distance_km ?? 0) > 0 && (run.duration_seconds ?? 0) > 0);
-    const totalDist = validRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const totalSec = validRuns.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0);
-    const avgPaceSecPerKm = totalDist > 0 ? totalSec / totalDist : 0;
-
-    const longestRun = Math.max(...runsForStats.map((run) => run.distance_km ?? 0));
-
     const weekKeys = new Set(
       runsForStats
         .filter((run) => Boolean(run.started_at))
@@ -444,8 +447,33 @@ const Dashboard = () => {
       }
     }
 
+    if (lifetimeStatsDb) {
+      return {
+        totalKm: Number(lifetimeStatsDb.total_distance_km ?? 0),
+        totalHours: Number(lifetimeStatsDb.total_duration_seconds ?? 0) / 3600,
+        totalRuns: Number(lifetimeStatsDb.total_runs ?? 0),
+        totalElevation: Number(lifetimeStatsDb.total_elevation_gain ?? 0),
+        avgPaceSecPerKm: Number(lifetimeStatsDb.best_pace_sec_per_km ?? 0),
+        longestRun: Number(lifetimeStatsDb.longest_run_km ?? 0),
+        streak,
+      };
+    }
+
+    if (!runsForStats?.length) return null;
+
+    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const totalHours = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0) / 3600;
+    const totalRuns = runsForStats.length;
+    const totalElevation = runsForStats.reduce((sum, run) => sum + (run.elevation_gain ?? 0), 0);
+
+    const validRuns = runsForStats.filter((run) => (run.distance_km ?? 0) > 0 && (run.duration_seconds ?? 0) > 0);
+    const totalDist = validRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const totalSec = validRuns.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0);
+    const avgPaceSecPerKm = totalDist > 0 ? totalSec / totalDist : 0;
+    const longestRun = Math.max(...runsForStats.map((run) => run.distance_km ?? 0));
+
     return { totalKm, totalHours, totalRuns, totalElevation, avgPaceSecPerKm, longestRun, streak };
-  }, [runsForStats]);
+  }, [lifetimeStatsDb, runsForStats]);
 
   return (
     <>
