@@ -905,40 +905,61 @@ const Health = () => {
       <ScrollReveal>
         {trainingLoad ? (
           <AppCard className="border-l-4" style={{ borderLeftColor: trainingLoad.statusColor }}>
-            <div className="mb-2 flex items-start justify-between">
+            <div className="mb-3 flex items-center justify-between">
               <div>
-                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Charge d&apos;entrainement</p>
+                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Forme du moment</p>
                 <p className="text-xl font-bold" style={{ color: trainingLoad.statusColor }}>
                   {trainingLoad.statusLabel}
                 </p>
               </div>
-              <div className="text-right">
-                <div className="font-metric text-2xl font-black text-foreground">{Math.round(trainingLoad.ctl)}</div>
-                <div className="text-xs text-muted-foreground">forme chronique</div>
-              </div>
+              <span className="text-3xl">
+                {trainingLoad.status === "peak"
+                  ? "🟢"
+                  : trainingLoad.status === "optimal"
+                    ? "🟡"
+                    : trainingLoad.status === "tired"
+                      ? "🔴"
+                      : trainingLoad.status === "fresh"
+                        ? "🔵"
+                        : "⚪"}
+              </span>
             </div>
-            <p className="mb-3 text-xs text-muted-foreground">{trainingLoad.statusDescription}</p>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="rounded-lg bg-muted/50 py-2 text-center">
-                <p className="font-metric text-sm font-bold text-foreground">{Math.round(trainingLoad.atl)}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Fatigue</p>
-              </div>
-              <div className="rounded-lg bg-muted/50 py-2 text-center">
-                <p className="font-metric text-sm font-bold text-foreground">{Math.round(trainingLoad.ctl)}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Forme</p>
-              </div>
-              <div className="rounded-lg bg-muted/50 py-2 text-center">
-                <p
-                  className={cn(
-                    "font-metric text-sm font-bold",
-                    trainingLoad.tsb >= 0 ? "text-accent" : "text-orange-400",
-                  )}
-                >
-                  {trainingLoad.tsb >= 0 ? "+" : ""}
-                  {Math.round(trainingLoad.tsb)}
-                </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">Équilibre</p>
-              </div>
+            <p className="mb-4 text-xs text-muted-foreground">{trainingLoad.statusDescription}</p>
+
+            <div className="mb-3 space-y-1.5">
+              {[
+                { label: "Désentraînement", color: "#9CA3AF", active: trainingLoad.status === "detraining" },
+                { label: "Récupération", color: "#ef4444", active: trainingLoad.status === "tired" },
+                { label: "En progression", color: "#fb923c", active: trainingLoad.status === "optimal" },
+                { label: "Pic de forme", color: "#1DB954", active: trainingLoad.status === "peak" },
+                { label: "Frais / Affûté", color: "#60a5fa", active: trainingLoad.status === "fresh" },
+              ].map((segment) => (
+                <div key={segment.label} className="flex items-center gap-2">
+                  <div
+                    className={cn("h-2 rounded-full transition-all", segment.active ? "flex-[3]" : "flex-1 opacity-30")}
+                    style={{ backgroundColor: segment.color }}
+                  />
+                  <span
+                    className={cn(
+                      "w-28 shrink-0 text-xs",
+                      segment.active ? "font-semibold text-foreground" : "text-muted-foreground",
+                    )}
+                  >
+                    {segment.label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{trainingLoad.trend === "improving" ? "↑" : trainingLoad.trend === "declining" ? "↓" : "→"}</span>
+              <span>
+                {trainingLoad.trend === "improving"
+                  ? "Charge en hausse cette semaine"
+                  : trainingLoad.trend === "declining"
+                    ? "Charge en baisse cette semaine"
+                    : "Charge stable cette semaine"}
+              </span>
             </div>
           </AppCard>
         ) : null}
