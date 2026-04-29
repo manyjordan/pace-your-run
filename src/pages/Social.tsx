@@ -58,7 +58,7 @@ import {
   getInitials,
   type CommunityPost,
 } from "@/lib/runFormatters";
-import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
+import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { ActivityPostCard } from "@/components/social/ActivityPostCard";
 
 const ForumSection = lazy(() =>
@@ -403,7 +403,6 @@ export default function Social() {
   const [friendQuery, setFriendQuery] = useState("");
   const [suggestions, setSuggestions] = useState<{ profile: ProfileRow; runCount: number }[]>([]);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
-  const [followingAnyone, setFollowingAnyone] = useState(false);
   const [followBusyId, setFollowBusyId] = useState<string | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<RunRow | null>(null);
   const [selectedTrace, setSelectedTrace] = useState<CommunityPost["gpsTrace"] | undefined>(undefined);
@@ -599,7 +598,6 @@ export default function Social() {
       ]);
 
       setFollowingIds(new Set(followingList));
-      setFollowingAnyone(followingList.length > 0);
       setSuggestions(suggested);
       const mappedPosts = feed.map(mapPersonalizedPostToFeedPost);
       const nextActivities = feed.filter((post) => post.run).map((post) => post.run as RunRow);
@@ -655,7 +653,6 @@ export default function Social() {
       setFollowBusyId(profileId);
       await followUser(user.id, profileId);
       setFollowingIds((prev) => new Set([...prev, profileId]));
-      setFollowingAnyone(true);
       setSuggestions((prev) => prev.filter((s) => s.profile.id !== profileId));
       window.dispatchEvent(new Event("pace-notifications-updated"));
     } catch {
@@ -706,94 +703,97 @@ export default function Social() {
         />
       )}
 
-      <ScrollReveal>
-        <PageHeader
-          title="Communauté"
-          action={
-            <div className="flex shrink-0 items-center gap-1">
-            <Sheet open={notifOpen} onOpenChange={(o) => void handleNotifOpenChange(o)}>
-              <SheetTrigger asChild>
-                <Button variant="outline" size="icon" className="relative" aria-label="Notifications">
-                  <Bell className="h-4 w-4" />
-                  {unreadNotifCount > 0 ? (
-                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
-                      {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
-                    </span>
-                  ) : null}
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
-                <SheetHeader>
-                  <SheetTitle>Notifications</SheetTitle>
-                </SheetHeader>
-                <div className="mt-4 space-y-2">
-                  {notifLoading ? (
-                    <div className="space-y-2 py-4">
-                      {[1, 2, 3].map((i) => (
-                        <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
-                      ))}
-                    </div>
-                  ) : notifications.length === 0 ? (
-                    <p className="py-8 text-center text-sm text-muted-foreground">Aucune notification pour l&apos;instant</p>
-                  ) : (
-                    notifications.map((n) => (
-                      <div
-                        key={n.id}
-                        className={`flex gap-3 rounded-lg border border-border p-3 ${
-                          !n.read_at ? "bg-accent/10" : ""
-                        }`}
-                      >
-                        <div className="mt-0.5 text-muted-foreground">
-                          {n.type === "like" ? <Heart className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
-                        </div>
-                        <div className="min-w-0 flex-1 text-sm">
-                          <p>
-                            {n.type === "like" ? (
-                              <>
-                                {actorFirstName(n.actor)} a aimé votre course{" "}
-                                <span className="font-medium">{n.post_title || "sans titre"}</span>
-                              </>
-                            ) : (
-                              <>{actorFirstName(n.actor)} a commencé à vous suivre</>
-                            )}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {formatRelativeTime(n.created_at ?? new Date().toISOString())}
-                          </p>
-                        </div>
+      <Tabs defaultValue="feed" className="space-y-4">
+        <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+          <div className="pt-safe" />
+          <div className="flex items-center justify-between px-4 py-3">
+            <h1 className="text-xl font-bold text-foreground">Social</h1>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => navigate("/import")}
+                className="text-xs font-medium text-accent"
+              >
+                + Importer
+              </button>
+              <Sheet open={notifOpen} onOpenChange={(o) => void handleNotifOpenChange(o)}>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon" className="relative" aria-label="Notifications">
+                    <Bell className="h-4 w-4" />
+                    {unreadNotifCount > 0 ? (
+                      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-0.5 text-[10px] font-bold text-white">
+                        {unreadNotifCount > 9 ? "9+" : unreadNotifCount}
+                      </span>
+                    ) : null}
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto">
+                  <SheetHeader>
+                    <SheetTitle>Notifications</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-4 space-y-2">
+                    {notifLoading ? (
+                      <div className="space-y-2 py-4">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="h-14 animate-pulse rounded-lg bg-muted" />
+                        ))}
                       </div>
-                    ))
-                  )}
-                </div>
-              </SheetContent>
-            </Sheet>
-            <Button
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-              onClick={() => setShowFriendSearch((v) => !v)}
-              aria-label="Rechercher des amis"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
+                    ) : notifications.length === 0 ? (
+                      <p className="py-8 text-center text-sm text-muted-foreground">Aucune notification pour l&apos;instant</p>
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          className={`flex gap-3 rounded-lg border border-border p-3 ${
+                            !n.read_at ? "bg-accent/10" : ""
+                          }`}
+                        >
+                          <div className="mt-0.5 text-muted-foreground">
+                            {n.type === "like" ? <Heart className="h-4 w-4" /> : <UserPlus className="h-4 w-4" />}
+                          </div>
+                          <div className="min-w-0 flex-1 text-sm">
+                            <p>
+                              {n.type === "like" ? (
+                                <>
+                                  {actorFirstName(n.actor)} a aimé votre course{" "}
+                                  <span className="font-medium">{n.post_title || "sans titre"}</span>
+                                </>
+                              ) : (
+                                <>{actorFirstName(n.actor)} a commencé à vous suivre</>
+                              )}
+                            </p>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {formatRelativeTime(n.created_at ?? new Date().toISOString())}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </SheetContent>
+              </Sheet>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0"
+                onClick={() => setShowFriendSearch((v) => !v)}
+                aria-label="Rechercher des amis"
+              >
+                <Search className="h-4 w-4" />
+              </Button>
             </div>
-          }
-        />
-      </ScrollReveal>
-
-      <Tabs defaultValue="activity" className="space-y-6">
-        <ScrollReveal>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="activity">
-              <Users className="mr-1.5 h-4 w-4" /> Activité
+          </div>
+          <TabsList className="h-auto w-full gap-2 border-0 bg-transparent px-4 pb-2">
+            <TabsTrigger value="feed" className="flex-1 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white">
+              Feed
             </TabsTrigger>
-            <TabsTrigger value="forum">
-              <MessageCircle className="mr-1.5 h-4 w-4" /> Forum
+            <TabsTrigger value="forum" className="flex-1 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white">
+              Forum
             </TabsTrigger>
           </TabsList>
-        </ScrollReveal>
+        </div>
 
-        <TabsContent value="activity" className="space-y-4">
+        <TabsContent value="feed" className="space-y-4">
           {showFriendSearch && (
             <ScrollReveal>
               <AppCard className="p-0">
@@ -908,29 +908,22 @@ export default function Social() {
                   </AppCard>
                 </ScrollReveal>
               ) : posts.length === 0 ? (
-                <ScrollReveal>
-                  <AppCard className="border-[hsl(var(--accent))]/30 bg-[hsl(var(--accent))]/5">
-                    <CardContent className="flex flex-col items-center gap-4 p-6 text-center">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[hsl(var(--accent))]/15 text-[hsl(var(--accent))]">
-                        <Users className="h-7 w-7" />
-                      </div>
-                      <div className="space-y-1">
-                        <h3 className="font-semibold">Fil vide</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {!followingAnyone
-                            ? "Suivez des coureurs pour voir leur activité ici. Commencez par enregistrer votre première course et partagez-la !"
-                            : "Aucune activité récente de vos abonnements"}
-                        </p>
-                      </div>
-                      <Button
-                        className="bg-[hsl(var(--accent))] text-accent-foreground hover:bg-[hsl(var(--accent))]/90"
-                        onClick={() => navigate("/run")}
-                      >
-                        Enregistrer une course
-                      </Button>
-                    </CardContent>
-                  </AppCard>
-                </ScrollReveal>
+                <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                  <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10">
+                    <Users className="h-8 w-8 text-accent" />
+                  </div>
+                  <p className="text-lg font-bold text-foreground">Votre feed est vide</p>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Suivez d&apos;autres coureurs ou importez vos courses pour voir du contenu ici.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/import")}
+                    className="mt-4 rounded-xl bg-accent px-6 py-2.5 text-sm font-semibold text-white transition-all active:scale-95"
+                  >
+                    Importer mes courses
+                  </button>
+                </div>
               ) : (
                 <>
                   {visibleItems.map((post) => (
