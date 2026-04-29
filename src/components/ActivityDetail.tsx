@@ -12,6 +12,10 @@ import { calculateSplits, formatSplitPace, type SplitTracePoint } from "@/lib/sp
 import { calculateZoneDistribution, getHRZones } from "@/lib/heartRateZones";
 import { downloadGpx, generateGpx } from "@/lib/gpxExport";
 import { fetchRunWeather, type RunWeather } from "@/lib/weather";
+import { AppCard } from "@/components/ui/page-layout";
+import { findSimilarRoutes } from "@/lib/routeMatcher";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
 type ActivitySplitMetric = {
   distance: number;
@@ -433,6 +437,33 @@ export function ActivityDetail({
         value: Math.round(point.altitude as number),
       }));
   }, [fullRun?.gps_trace]);
+  const similarRuns = useMemo(() => {
+    if (!Array.isArray(fullRun?.gps_trace) || fullRun.gps_trace.length === 0 || !Array.isArray(allActivities)) return [];
+    return findSimilarRoutes(
+      {
+        id: activity.id,
+        distance_km: activity.distance_km ?? 0,
+        gps_trace: fullRun.gps_trace as Array<{ lat: number; lng: number }>,
+      },
+      allActivities
+        .filter(
+          (run) =>
+            run.id !== activity.id &&
+            Array.isArray(run.gps_trace) &&
+            run.gps_trace.length > 1 &&
+            (run.started_at ?? "").length > 0 &&
+            run.distance_km > 0,
+        )
+        .map((run) => ({
+          id: run.id,
+          started_at: run.started_at ?? run.created_at ?? new Date().toISOString(),
+          distance_km: run.distance_km,
+          duration_seconds: run.duration_seconds,
+          average_pace: run.average_pace,
+          gps_trace: run.gps_trace as Array<{ lat: number; lng: number }>,
+        })),
+    );
+  }, [fullRun?.gps_trace, allActivities, activity.id, activity.distance_km]);
 
   const handleExportGpx = useCallback(() => {
     if (!Array.isArray(fullRun?.gps_trace) || fullRun.gps_trace.length === 0) return;
@@ -648,6 +679,44 @@ export function ActivityDetail({
               })}
             </div>
           </div>
+        ) : null}
+
+        {similarRuns.length > 0 ? (
+          <AppCard>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Même itinéraire
+            </h3>
+            <div className="space-y-2">
+              {similarRuns.map(({ run }) => {
+                const currentPace = (activity.duration_seconds ?? 0) / Math.max(activity.distance_km ?? 1, 0.001);
+                const runPace = run.duration_seconds / Math.max(run.distance_km, 0.001);
+                const diffSec = Math.round(currentPace - runPace);
+                const isFaster = diffSec < 0;
+
+                return (
+                  <div key={run.id} className="flex items-center justify-between border-b border-border py-2 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {format(new Date(run.started_at), "dd MMM yyyy", { locale: fr })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {run.distance_km.toFixed(2)} km · {formatDuration(run.duration_seconds)}
+                      </p>
+                    </div>
+                    <div
+                      className={cn(
+                        "font-metric rounded-lg px-2 py-1 text-sm font-bold",
+                        isFaster ? "bg-accent/10 text-accent" : "bg-orange-50 text-orange-500",
+                      )}
+                    >
+                      {isFaster ? "" : "+"}
+                      {Math.abs(diffSec)}s {isFaster ? "plus rapide" : "plus lent"}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </AppCard>
         ) : null}
 
         {elevationData.length > 5 ? (
