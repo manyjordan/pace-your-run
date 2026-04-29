@@ -4,7 +4,7 @@ import { InfoTooltip } from "@/components/InfoTooltip";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Search } from "lucide-react";
-import { differenceInDays, format, getWeek, startOfWeek, subWeeks } from "date-fns";
+import { addDays, differenceInDays, endOfWeek, format, parseISO, startOfWeek, subWeeks } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -15,7 +15,12 @@ import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { cache } from "@/lib/cache";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { getAllRunsForStats, type RunRow } from "@/lib/database";
+import {
+  getRunStatsLifetime,
+  getRunStatsWeekly,
+  type RunStatsLifetimeRow,
+  type RunStatsWeeklyRow,
+} from "@/lib/database";
 import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import { calculateTrainingLoad } from "@/lib/trainingLoad";
 import { ACHIEVEMENTS, getEarnedAchievements, getNextAchievements } from "@/lib/achievements";
@@ -712,6 +717,71 @@ function resolveIssueKeyFromUrl(issueKey: string | undefined): string | null {
   return null;
 }
 
+function computeWeeklyStreakFromAggregate(weekly: RunStatsWeeklyRow[]): number {
+  const map = new Map<string, RunStatsWeeklyRow>();
+  for (const w of weekly) {
+    map.set(w.week_start.slice(0, 10), w);
+  }
+  let streak = 0;
+  let checkDate = new Date();
+  for (let i = 0; i < 104; i += 1) {
+    const monday = startOfWeek(checkDate, { weekStartsOn: 1 });
+    const key = format(monday, "yyyy-MM-dd");
+    const row = map.get(key);
+    if (row && Number(row.run_count ?? 0) > 0) {
+      streak += 1;
+      checkDate = subWeeks(checkDate, 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+function daysSinceLastWeeklyActivity(weekly: RunStatsWeeklyRow[]): number {
+  const sorted = [...weekly].sort(
+    (a, b) => parseISO(b.week_start).getTime() - parseISO(a.week_start).getTime(),
+  );
+  for (const w of sorted) {
+    if (Number(w.run_count ?? 0) > 0 || Number(w.total_distance_km ?? 0) > 0) {
+      const weekStart = startOfWeek(parseISO(w.week_start), { weekStartsOn: 1 });
+      const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+      return Math.max(0, differenceInDays(new Date(), weekEnd));
+    }
+  }
+  return 99;
+}
+
+function weeklyRowsToTrainingRunData(weeks: RunStatsWeeklyRow[]): Array<{
+  started_at: string;
+  duration_seconds: number;
+  distance_km: number;
+  average_heartrate?: number;
+}> {
+  const out: Array<{
+    started_at: string;
+    duration_seconds: number;
+    distance_km: number;
+    average_heartrate?: number;
+  }> = [];
+  for (const w of weeks) {
+    const dist = Number(w.total_distance_km ?? 0);
+    const dur = Number(w.total_duration_seconds ?? 0);
+    if (Number(w.run_count ?? 0) <= 0 && dist <= 0) continue;
+    const weekStart = parseISO(w.week_start);
+    if (!Number.isFinite(weekStart.getTime())) continue;
+    for (let d = 0; d < 7; d += 1) {
+      const day = addDays(weekStart, d);
+      out.push({
+        started_at: day.toISOString(),
+        distance_km: dist / 7,
+        duration_seconds: Math.max(1, Math.round(dur / 7)),
+      });
+    }
+  }
+  return out.filter((r) => r.distance_km > 0 && r.duration_seconds > 0);
+}
+
 const Health = () => {
   const { issueKey } = useParams<{ issueKey: string }>();
   const navigate = useNavigate();
@@ -719,7 +789,8 @@ const Health = () => {
   const resolvedIssueKey = useMemo(() => resolveIssueKeyFromUrl(issueKey), [issueKey]);
   const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
-  const [runsForStats, setRunsForStats] = useState<RunRow[]>([]);
+  const [lifetimeRow, setLifetimeRow] = useState<RunStatsLifetimeRow | null>(null);
+  const [weeklyRows, setWeeklyRows] = useState<RunStatsWeeklyRow[]>([]);
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
@@ -738,22 +809,26 @@ const Health = () => {
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) {
-      setRunsForStats([]);
+      setLifetimeRow(null);
+      setWeeklyRows([]);
       return;
     }
 
-    const cachedRuns = cache.get<RunRow[]>(`healthRuns_${userId}`);
-    if (cachedRuns) {
-      setRunsForStats(cachedRuns);
-    }
+    const cachedLifetime = cache.get<RunStatsLifetimeRow>(`healthLifetime_${userId}`);
+    const cachedWeekly = cache.get<RunStatsWeeklyRow[]>(`healthWeekly_${userId}`);
+    if (cachedLifetime) setLifetimeRow(cachedLifetime);
+    if (cachedWeekly?.length) setWeeklyRows(cachedWeekly);
 
-    void getAllRunsForStats(userId)
-      .then((runs) => {
-        setRunsForStats(runs ?? []);
-        cache.set(`healthRuns_${userId}`, runs ?? []);
+    void Promise.all([getRunStatsLifetime(userId), getRunStatsWeekly(userId, 52)])
+      .then(([lifetime, weekly]) => {
+        setLifetimeRow(lifetime);
+        setWeeklyRows(weekly ?? []);
+        if (lifetime) cache.set(`healthLifetime_${userId}`, lifetime);
+        cache.set(`healthWeekly_${userId}`, weekly ?? []);
       })
       .catch(() => {
-        if (!cachedRuns) setRunsForStats([]);
+        if (!cachedLifetime) setLifetimeRow(null);
+        if (!cachedWeekly?.length) setWeeklyRows([]);
       });
   }, [session?.user?.id]);
 
@@ -807,110 +882,59 @@ const Health = () => {
 
   const visibleIssuesCount = filteredZones.reduce((count, zone) => count + zone.issues.length, 0);
   const fitnessScore = useMemo(() => {
-    if (!runsForStats || runsForStats.length === 0) return null;
+    if (!weeklyRows.length) return null;
     const now = new Date();
-    const last4Weeks = runsForStats.filter((run) => {
-      if (!run.started_at) return false;
-      return new Date(run.started_at) >= subWeeks(now, 4);
-    });
-    const prev4Weeks = runsForStats.filter((run) => {
-      if (!run.started_at) return false;
-      const d = new Date(run.started_at);
-      return d >= subWeeks(now, 8) && d < subWeeks(now, 4);
+    const fourAgo = subWeeks(now, 4);
+    const eightAgo = subWeeks(now, 8);
+    const last4Weeks = weeklyRows.filter((w) => parseISO(w.week_start) >= fourAgo);
+    const prev4Weeks = weeklyRows.filter((w) => {
+      const s = parseISO(w.week_start);
+      return s >= eightAgo && s < fourAgo;
     });
 
-    const recentKm = last4Weeks.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const prevKm = prev4Weeks.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    const recentKm = last4Weeks.reduce((sum, w) => sum + Number(w.total_distance_km ?? 0), 0);
+    const prevKm = prev4Weeks.reduce((sum, w) => sum + Number(w.total_distance_km ?? 0), 0);
     const trend = prevKm > 0 ? ((recentKm - prevKm) / prevKm) * 100 : 0;
-    const runsPerWeek = last4Weeks.length / 4;
+    const runCount = last4Weeks.reduce((sum, w) => sum + Number(w.run_count ?? 0), 0);
+    const runsPerWeek = runCount / 4;
     return { recentKm, trend, runsPerWeek };
-  }, [runsForStats]);
+  }, [weeklyRows]);
   const weeklyView = useMemo(() => {
-    if (!runsForStats?.length) return null;
-    const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const lastWeekStart = subWeeks(thisWeekStart, 1);
-    const thisWeekRuns = runsForStats.filter((run) => {
-      if (!run.started_at) return false;
-      return new Date(run.started_at) >= thisWeekStart;
-    });
-    const lastWeekRuns = runsForStats.filter((run) => {
-      if (!run.started_at) return false;
-      const date = new Date(run.started_at);
-      return date >= lastWeekStart && date < thisWeekStart;
-    });
-
-    const thisWeekKm = thisWeekRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const lastWeekKm = lastWeekRuns.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
+    if (!weeklyRows.length) return null;
+    const thisMonday = format(startOfWeek(new Date(), { weekStartsOn: 1 }), "yyyy-MM-dd");
+    const lastMonday = format(subWeeks(startOfWeek(new Date(), { weekStartsOn: 1 }), 1), "yyyy-MM-dd");
+    const rowFor = (key: string) => weeklyRows.find((w) => w.week_start.slice(0, 10) === key);
+    const tw = rowFor(thisMonday);
+    const lw = rowFor(lastMonday);
+    const thisWeekKm = Number(tw?.total_distance_km ?? 0);
+    const lastWeekKm = Number(lw?.total_distance_km ?? 0);
+    const thisWeekRuns = Number(tw?.run_count ?? 0);
     const trend = lastWeekKm > 0 ? Math.round(((thisWeekKm - lastWeekKm) / lastWeekKm) * 100) : 0;
 
     return {
-      thisWeekRuns: thisWeekRuns.length,
+      thisWeekRuns,
       thisWeekKm,
       trend,
     };
-  }, [runsForStats]);
-  const trainingLoad = useMemo(
-    () =>
-      runsForStats?.length
-        ? calculateTrainingLoad(
-            runsForStats
-              .map((run) => ({
-                started_at: run.started_at ?? run.created_at ?? "",
-                duration_seconds: run.duration_seconds ?? 0,
-                average_heartrate: run.average_heartrate ?? undefined,
-                distance_km: run.distance_km ?? 0,
-              }))
-              .filter((run) => run.started_at.length > 0 && run.duration_seconds > 0 && run.distance_km > 0),
-          )
-        : null,
-    [runsForStats],
-  );
-  const lastRunDaysAgo = useMemo(() => {
-    const lastRun = runsForStats.find((run) => Boolean(run.started_at));
-    if (!lastRun?.started_at) return 99;
-    return Math.max(0, differenceInDays(new Date(), new Date(lastRun.started_at)));
-  }, [runsForStats]);
+  }, [weeklyRows]);
+  const trainingLoad = useMemo(() => {
+    const synthetic = weeklyRowsToTrainingRunData(weeklyRows);
+    return synthetic.length ? calculateTrainingLoad(synthetic) : null;
+  }, [weeklyRows]);
+  const lastRunDaysAgo = useMemo(() => daysSinceLastWeeklyActivity(weeklyRows), [weeklyRows]);
   const dailyRec = useMemo(
     () => (trainingLoad ? getDailyRecommendation(trainingLoad, lastRunDaysAgo) : null),
     [trainingLoad, lastRunDaysAgo],
   );
   const lifetimeStats = useMemo(() => {
-    if (!runsForStats?.length) return null;
+    if (!lifetimeRow) return null;
 
-    const totalKm = runsForStats.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const totalHours = runsForStats.reduce((sum, run) => sum + (run.duration_seconds ?? 0), 0) / 3600;
-    const totalRuns = runsForStats.length;
-    const longestRun = Math.max(...runsForStats.map((run) => run.distance_km ?? 0));
-
-    const validRuns = runsForStats.filter((run) => (run.distance_km ?? 0) > 0 && (run.duration_seconds ?? 0) > 0);
-    const bestPaceSecPerKm = validRuns.length
-      ? Math.min(...validRuns.map((run) => (run.duration_seconds ?? 0) / Math.max(run.distance_km ?? 0, 0.001)))
-      : 0;
-
-    const weekKeys = new Set(
-      runsForStats
-        .filter((run) => Boolean(run.started_at))
-        .map((run) => {
-          const d = new Date(run.started_at as string);
-          const year = d.getFullYear();
-          const week = getWeek(d, { weekStartsOn: 1 });
-          return `${year}-W${String(week).padStart(2, "0")}`;
-        }),
-    );
-
-    let weeklyStreak = 0;
-    let checkDate = new Date();
-    for (let i = 0; i < 104; i += 1) {
-      const year = checkDate.getFullYear();
-      const week = getWeek(checkDate, { weekStartsOn: 1 });
-      const key = `${year}-W${String(week).padStart(2, "0")}`;
-      if (weekKeys.has(key)) {
-        weeklyStreak += 1;
-        checkDate = subWeeks(checkDate, 1);
-      } else {
-        break;
-      }
-    }
+    const totalKm = Number(lifetimeRow.total_distance_km ?? 0);
+    const totalHours = Number(lifetimeRow.total_duration_seconds ?? 0) / 3600;
+    const totalRuns = Number(lifetimeRow.total_runs ?? 0);
+    const longestRun = Number(lifetimeRow.longest_run_km ?? 0);
+    const bestPaceSecPerKm = Number(lifetimeRow.best_pace_sec_per_km ?? 0);
+    const weeklyStreak = computeWeeklyStreakFromAggregate(weeklyRows);
 
     return {
       totalKm,
@@ -920,7 +944,7 @@ const Health = () => {
       weeklyStreak,
       bestPaceSecPerKm,
     };
-  }, [runsForStats]);
+  }, [lifetimeRow, weeklyRows]);
   const achievementStats = useMemo(
     () => ({
       totalKm: lifetimeStats?.totalKm ?? 0,

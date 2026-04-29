@@ -8,7 +8,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   getProfile,
   getRuns,
-  getAllRunsForStats,
   getRunStatsLifetime,
   getPersonalizedFeed,
   getRunWithGps,
@@ -199,9 +198,11 @@ const Dashboard = () => {
     if (cachedRuns) {
       setRecentRuns(cachedRuns);
       setRunCount(cachedRuns.length);
+      setRunsForStats(cachedRuns);
       setIsLoading(false);
-    }
-    if (cachedRunsStats) {
+    } else if (cachedRunsStats) {
+      setRecentRuns(cachedRunsStats);
+      setRunCount(cachedRunsStats.length);
       setRunsForStats(cachedRunsStats);
       setIsLoading(false);
     }
@@ -230,21 +231,22 @@ const Dashboard = () => {
     }
 
     try {
-      const [profile, runs, runsStats, lifetimeDb] = await Promise.all([
+      const [profile, runs, lifetimeDb] = await Promise.all([
         getProfile(userId),
         getRuns(userId),
-        getAllRunsForStats(userId),
         getRunStatsLifetime(userId),
       ]);
 
-      if (runs) cache.set(`runs_${userId}`, runs);
-      if (runsStats) cache.set(`runsStats_${userId}`, runsStats);
+      if (runs) {
+        cache.set(`runs_${userId}`, runs);
+        cache.set(`runsStats_${userId}`, runs);
+      }
       if (profile) cache.set(`profile_${userId}`, profile);
       if (lifetimeDb) cache.set(`lifetimeStats_${userId}`, lifetimeDb);
 
       setRunCount(runs?.length ?? 0);
       setRecentRuns(runs ?? []);
-      setRunsForStats(runsStats ?? []);
+      setRunsForStats(runs ?? []);
       setLifetimeStatsDb(lifetimeDb ?? null);
 
       if (profile?.first_name?.trim()) {

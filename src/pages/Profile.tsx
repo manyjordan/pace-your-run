@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Download, Footprints, Settings, Target } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppCard } from "@/components/ui/page-layout";
-import { getAllRunsForStats, getProfile, type ProfileRow, type RunRow, upsertProfile } from "@/lib/database";
+import { getProfile, getRunStatsLifetime, type ProfileRow, type RunStatsLifetimeRow, upsertProfile } from "@/lib/database";
 
 function formatPacePerKmFromSeconds(secondsPerKm: number): string {
   if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return "--:--";
@@ -16,7 +16,7 @@ export default function Profile() {
   const { session, signOut } = useAuth();
   const navigate = useNavigate();
   const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [lifetimeStatsRow, setLifetimeStatsRow] = useState<RunStatsLifetimeRow | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [username, setUsername] = useState("");
@@ -26,9 +26,9 @@ export default function Profile() {
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
-    void Promise.all([getProfile(userId), getAllRunsForStats(userId)]).then(([p, r]) => {
+    void Promise.all([getProfile(userId), getRunStatsLifetime(userId)]).then(([p, row]) => {
       setProfile(p);
-      setRuns(r ?? []);
+      setLifetimeStatsRow(row);
       setFirstName(p?.first_name ?? "");
       setUsername((p?.username ?? "").replace(/^@+/, ""));
       setBio(p?.bio ?? "");
@@ -36,15 +36,12 @@ export default function Profile() {
   }, [session?.user?.id]);
 
   const stats = useMemo(() => {
-    if (!runs.length) return null;
-    const totalKm = runs.reduce((sum, run) => sum + (run.distance_km ?? 0), 0);
-    const totalRuns = runs.length;
-    const pacedRuns = runs
-      .filter((run) => (run.distance_km ?? 0) >= 3 && (run.duration_seconds ?? 0) > 0)
-      .map((run) => (run.duration_seconds ?? 0) / Math.max(run.distance_km ?? 0, 0.001));
-    const bestPace = pacedRuns.length > 0 ? Math.min(...pacedRuns) : 0;
+    if (!lifetimeStatsRow) return null;
+    const totalKm = Number(lifetimeStatsRow.total_distance_km ?? 0);
+    const totalRuns = Number(lifetimeStatsRow.total_runs ?? 0);
+    const bestPace = Number(lifetimeStatsRow.best_pace_sec_per_km ?? 0);
     return { totalKm, totalRuns, bestPace };
-  }, [runs]);
+  }, [lifetimeStatsRow]);
 
   const handleSave = async () => {
     const userId = session?.user?.id;
