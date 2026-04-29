@@ -29,6 +29,8 @@ export type RunSpeechBridgeProps = {
   secondsRemainingInCurrentSegment: number;
   thirtySecondAnnouncedRef: MutableRefObject<Set<number>>;
   segmentTransitionAnnouncedRef: MutableRefObject<Set<number>>;
+  pauseKeepAlive?: () => void;
+  resumeKeepAlive?: () => void;
 };
 
 export default function RunSpeechBridge(props: RunSpeechBridgeProps) {
@@ -52,6 +54,8 @@ export default function RunSpeechBridge(props: RunSpeechBridgeProps) {
     secondsRemainingInCurrentSegment: props.secondsRemainingInCurrentSegment,
     thirtySecondAnnouncedRef: props.thirtySecondAnnouncedRef,
     segmentTransitionAnnouncedRef: props.segmentTransitionAnnouncedRef,
+    pauseKeepAlive: props.pauseKeepAlive,
+    resumeKeepAlive: props.resumeKeepAlive,
   });
 
   useEffect(() => {

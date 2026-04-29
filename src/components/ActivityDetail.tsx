@@ -68,80 +68,6 @@ function formatClockLabel(seconds: number) {
   return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
-function formatTrendComment({
-  activity,
-  allActivities,
-  zoneSummary,
-}: {
-  activity: NormalizedActivity;
-  allActivities: NormalizedActivity[];
-  zoneSummary: Array<{ label: string; percentage: number }>;
-}) {
-  const previousActivities = allActivities
-    .filter((item) => item.id !== activity.id && new Date(item.start_date) < new Date(activity.start_date))
-    .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-
-  const similarRuns = previousActivities.filter((item) => {
-    const ratio = item.distance / Math.max(activity.distance, 1);
-    return ratio >= 0.8 && ratio <= 1.2;
-  });
-
-  const currentPaceSeconds = activity.moving_time / Math.max(activity.distance / 1000, 1);
-  const previousPaceSeconds = similarRuns.length
-    ? similarRuns.slice(0, 4).reduce((sum, item) => sum + item.moving_time / Math.max(item.distance / 1000, 1), 0) /
-      Math.min(similarRuns.length, 4)
-    : null;
-
-  const recent28Days = allActivities.filter((item) => {
-    const diffMs = new Date(activity.start_date).getTime() - new Date(item.start_date).getTime();
-    return diffMs >= 0 && diffMs <= 28 * 24 * 60 * 60 * 1000;
-  });
-  const previous28Days = allActivities.filter((item) => {
-    const diffMs = new Date(activity.start_date).getTime() - new Date(item.start_date).getTime();
-    return diffMs > 28 * 24 * 60 * 60 * 1000 && diffMs <= 56 * 24 * 60 * 60 * 1000;
-  });
-
-  const recentKm = recent28Days.reduce((sum, item) => sum + item.distance / 1000, 0);
-  const previousKm = previous28Days.reduce((sum, item) => sum + item.distance / 1000, 0);
-  const highIntensityShare = zoneSummary
-    .filter((zone) => zone.label === "Zone 4" || zone.label === "Zone 5")
-    .reduce((sum, zone) => sum + zone.percentage, 0);
-  const enduranceShare = zoneSummary
-    .filter((zone) => zone.label === "Zone 1" || zone.label === "Zone 2")
-    .reduce((sum, zone) => sum + zone.percentage, 0);
-
-  if (previousPaceSeconds && currentPaceSeconds < previousPaceSeconds * 0.97 && highIntensityShare < 30) {
-    return "Très belle sortie: tu vas plus vite que sur tes courses comparables tout en gardant une intensité bien maîtrisée. C'est un vrai signal de progression.";
-  }
-
-  if (highIntensityShare >= 35) {
-    return "Séance exigeante: une grosse part du temps a été passée dans les zones hautes. Pense à bien récupérer sur les prochaines sorties pour consolider le bénéfice.";
-  }
-
-  if (recentKm > previousKm * 1.15 && previousKm > 0) {
-    return "Ton volume récent est en hausse par rapport aux semaines précédentes. La dynamique est bonne, mais garde un oeil sur la fatigue pour éviter d'enchaîner trop fort.";
-  }
-
-  const recentDistanceAverage = previousActivities.length
-    ? previousActivities.slice(0, 6).reduce((sum, item) => sum + item.distance / 1000, 0) /
-      Math.min(previousActivities.length, 6)
-    : null;
-
-  if (recentDistanceAverage && activity.distance / 1000 > recentDistanceAverage * 1.2) {
-    return "Bravo, tu t'es bien dépassé sur cette activité qui était plus longue que ce que tu fais d'habitude. C'est un bon marqueur de confiance et d'endurance.";
-  }
-
-  if (enduranceShare >= 60) {
-    return "Sortie propre et régulière: tu as passé l'essentiel du temps dans les zones d'endurance. C'est excellent pour construire une base solide.";
-  }
-
-  if (previousPaceSeconds && currentPaceSeconds > previousPaceSeconds * 1.03) {
-    return "Cette activité semble un peu plus difficile que tes repères récents. Rien d'inquiétant, mais ça peut valoir le coup d'alléger un peu la récupération ensuite.";
-  }
-
-  return "Sortie cohérente avec ta charge récente. Continue à empiler les kilomètres avec régularité, c'est ce qui fera la différence sur la durée.";
-}
-
 function decodePolyline(polyline: string): Array<{ lat: number; lng: number }> {
   const coordinates: Array<{ lat: number; lng: number }> = [];
   let index = 0;
@@ -453,12 +379,6 @@ export function ActivityDetail({
       ? (fullRun.gps_trace as GPSTracePoint[])
       : undefined;
     const trace = loadedTrace ?? fallbackTrace ?? buildTraceFromActivityPolyline(resolvedActivity);
-    const comment = formatTrendComment({
-      activity: resolvedActivity,
-      allActivities: normalizedAllActivities,
-      zoneSummary: zones.map(({ label, percentage }) => ({ label, percentage })),
-    });
-
     return {
       distanceKm,
       avgPace,
@@ -467,7 +387,6 @@ export function ActivityDetail({
       heartRateSeries,
       zones,
       trace,
-      comment,
       hasDetailedSplits: splitChartData.length > 0,
       hasHeartRateCurve: heartRateSeries.length > 1,
       startDate: new Date(resolvedActivity.start_date),
@@ -524,11 +443,8 @@ export function ActivityDetail({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="flex justify-center pb-1 pt-3">
-        <div className="h-1 w-10 rounded-full bg-muted-foreground/30" />
-      </div>
-
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background px-4 py-3">
+      <div className="bg-background pt-safe" />
+      <div className="flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
         <button
           type="button"
           onClick={onClose}
@@ -554,7 +470,7 @@ export function ActivityDetail({
         )}
       </div>
 
-      <div ref={scrollContainerRef} className="flex-1 space-y-4 overflow-y-auto px-4 pb-8 pt-2">
+      <div ref={scrollContainerRef} className="flex-1 space-y-4 overflow-y-auto px-4 pb-safe pt-2">
         <div className="rounded-lg border border-accent/20 bg-card p-4">
           {activity.run_type === "treadmill" && (
             <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">
@@ -811,11 +727,6 @@ export function ActivityDetail({
             </div>
           </div>
         )}
-
-        <div className="rounded-lg border border-accent/30 bg-accent/10 p-4">
-          <p className="text-xs font-semibold text-muted-foreground">Commentaire de performance</p>
-          <p className="mt-2 text-sm text-foreground">{analysis.comment}</p>
-        </div>
       </div>
     </div>
   );

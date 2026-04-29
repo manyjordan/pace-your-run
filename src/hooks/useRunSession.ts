@@ -182,7 +182,7 @@ export function useRunSession({
     onDistanceDelta: bumpDistance,
   });
 
-  const { elapsed, setElapsed, startInterval, stopInterval, startKeepAlive, formatTime } = useRunTimer();
+  const { elapsed, setElapsed, startInterval, stopInterval, startKeepAlive, pauseKeepAlive, resumeKeepAlive, formatTime } = useRunTimer();
   const startIntervalRef = useRef(startInterval);
   const startKeepAliveRef = useRef(startKeepAlive);
   const startGpsTrackingRef = useRef(startGpsTracking);
@@ -534,6 +534,8 @@ export function useRunSession({
     stopGpsTracking,
     getAccuracyColor,
     formatTime,
+    pauseKeepAlive,
+    resumeKeepAlive,
     routeProgress,
     setRouteProgress,
     start,

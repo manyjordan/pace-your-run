@@ -13,7 +13,6 @@ import { getProfile, getRuns, type RunRow } from "@/lib/database";
 import { calculateTrainingLoad } from "@/lib/trainingLoad";
 import { getDailyRecommendation } from "@/lib/dailyRecommendation";
 import GoalTab from "@/components/plan/GoalTab";
-import TrainingTab from "@/components/plan/TrainingTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
 import type { Session, TrainingPlan } from "@/lib/plans/types";
 
@@ -60,8 +59,7 @@ export default function PlanPage() {
   const [searchParams] = useSearchParams();
   const { session } = useAuth();
   const tabParam = searchParams.get("tab");
-  const mainTab =
-    tabParam === "goal" || tabParam === "training" || tabParam === "equipment" ? tabParam : "goal";
+  const mainTab = tabParam === "goal" || tabParam === "equipment" ? tabParam : "goal";
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [userGoal, setUserGoal] = useState<PlanGoal | null>(null);
   const [availableDays, setAvailableDays] = useState<string[]>([]);
@@ -295,10 +293,7 @@ export default function PlanPage() {
       <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
         <TabsList className="w-full">
           <TabsTrigger value="goal" className="flex-1">
-            Objectif
-          </TabsTrigger>
-          <TabsTrigger value="training" className="flex-1">
-            Plan
+            Objectif & Plan
           </TabsTrigger>
           <TabsTrigger value="equipment" className="flex-1">
             Équipement
@@ -307,44 +302,7 @@ export default function PlanPage() {
       </div>
 
       <TabsContent value="goal" className="space-y-6">
-        {normalizedGoalType && normalizedGoalType !== "none" ? (
-        <ScrollReveal>
-          <AppCard className="relative overflow-hidden border-accent/20">
-            <div className="pointer-events-none absolute -right-8 -top-8 h-32 w-32 rounded-full bg-accent/10" />
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Objectif</p>
-                <p className="text-xl font-bold text-foreground">{raceLabel ?? "Objectif actif"}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {targetDistanceKm ? `${targetDistanceKm} km` : ""}
-                  {targetDistanceKm && targetTime ? " · " : ""}
-                  {targetTime ? `Objectif ${targetTime}` : ""}
-                </p>
-              </div>
-              {daysUntilGoal !== null ? (
-                <div className="text-center">
-                  <div className="font-metric text-4xl font-black text-accent">{weeksUntilGoal}</div>
-                  <div className="text-xs text-muted-foreground">semaines</div>
-                </div>
-              ) : null}
-            </div>
-            {daysUntilGoal !== null ? (
-              <div className="mt-4">
-                <div className="mb-1.5 flex justify-between text-xs text-muted-foreground">
-                  <span>Progression</span>
-                  <span>{daysUntilGoal} jours restants</span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full rounded-full bg-accent transition-all"
-                    style={{ width: `${Math.min(100, Math.max(5, 100 - (daysUntilGoal / 180) * 100))}%` }}
-                  />
-                </div>
-              </div>
-            ) : null}
-          </AppCard>
-        </ScrollReveal>
-        ) : null}
+        <GoalTab />
 
         {dailyRec ? (
         <ScrollReveal>
@@ -532,10 +490,6 @@ export default function PlanPage() {
           </AppCard>
         </ScrollReveal>
         ) : null}
-      </TabsContent>
-
-      <TabsContent value="training">
-        <TrainingTab />
       </TabsContent>
       <TabsContent value="equipment">
         <EquipmentTab />

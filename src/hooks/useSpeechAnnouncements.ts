@@ -64,6 +64,8 @@ type UseSpeechAnnouncementsParams = {
   secondsRemainingInCurrentSegment?: number;
   thirtySecondAnnouncedRef?: MutableRefObject<Set<number>>;
   segmentTransitionAnnouncedRef?: MutableRefObject<Set<number>>;
+  pauseKeepAlive?: () => void;
+  resumeKeepAlive?: () => void;
 };
 
 export function useSpeechAnnouncements({
@@ -86,6 +88,8 @@ export function useSpeechAnnouncements({
   secondsRemainingInCurrentSegment = 0,
   thirtySecondAnnouncedRef,
   segmentTransitionAnnouncedRef,
+  pauseKeepAlive,
+  resumeKeepAlive,
 }: UseSpeechAnnouncementsParams) {
   const lastAnnouncedKmRef = useRef(0);
   const lastPaceAlertRef = useRef(0);
@@ -97,13 +101,15 @@ export function useSpeechAnnouncements({
 
   const speak = useCallback((message: string) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    window.speechSynthesis.cancel();
+    pauseKeepAlive?.();
     const utterance = new SpeechSynthesisUtterance(message);
     utterance.lang = "fr-FR";
-    utterance.rate = 1.0;
-    utterance.volume = 1.0;
-    window.speechSynthesis.cancel();
+    utterance.rate = 0.95;
+    utterance.onend = () => resumeKeepAlive?.();
+    utterance.onerror = () => resumeKeepAlive?.();
     window.speechSynthesis.speak(utterance);
-  }, []);
+  }, [pauseKeepAlive, resumeKeepAlive]);
 
   const formatPaceFromSeconds = useCallback((secondsPerKm: number): string => {
     if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return "--:--";
@@ -151,7 +157,6 @@ export function useSpeechAnnouncements({
 
   useEffect(() => {
     if (!isProgrammedSessionActive || status !== "running") return;
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
     if (!programmedSegments.length) return;
 
     const current = programmedSegments[currentProgramSegmentIndex];
@@ -166,13 +171,7 @@ export function useSpeechAnnouncements({
       !thirtySecondAnnouncedRef.current.has(currentProgramSegmentIndex)
     ) {
       const nextLabel = next.label?.trim() || `segment ${currentProgramSegmentIndex + 2}`;
-      const utterance = new SpeechSynthesisUtterance(
-        `Dans 30 secondes, passage à ${nextLabel} à ${next.target_pace}.`,
-      );
-      utterance.lang = "fr-FR";
-      utterance.rate = 1.0;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      speak(`Dans 30 secondes, passage à ${nextLabel} à ${next.target_pace}.`);
       thirtySecondAnnouncedRef.current.add(currentProgramSegmentIndex);
     }
 
@@ -181,13 +180,7 @@ export function useSpeechAnnouncements({
       !segmentTransitionAnnouncedRef.current.has(currentProgramSegmentIndex)
     ) {
       const label = current.label?.trim() || `segment ${currentProgramSegmentIndex + 1}`;
-      const utterance = new SpeechSynthesisUtterance(
-        `Nouveau segment : ${label} — objectif ${current.target_pace} par kilomètre.`,
-      );
-      utterance.lang = "fr-FR";
-      utterance.rate = 1.0;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
+      speak(`Nouveau segment : ${label} — objectif ${current.target_pace} par kilomètre.`);
       segmentTransitionAnnouncedRef.current.add(currentProgramSegmentIndex);
     }
   }, [
@@ -197,6 +190,7 @@ export function useSpeechAnnouncements({
     secondsRemainingInCurrentSegment,
     segmentTransitionAnnouncedRef,
     status,
+    speak,
     thirtySecondAnnouncedRef,
   ]);
 
@@ -206,16 +200,9 @@ export function useSpeechAnnouncements({
 
     if (routeProgress >= activeRoute.distance_km * 0.95) {
       routeArrivalAnnouncedRef.current = true;
-      if (typeof window !== "undefined" && "speechSynthesis" in window) {
-        const utterance = new SpeechSynthesisUtterance("Vous approchez de l'arrivée");
-        utterance.lang = "fr-FR";
-        utterance.rate = 1.0;
-        utterance.volume = 1.0;
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-      }
+      speak("Vous approchez de l'arrivée");
     }
-  }, [activeRoute, routeProgress, status, routeArrivalAnnouncedRef]);
+  }, [activeRoute, routeProgress, status, routeArrivalAnnouncedRef, speak]);
 
   useEffect(() => {
     if (status !== "running") return;
@@ -227,8 +214,6 @@ export function useSpeechAnnouncements({
     if (currentKm <= lastAnnouncedKmRef.current) return;
 
     lastAnnouncedKmRef.current = currentKm;
-
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
     if (prefs.announceSplitSpeed && currentKm > 0) {
       const splitMinPerKm = paceMinutesPerKmForLastKm(gpsTrace, currentKm);
@@ -290,8 +275,6 @@ export function useSpeechAnnouncements({
     const threshold = prefs.paceAlertThresholdSeconds;
     if (Math.abs(diff) <= threshold) return;
 
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-
     const targetMin = Math.floor(targetPaceSeconds / 60);
     const targetSec = targetPaceSeconds % 60;
     const currentMin = Math.floor(currentPaceSeconds / 60);
@@ -302,13 +285,9 @@ export function useSpeechAnnouncements({
         ? `Allure prévue ${targetMin} minutes ${targetSec > 0 ? `${targetSec} secondes` : ""}. Allure actuelle ${currentMin} minutes ${currentSec > 0 ? `${currentSec} secondes` : ""}. Accélérez légèrement.`
         : `Allure prévue ${targetMin} minutes ${targetSec > 0 ? `${targetSec} secondes` : ""}. Allure actuelle ${currentMin} minutes ${currentSec > 0 ? `${currentSec} secondes` : ""}. Ralentissez légèrement.`;
 
-    const utterance = new SpeechSynthesisUtterance(message);
-    utterance.lang = "fr-FR";
-    utterance.rate = 1.0;
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    speak(message);
     lastPaceAlertRef.current = now;
-  }, [activeSession, currentProgramSegmentIndex, isProgrammedSessionActive, pace, programmedSegments, speechPrefsRef, status]);
+  }, [activeSession, currentProgramSegmentIndex, isProgrammedSessionActive, pace, programmedSegments, speak, speechPrefsRef, status]);
 
   useEffect(() => {
     if (status !== "running" || elapsed === 0 || elapsed % 300 !== 0) return;

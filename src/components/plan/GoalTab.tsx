@@ -11,7 +11,7 @@ import { DistanceSelector } from "@/components/goal/DistanceSelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, Scale, Route, Trophy, AlertCircle, AlertTriangle, Info, Calendar as CalendarIcon, Zap } from "lucide-react";
+import { Target, Scale, Route, Trophy, AlertCircle, AlertTriangle, Info, Calendar as CalendarIcon, Zap, Pencil } from "lucide-react";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
@@ -578,6 +578,17 @@ export default function GoalTab() {
       {/* État : Objectif en cours */}
       {savedAt && !isDefining && !isChanging && (
         <ScrollReveal>
+          {!isDefining && !isChanging && formData.goalType && formData.goalType !== "none" && (
+            <div className="mb-2 flex justify-end">
+              <button
+                onClick={handleChangeGoal}
+                className="flex items-center gap-1.5 rounded-xl border border-accent/30 px-3 py-1.5 text-sm font-medium text-accent transition-all hover:bg-accent/10 active:scale-95"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+                Modifier mon objectif
+              </button>
+            </div>
+          )}
           <Card className={`border-2 ${goalOptions.find(g => g.type === formData.goalType)?.borderColor || "border-border"}`}>
             <CardContent className={`p-4 space-y-3 ${goalOptions.find(g => g.type === formData.goalType)?.bgColor || ""}`}>
               <div className="space-y-1">

@@ -81,6 +81,18 @@ export function useRunTimer() {
     audioContextRef.current = null;
   }, []);
 
+  const pauseKeepAlive = useCallback(() => {
+    if (audioContextRef.current?.state === "running") {
+      void audioContextRef.current.suspend().catch(() => {});
+    }
+  }, []);
+
+  const resumeKeepAlive = useCallback(() => {
+    if (audioContextRef.current?.state === "suspended") {
+      void audioContextRef.current.resume().catch(() => {});
+    }
+  }, []);
+
   const tick = useCallback(() => {
     if (startTimeRef.current === null) return;
     const elapsedSeconds =
@@ -148,6 +160,9 @@ export function useRunTimer() {
     startInterval,
     stopInterval,
     startKeepAlive,
+    stopKeepAlive,
+    pauseKeepAlive,
+    resumeKeepAlive,
     formatTime,
   };
 }

@@ -112,6 +112,8 @@ export default function Run() {
     pause,
     resume,
     stop,
+    pauseKeepAlive,
+    resumeKeepAlive,
   } = session;
 
   const {
@@ -266,6 +268,8 @@ export default function Run() {
           secondsRemainingInCurrentSegment={secondsRemainingInCurrentSegment}
           thirtySecondAnnouncedRef={thirtySecondAnnouncedRef}
           segmentTransitionAnnouncedRef={segmentTransitionAnnouncedRef}
+          pauseKeepAlive={pauseKeepAlive}
+          resumeKeepAlive={resumeKeepAlive}
         />
       </Suspense>
 

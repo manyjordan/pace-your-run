@@ -111,27 +111,26 @@ const Dashboard = () => {
     const cachedRunsStats = cache.get<RunRow[]>(`runsStats_${storedUserId}`);
     const cachedProfile = cache.get<ProfileRow>(`profile_${storedUserId}`);
 
-    if (cachedRuns) {
-      setRecentRuns(cachedRuns);
-      setRunCount(cachedRuns.length);
-      setIsLoading(false);
-    }
-    if (cachedRunsStats) {
-      setRunsForStats(cachedRunsStats);
-      setIsLoading(false);
-    }
-    if (cachedProfile) {
-      setAthleteName(cachedProfile.first_name?.trim() || "Coureur");
-      if (
-        cachedProfile.goal_data &&
-        typeof cachedProfile.goal_data === "object" &&
-        !Array.isArray(cachedProfile.goal_data)
-      ) {
-        setUserGoal(normalizeGoalData(cachedProfile.goal_data as ProfileGoalData) as ProfileGoalData);
-      } else {
-        setUserGoal(null);
+    if (cachedRuns || cachedProfile) {
+      if (cachedRuns) {
+        setRecentRuns(cachedRuns);
+        setRunCount(cachedRuns.length);
+      }
+      if (cachedRunsStats) {
+        setRunsForStats(cachedRunsStats);
+      }
+      if (cachedProfile) {
+        setAthleteName(cachedProfile.first_name?.trim() || "Coureur");
+        if (
+          cachedProfile.goal_data &&
+          typeof cachedProfile.goal_data === "object" &&
+          !Array.isArray(cachedProfile.goal_data)
+        ) {
+          setUserGoal(normalizeGoalData(cachedProfile.goal_data as ProfileGoalData) as ProfileGoalData);
+        }
       }
       setIsLoading(false);
+      setShowSkeletons(false);
     }
   }, []);
 
