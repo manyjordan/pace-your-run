@@ -6,8 +6,7 @@ import { RunPerformanceRecapCard } from "@/components/run/RunPerformanceRecapCar
 import { RunSplitsCard } from "@/components/run/RunSplitsCard";
 import { RunTreadmillSpeedPanel } from "@/components/run/RunTreadmillSpeedPanel";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Map, AlertCircle, Settings } from "lucide-react";
+import { Map, AlertCircle, Settings, Play, ClipboardList } from "lucide-react";
 import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -324,96 +323,92 @@ export default function Run() {
       )}
 
       <div className="space-y-6">
-        {activeSession && status === "idle" && (
-          <AppCard className="space-y-2 border-accent/30 bg-accent/5 p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  {activeSession.planName} · Semaine {activeSession.weekNumber}
-                </p>
-                <p className="text-sm font-semibold">{activeSession.session.type}</p>
+        {status === "idle" && !runSummary && (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6 px-4">
+            {currentWeather && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <span>{currentWeather.emoji}</span>
+                <span>
+                  {currentWeather.temperature}°C · {currentWeather.description}
+                </span>
               </div>
+            )}
+
+            {activeSession && (
+              <div className="rounded-xl border border-accent/20 bg-accent/10 px-4 py-2 text-center">
+                <p className="text-xs text-muted-foreground">Session programmée</p>
+                <p className="font-semibold text-accent">{activeSession.session.type}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearActiveSession();
+                    setActiveSession(null);
+                  }}
+                  className="mt-1 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  Ignorer
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={start}
+              className="flex h-32 w-32 items-center justify-center rounded-full bg-accent shadow-2xl transition-all active:scale-95"
+            >
+              <Play className="ml-2 h-12 w-12 fill-white text-white" />
+            </button>
+            <p className="text-sm text-muted-foreground">Appuyez pour démarrer</p>
+
+            <div className="mt-2 flex gap-3">
+              <Suspense fallback={null}>
+                <div className="w-[120px]">
+                  <RunCourseSettingsDialog
+                    runPreferences={runPreferences}
+                    setRunPreferences={setRunPreferences}
+                    runMode={runMode}
+                    setRunMode={setRunMode}
+                    isProgrammedMode={isProgrammedMode}
+                    isTreadmill={treadmill.isTreadmill}
+                    setIsTreadmill={treadmill.setIsTreadmill}
+                    programmed={{
+                      programSource,
+                      setProgramSource,
+                      selectedTemplateId,
+                      loadTemplate,
+                      segments,
+                      addSegment,
+                      removeSegment,
+                      updateSegment,
+                    }}
+                  />
+                </div>
+              </Suspense>
               <button
                 type="button"
-                onClick={() => {
-                  clearActiveSession();
-                  setActiveSession(null);
-                }}
-                className="text-xs text-muted-foreground hover:text-foreground"
+                onClick={() => navigate("/routes")}
+                className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground"
               >
-                Ignorer
+                <Map className="h-3.5 w-3.5" />
+                Parcours
               </button>
-            </div>
-            <div className="flex gap-4 text-xs text-muted-foreground">
-              <span>{activeSession.session.distance} km</span>
-              <span>·</span>
-              <span>Allure cible : {activeSession.session.pace} /km</span>
-              {activeSession.session.intervals && (
-                <>
-                  <span>·</span>
-                  <span>
-                    {activeSession.session.intervals.reps} ×{" "}
-                    {activeSession.session.intervals.distanceM
-                      ? `${activeSession.session.intervals.distanceM}m`
-                      : `${activeSession.session.intervals.durationSeconds}s`}
-                  </span>
-                </>
-              )}
-            </div>
-          </AppCard>
-        )}
-
-        {activeRoute && status === "idle" && (
-          <AppCard className="flex items-center justify-between border-accent/30 bg-accent/5 px-4 py-3">
-            <div>
-              <p className="text-sm font-semibold">{activeRoute.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {activeRoute.distance_km.toFixed(1)} km · {Math.round(activeRoute.elevation_gain)}m D+
-              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/plan")}
+                className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground"
+              >
+                <ClipboardList className="h-3.5 w-3.5" />
+                Plan
+              </button>
             </div>
             <button
               type="button"
-              onClick={() => {
-                setActiveRoute(null);
-                localStorage.removeItem(SELECTED_ROUTE_KEY);
-              }}
-              className="text-xs text-muted-foreground hover:text-foreground"
-            >
-              Retirer
-            </button>
-          </AppCard>
-        )}
-
-        {status === "idle" && (
-          <div className="flex gap-3 mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="flex-1 gap-2"
               onClick={() => navigate("/settings")}
+              className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground"
             >
-              <Settings className="h-4 w-4 shrink-0" />
-              Réglages
-            </Button>
-            <Button type="button" variant="outline" className="flex-1 gap-2" onClick={() => navigate("/routes")}>
-              <Map className="h-4 w-4 shrink-0" />
-              Mes parcours
-            </Button>
-          </div>
-        )}
-
-        {status === "idle" && currentWeather && (
-          <div className="mb-4 flex items-center justify-center gap-3 rounded-xl bg-muted/50 px-4 py-3">
-            <span className="text-2xl">{currentWeather.emoji}</span>
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                {currentWeather.temperature}°C — {currentWeather.description}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Ressenti {currentWeather.feelsLike ?? currentWeather.temperature}°C · Vent {currentWeather.windSpeed} km/h ·
-                {" "}Humidité {currentWeather.humidity}%
-              </p>
-            </div>
+              <Settings className="h-3.5 w-3.5" />
+              Paramètres du compte
+            </button>
           </div>
         )}
 
@@ -473,56 +468,28 @@ export default function Run() {
 
         {treadmill.isTreadmill && status === "running" && <RunTreadmillSpeedPanel treadmill={treadmill} />}
 
-        <RunMainTimerCard
-          formatTime={formatTime}
-          elapsed={elapsed}
-          displayDistance={displayDistance}
-          distanceUnitShortLabel={distanceUnitShortLabel}
-          displayPace={displayPace}
-          formatPace={formatPace}
-          bluetooth={{
-            isBluetoothConnected: bluetooth.isBluetoothConnected,
-            heartRate: bluetooth.heartRate,
-          }}
-          gpsAccuracy={gpsAccuracy}
-          status={status}
-          start={start}
-          pause={pause}
-          resume={resume}
-          stop={stop}
-          isProgrammedMode={isProgrammedMode}
-          isProgramActive={isProgramActive}
-          estimatedFinishTimes={estimatedFinishTimes}
-        />
-
-        {status === "idle" && (
-          <div className="flex flex-col gap-3 pt-1">
-            <Button type="button" variant="outline" className="h-12 w-full gap-2" onClick={() => navigate("/routes")}>
-              <Map className="h-4 w-4 shrink-0" />
-              Mes parcours
-            </Button>
-            <Suspense fallback={null}>
-              <RunCourseSettingsDialog
-                runPreferences={runPreferences}
-                setRunPreferences={setRunPreferences}
-                runMode={runMode}
-                setRunMode={setRunMode}
-                isProgrammedMode={isProgrammedMode}
-                isTreadmill={treadmill.isTreadmill}
-                setIsTreadmill={treadmill.setIsTreadmill}
-                programmed={{
-                  programSource,
-                  setProgramSource,
-                  selectedTemplateId,
-                  loadTemplate,
-                  segments,
-                  addSegment,
-                  removeSegment,
-                  updateSegment,
-                }}
-              />
-            </Suspense>
-          </div>
+        {status !== "idle" && (
+          <RunMainTimerCard
+            formatTime={formatTime}
+            elapsed={elapsed}
+            displayDistance={displayDistance}
+            distanceUnitShortLabel={distanceUnitShortLabel}
+            displayPace={displayPace}
+            formatPace={formatPace}
+            bluetooth={{
+              isBluetoothConnected: bluetooth.isBluetoothConnected,
+              heartRate: bluetooth.heartRate,
+            }}
+            gpsAccuracy={gpsAccuracy}
+            status={status}
+            start={start}
+            pause={pause}
+            resume={resume}
+            stop={stop}
+            isProgrammedMode={isProgrammedMode}
+            isProgramActive={isProgramActive}
+            estimatedFinishTimes={estimatedFinishTimes}
+          />
         )}
 
         {runSummary && status === "idle" && (
