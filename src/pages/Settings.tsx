@@ -1,7 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { useEffect, useState } from "react";
 import {
-  Watch,
   User,
   ChevronRight,
   LogOut,
@@ -10,9 +9,11 @@ import {
   Loader2,
   FileText,
   HeartPulse,
-  Apple,
-  Database,
   Footprints,
+  Route,
+  Megaphone,
+  Ruler,
+  SlidersHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -163,23 +164,12 @@ const SettingsPage = () => {
       </ScrollReveal>
 
       <ScrollReveal>
-        <SettingsSection title="Profil" icon={User}>
+        <SettingsSection title="Mon Compte" icon={User}>
           <NavigationRow
             icon={User}
             label="Mon profil athlète"
             description="Modifier votre prénom, pseudo, bio et voir vos stats"
             onClick={() => navigate("/profile")}
-          />
-        </SettingsSection>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <SettingsSection title="Données" icon={Database}>
-          <NavigationRow
-            icon={Upload}
-            label="Importer l'historique"
-            description="Strava, Nike, Garmin, Apple Health, GPX..."
-            onClick={() => navigate("/import")}
           />
           <NavigationRow
             icon={Footprints}
@@ -187,46 +177,13 @@ const SettingsPage = () => {
             description="Suivez l'usure et le kilometrage de vos paires"
             onClick={() => navigate("/shoes")}
           />
-        </SettingsSection>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <SettingsSection title="Appareils connectés" icon={Watch}>
           <NavigationRow
-            icon={Apple}
-            label="Importer depuis Apple Santé"
-            description="Import par fichier (export.xml) ou import ponctuel depuis l'app Santé sur iPhone"
-            onClick={() => navigate("/healthkit")}
+            icon={Upload}
+            label="Importer des courses"
+            description="Strava, Nike, Garmin, Apple Health, GPX..."
+            onClick={() => navigate("/import")}
           />
-
-          <NavigationRow
-            icon={HeartPulse}
-            label="Capteur cardiaque Bluetooth"
-            description="Connectez votre capteur depuis l'écran de course"
-            onClick={() => navigate("/run")}
-          />
-        </SettingsSection>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <SettingsSection title="Réglages de course" icon={Watch}>
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
-            <div className="space-y-1">
-              <p className="text-sm font-medium">Alertes d&apos;allure</p>
-              <p className="text-xs text-muted-foreground">
-                Vous prévient vocalement si votre allure s&apos;écarte de l&apos;objectif lors d&apos;une séance planifiée. Maximum toutes les 15 secondes.
-              </p>
-            </div>
-            <Switch
-              checked={runPreferences.paceAlerts}
-              onCheckedChange={(checked) => {
-                const updated = { ...runPreferences, paceAlerts: checked };
-                setRunPreferences(updated);
-                saveRunPreferences(updated, session?.user?.id ?? null);
-              }}
-            />
-          </div>
-          <div className="mt-3 space-y-2 rounded-lg border border-border p-3">
+          <div className="space-y-2 rounded-lg border border-border p-3">
             <label className="text-sm font-medium">Fréquence cardiaque max (bpm)</label>
             <p className="text-xs text-muted-foreground">
               Utilisée pour calculer vos zones d&apos;entraînement. Estimation : 220 - votre âge.
@@ -248,7 +205,66 @@ const SettingsPage = () => {
       </ScrollReveal>
 
       <ScrollReveal>
-        <SettingsSection title="Légal" icon={FileText}>
+        <SettingsSection title="Ma Course" icon={Route}>
+          <div className="flex items-center justify-between rounded-lg border border-border p-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="rounded-lg bg-secondary p-2">
+                <Ruler className="h-4 w-4 text-[hsl(var(--accent))]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Unité de distance</p>
+                <p className="text-xs text-muted-foreground">Choisissez entre kilomètres et miles</p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const updated = { ...runPreferences, distanceUnit: runPreferences.distanceUnit === "km" ? "mi" : "km" };
+                setRunPreferences(updated);
+                saveRunPreferences(updated, session?.user?.id ?? null);
+              }}
+            >
+              {runPreferences.distanceUnit === "km" ? "km" : "miles"}
+            </Button>
+          </div>
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-border p-3">
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="rounded-lg bg-secondary p-2">
+                <Megaphone className="h-4 w-4 text-[hsl(var(--accent))]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-medium">Annonces vocales</p>
+                <p className="text-xs text-muted-foreground">Annonce des splits et de l&apos;allure pendant la course</p>
+              </div>
+            </div>
+            <Switch
+              checked={runPreferences.announceSplitSpeed}
+              onCheckedChange={(checked) => {
+                const updated = { ...runPreferences, announceSplitSpeed: checked };
+                setRunPreferences(updated);
+                saveRunPreferences(updated, session?.user?.id ?? null);
+              }}
+            />
+          </div>
+          <NavigationRow
+            icon={HeartPulse}
+            label="Allure cible"
+            description="Définir votre allure cible et les alertes associées"
+            onClick={() => navigate("/run")}
+          />
+          <NavigationRow
+            icon={SlidersHorizontal}
+            label="Type de course par défaut"
+            description="Définir le type de séance utilisé au démarrage"
+            onClick={() => navigate("/run")}
+          />
+        </SettingsSection>
+      </ScrollReveal>
+
+      <ScrollReveal>
+        <SettingsSection title="Légal & Aide" icon={FileText}>
           <NavigationRow
             icon={FileText}
             label="Politique de confidentialité"
@@ -257,24 +273,21 @@ const SettingsPage = () => {
 
           <NavigationRow
             icon={FileText}
-            label="Conditions d'utilisation"
+            label="CGU"
             onClick={() => navigate("/terms")}
           />
-          <a
-            href="/legal"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Mentions légales
-          </a>
-        </SettingsSection>
-      </ScrollReveal>
-
-      <ScrollReveal>
-        <SettingsSection title="Zone de danger" icon={AlertTriangle} destructive>
+          <NavigationRow
+            icon={FileText}
+            label="Mentions légales"
+            onClick={() => navigate("/legal")}
+          />
           <div className="flex items-center justify-between rounded-lg border border-destructive/20 bg-destructive/5 p-3">
-            <div>
-              <h3 className="text-sm font-medium">Se déconnecter</h3>
-              <p className="text-xs text-muted-foreground">Quitter votre compte en toute sécurité</p>
+            <div className="flex items-start gap-3">
+              <LogOut className="mt-0.5 h-5 w-5 shrink-0 text-destructive" />
+              <div>
+                <h3 className="text-sm font-medium text-destructive">Se déconnecter</h3>
+                <p className="text-xs text-muted-foreground">Quitter votre compte en toute sécurité</p>
+              </div>
             </div>
             <Button
               variant="destructive"
@@ -283,7 +296,6 @@ const SettingsPage = () => {
               disabled={signingOut}
               className="gap-2"
             >
-              <LogOut className="h-4 w-4" />
               {signingOut ? "Déconnexion..." : "Se déconnecter"}
             </Button>
           </div>

@@ -39,7 +39,7 @@ function isOfflinePostOnlyItem(item: unknown): item is OfflinePostOnlyQueueItem 
 
 const desktopNavItems = [
   { to: "/", icon: Home, label: "Accueil" },
-  { to: "/social", icon: Users, label: "Actu" },
+  { to: "/social", icon: Users, label: "Social" },
   { to: "/run", icon: Play, label: "Course" },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
