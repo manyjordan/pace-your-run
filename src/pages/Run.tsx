@@ -29,6 +29,7 @@ import {
 } from "@/lib/runPreferences";
 import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib/activeSession";
 import { AppCard, PageContainer, PageHeader } from "@/components/ui/page-layout";
+import { fetchCurrentWeather, type RunWeather } from "@/lib/weather";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -52,6 +53,7 @@ export default function Run() {
   const [completedPostId, setCompletedPostId] = useState<string | null>(null);
   const [isUpdatingAudience, setIsUpdatingAudience] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [currentWeather, setCurrentWeather] = useState<RunWeather | null>(null);
 
   const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
@@ -236,6 +238,23 @@ export default function Run() {
   }, []);
 
   useEffect(() => {
+    if (status !== "idle") return;
+    if (typeof navigator === "undefined" || !navigator.geolocation) return;
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        void fetchCurrentWeather(pos.coords.latitude, pos.coords.longitude)
+          .then((weather) => {
+            setCurrentWeather(weather);
+          })
+          .catch(() => {});
+      },
+      () => {},
+      { timeout: 5000, maximumAge: 300_000 },
+    );
+  }, [status]);
+
+  useEffect(() => {
     return () => {
       if (typeof window !== "undefined" && "speechSynthesis" in window) {
         window.speechSynthesis.cancel();
@@ -380,6 +399,21 @@ export default function Run() {
               <Map className="h-4 w-4 shrink-0" />
               Mes parcours
             </Button>
+          </div>
+        )}
+
+        {status === "idle" && currentWeather && (
+          <div className="mb-4 flex items-center justify-center gap-3 rounded-xl bg-muted/50 px-4 py-3">
+            <span className="text-2xl">{currentWeather.emoji}</span>
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                {currentWeather.temperature}°C — {currentWeather.description}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Ressenti {currentWeather.feelsLike ?? currentWeather.temperature}°C · Vent {currentWeather.windSpeed} km/h ·
+                {" "}Humidité {currentWeather.humidity}%
+              </p>
+            </div>
           </div>
         )}
 

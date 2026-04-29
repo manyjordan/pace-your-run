@@ -2,6 +2,7 @@ import { format } from "date-fns";
 
 export interface RunWeather {
   temperature: number;
+  feelsLike?: number;
   weatherCode: number;
   windSpeed: number;
   humidity: number;
@@ -29,6 +30,14 @@ type OpenMeteoHourly = {
   weathercode?: number[];
   windspeed_10m?: number[];
   relativehumidity_2m?: number[];
+};
+
+type OpenMeteoCurrent = {
+  temperature_2m?: number;
+  apparent_temperature?: number;
+  weathercode?: number;
+  windspeed_10m?: number;
+  relativehumidity_2m?: number;
 };
 
 export async function fetchRunWeather(lat: number, lng: number, startTime: string): Promise<RunWeather | null> {
@@ -63,6 +72,40 @@ export async function fetchRunWeather(lat: number, lng: number, startTime: strin
       weatherCode: code,
       windSpeed: Math.round(wind),
       humidity: Math.round(humidity),
+      description: weather.description,
+      emoji: weather.emoji,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchCurrentWeather(lat: number, lng: number): Promise<RunWeather | null> {
+  try {
+    const url = new URL("https://api.open-meteo.com/v1/forecast");
+    url.searchParams.set("latitude", lat.toFixed(4));
+    url.searchParams.set("longitude", lng.toFixed(4));
+    url.searchParams.set(
+      "current",
+      "temperature_2m,weathercode,windspeed_10m,relativehumidity_2m,apparent_temperature",
+    );
+    url.searchParams.set("timezone", "auto");
+
+    const res = await fetch(url.toString());
+    if (!res.ok) return null;
+    const data = (await res.json()) as { current?: OpenMeteoCurrent };
+    const current = data.current;
+    if (!current) return null;
+
+    const code = current.weathercode ?? 0;
+    const weather = WEATHER_CODES[code] ?? { description: "Conditions inconnues", emoji: "🌡️" };
+
+    return {
+      temperature: Math.round(current.temperature_2m ?? 0),
+      feelsLike: Math.round(current.apparent_temperature ?? 0),
+      weatherCode: code,
+      windSpeed: Math.round(current.windspeed_10m ?? 0),
+      humidity: Math.round(current.relativehumidity_2m ?? 0),
       description: weather.description,
       emoji: weather.emoji,
     };
