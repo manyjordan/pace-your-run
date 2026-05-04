@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { Map, Trash2, Upload } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowLeft, Map, Trash2, Upload } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,11 +13,31 @@ import { parseGpxFile } from "@/lib/parsers/gpxParser";
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
 export default function RoutesPage() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [routes, setRoutes] = useState<RouteRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isImporting, setIsImporting] = useState(false);
+  const touchStartYRef = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0]?.clientY ?? null;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartYRef.current === null) return;
+    const y = e.touches[0]?.clientY;
+    if (y === undefined) return;
+    if (y - touchStartYRef.current > 80) {
+      touchStartYRef.current = null;
+      navigate(-1);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartYRef.current = null;
+  };
 
   const loadRoutes = useCallback(async () => {
     if (!user?.id) {
@@ -97,14 +118,31 @@ export default function RoutesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+        <div className="pt-safe" />
+        <div className="flex items-center gap-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2 transition-all active:scale-95"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="text-sm font-medium">Retour</span>
+          </button>
+          <h1 className="font-semibold text-foreground">Mes parcours</h1>
+        </div>
+      </div>
+
       <ScrollReveal>
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Mes parcours</h1>
-            <p className="text-sm text-muted-foreground">Importez et gérez vos traces GPX</p>
-          </div>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-accent/20 bg-card px-3 py-2 text-sm hover:border-accent/50">
+        <div className="flex items-center justify-between gap-4 px-1">
+          <p className="text-sm text-muted-foreground">Importez et gérez vos traces GPX</p>
+          <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-accent/20 bg-card px-3 py-2 text-sm hover:border-accent/50">
             <Upload className="h-4 w-4 text-accent" />
             <span>{isImporting ? "Import..." : "Importer GPX"}</span>
             <input type="file" accept=".gpx" className="hidden" onChange={(e) => void handleImport(e)} />

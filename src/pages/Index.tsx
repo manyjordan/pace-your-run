@@ -1,9 +1,9 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Activity, List, TrendingUp, X } from "lucide-react";
+import { Activity, List, Target, TrendingUp, X } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { differenceInDays, getWeek, subWeeks } from "date-fns";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   getProfile,
@@ -28,8 +28,10 @@ import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import {
   buildMetricData,
   getAggregationUnit,
+  getWeekOverWeekChange,
   type MetricChartPeriod,
 } from "@/lib/dashboardHelpers";
+import { cn } from "@/lib/utils";
 import {
   scheduleStreakNotification,
   getLastNotifiedStreak,
@@ -77,6 +79,8 @@ type ProfileGoalData = {
   targetWeightKg?: string;
   selectedPlanId?: string;
   goalSavedAt?: string;
+  distanceTargetDate?: string;
+  weightTargetDate?: string;
 };
 
 /** Running activities for metrics: recorded runs, treadmill, trail, and imports (`import:strava`, etc.). */
@@ -105,6 +109,7 @@ function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | und
 
 const Dashboard = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { session } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [athleteName, setAthleteName] = useState("Coureur");
@@ -419,6 +424,21 @@ const Dashboard = () => {
     }
     return "Objectif";
   }, [userGoal]);
+
+  const goalIsExpired = useMemo(() => {
+    if (!goalTargetDate) return false;
+    const end = new Date(goalTargetDate);
+    if (Number.isNaN(end.getTime())) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+    return end < today;
+  }, [goalTargetDate]);
+
+  const elevationChange = useMemo(
+    () => getWeekOverWeekChange(runsForStats, "elevation"),
+    [runsForStats],
+  );
   const lifetimeStats = useMemo(() => {
     const weekKeys = new Set(
       runsForStats
@@ -513,7 +533,7 @@ const Dashboard = () => {
                 Bonjour <span className="text-foreground">{athleteName}</span>
               </h2>
             </div>
-            {hasDefinedGoal && goalTargetDate ? (
+            {hasDefinedGoal && goalTargetDate && !goalIsExpired ? (
               <div className="mt-3 border-t border-border/50 pt-3">
                 <div className="mb-1.5 flex items-center justify-between text-xs">
                   <span className="text-muted-foreground">{goalLabel}</span>
@@ -533,6 +553,16 @@ const Dashboard = () => {
                   />
                 </div>
               </div>
+            ) : null}
+            {hasDefinedGoal && goalTargetDate && goalIsExpired ? (
+              <button
+                type="button"
+                onClick={() => navigate("/plan")}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-accent/30 py-3 text-sm font-medium text-accent"
+              >
+                <Target className="h-4 w-4" />
+                Définir un nouvel objectif
+              </button>
             ) : null}
           </AppCard>
         )}
@@ -623,10 +653,27 @@ const Dashboard = () => {
                     </AppCard>
 
                     <AppCard className="py-3 text-center">
-                      <p className="font-metric text-xl font-black text-foreground">
-                        {Math.round(lifetimeStats.totalElevation).toLocaleString("fr")}m
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">dénivelé total</p>
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                          <p className="font-metric text-xl font-black text-foreground">
+                            {Math.round(lifetimeStats.totalElevation).toLocaleString("fr")}m
+                          </p>
+                          {elevationChange.percent !== 0 ? (
+                            <span
+                              className={cn(
+                                "rounded-full px-2 py-0.5 text-xs font-semibold",
+                                elevationChange.trend === "up"
+                                  ? "bg-accent/15 text-accent"
+                                  : "bg-orange-100 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400",
+                              )}
+                            >
+                              {elevationChange.trend === "up" ? "+" : ""}
+                              {elevationChange.percent}% vs S-1
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="text-xs text-muted-foreground">dénivelé total</p>
+                      </div>
                     </AppCard>
 
                     <AppCard className="py-3 text-center">
@@ -644,7 +691,7 @@ const Dashboard = () => {
 
               <DashboardSection
                 recentRuns={recentRuns}
-                userGoal={hasDefinedGoal ? userGoal : null}
+                userGoal={hasDefinedGoal && !goalIsExpired ? userGoal : null}
                 filteredMetrics={filteredMetrics}
                 period={period}
                 onPeriodChange={setPeriod}

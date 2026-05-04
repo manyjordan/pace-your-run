@@ -6,7 +6,7 @@ import { RunPerformanceRecapCard } from "@/components/run/RunPerformanceRecapCar
 import { RunSplitsCard } from "@/components/run/RunSplitsCard";
 import { RunTreadmillSpeedPanel } from "@/components/run/RunTreadmillSpeedPanel";
 import { Card, CardContent } from "@/components/ui/card";
-import { Map, AlertCircle, Settings, Play, ClipboardList, Pause, Square } from "lucide-react";
+import { Map, Settings, Play, Pause, Square } from "lucide-react";
 import { lazy, Suspense, useState, useRef, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -419,14 +419,6 @@ export default function Run() {
                 >
                   <Map className="h-3.5 w-3.5" />
                   Parcours
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/plan")}
-                  className="flex items-center gap-1.5 rounded-xl bg-muted px-4 py-2.5 text-xs font-medium text-muted-foreground"
-                >
-                  <ClipboardList className="h-3.5 w-3.5" />
-                  Plan
                 </button>
               </div>
             </div>
