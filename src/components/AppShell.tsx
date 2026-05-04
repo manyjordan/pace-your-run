@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
 import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -62,7 +62,12 @@ type AppShellProps = {
 
 export const AppShell = ({ children, mainTabs }: AppShellProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
+  const athleteName =
+    user?.user_metadata && typeof user.user_metadata.full_name === "string" && user.user_metadata.full_name.trim()
+      ? user.user_metadata.full_name
+      : user?.email?.split("@")[0] ?? "?";
   const { toast } = useToast();
   const [socialUnread, setSocialUnread] = useState(0);
   const [isOnline, setIsOnline] = useState(() =>
@@ -253,6 +258,16 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
           </nav>
 
           <div className="flex items-center gap-1">
+            {activeMainTab === "index" && user ? (
+              <button
+                type="button"
+                onClick={() => navigate("/profile")}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-sm font-bold text-accent"
+                aria-label="Mon profil"
+              >
+                {athleteName.charAt(0).toUpperCase()}
+              </button>
+            ) : null}
             <NavLink
               to="/settings"
               className="rounded-lg p-2 text-accent-foreground/80 transition-colors hover:bg-[hsl(var(--foreground)/0.08)] hover:text-accent-foreground"

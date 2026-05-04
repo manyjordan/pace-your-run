@@ -1,9 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ChevronRight, Download, Footprints, Settings, Target } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { AppCard } from "@/components/ui/page-layout";
-import { getProfile, getRunStatsLifetime, type ProfileRow, type RunStatsLifetimeRow, upsertProfile } from "@/lib/database";
+import {
+  getProfile,
+  getRuns,
+  getRunStatsLifetime,
+  type ProfileRow,
+  type RunRow,
+  type RunStatsLifetimeRow,
+  upsertProfile,
+} from "@/lib/database";
+import { ACHIEVEMENTS, computeWeeklyStreakFromRuns, getEarnedAchievements, type AchievementStats } from "@/lib/achievements";
 
 function formatPacePerKmFromSeconds(secondsPerKm: number): string {
   if (!Number.isFinite(secondsPerKm) || secondsPerKm <= 0) return "--:--";
@@ -22,13 +31,15 @@ export default function Profile() {
   const [username, setUsername] = useState("");
   const [bio, setBio] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [runs, setRuns] = useState<RunRow[]>([]);
 
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
-    void Promise.all([getProfile(userId), getRunStatsLifetime(userId)]).then(([p, row]) => {
+    void Promise.all([getProfile(userId), getRunStatsLifetime(userId), getRuns(userId)]).then(([p, row, r]) => {
       setProfile(p);
       setLifetimeStatsRow(row);
+      setRuns(r);
       setFirstName(p?.first_name ?? "");
       setUsername((p?.username ?? "").replace(/^@+/, ""));
       setBio(p?.bio ?? "");
@@ -42,6 +53,19 @@ export default function Profile() {
     const bestPace = Number(lifetimeStatsRow.best_pace_sec_per_km ?? 0);
     return { totalKm, totalRuns, bestPace };
   }, [lifetimeStatsRow]);
+
+  const achievementStats = useMemo((): AchievementStats => {
+    return {
+      totalKm: Number(lifetimeStatsRow?.total_distance_km ?? 0),
+      totalRuns: Number(lifetimeStatsRow?.total_runs ?? 0),
+      longestRun: Number(lifetimeStatsRow?.longest_run_km ?? 0),
+      weeklyStreak: computeWeeklyStreakFromRuns(runs),
+      bestPaceSecPerKm: Number(lifetimeStatsRow?.best_pace_sec_per_km ?? 0),
+      totalHours: Number(lifetimeStatsRow?.total_duration_seconds ?? 0) / 3600,
+    };
+  }, [lifetimeStatsRow, runs]);
+
+  const earnedAchievements = useMemo(() => getEarnedAchievements(achievementStats), [achievementStats]);
 
   const handleSave = async () => {
     const userId = session?.user?.id;
@@ -129,6 +153,25 @@ export default function Profile() {
           </div>
         ) : null}
 
+        {earnedAchievements.length > 0 && (
+          <AppCard>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Badges</h3>
+              <span className="text-xs font-semibold text-accent">
+                {earnedAchievements.length}/{ACHIEVEMENTS.length}
+              </span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1">
+              {earnedAchievements.map((a) => (
+                <div key={a.id} className="flex shrink-0 flex-col items-center gap-1">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted/50 text-2xl">{a.emoji}</div>
+                  <span className="w-12 text-center text-[10px] leading-tight text-muted-foreground">{a.title}</span>
+                </div>
+              ))}
+            </div>
+          </AppCard>
+        )}
+
         {profile?.goal_type && profile.goal_type !== "none" ? (
           <AppCard className="border-accent/20">
             <div className="flex items-center gap-3">
@@ -144,21 +187,33 @@ export default function Profile() {
         ) : null}
 
         <AppCard className="divide-y divide-border overflow-hidden p-0">
-          {[
-            { icon: Footprints, label: "Mes chaussures", path: "/shoes" },
-            { icon: Settings, label: "Paramètres", path: "/settings" },
-            { icon: Download, label: "Importer des courses", path: "/import" },
-          ].map((item) => (
-            <button
-              key={item.path}
-              onClick={() => navigate(item.path)}
-              className="flex w-full items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
-            >
-              <item.icon className="h-4 w-4 text-muted-foreground" />
-              <span className="flex-1 text-left text-sm font-medium text-foreground">{item.label}</span>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))}
+          <Link
+            to="/shoes"
+            className="flex w-full items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
+          >
+            <Footprints className="h-4 w-4 text-muted-foreground" />
+            <span className="flex-1 text-left text-sm font-medium text-foreground">Mes chaussures</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/settings"
+            className="flex w-full items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
+          >
+            <Settings className="h-4 w-4 text-muted-foreground" />
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-sm font-medium text-foreground">Paramètres</p>
+              <p className="text-xs text-muted-foreground">Compte, préférences, confidentialité</p>
+            </div>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+          </Link>
+          <Link
+            to="/import"
+            className="flex w-full items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50"
+          >
+            <Download className="h-4 w-4 text-muted-foreground" />
+            <span className="flex-1 text-left text-sm font-medium text-foreground">Importer des courses</span>
+            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+          </Link>
         </AppCard>
 
         <button onClick={() => void signOut()} className="w-full py-3 text-center text-sm font-medium text-destructive">
