@@ -2,15 +2,15 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { AppCard } from "@/components/ui/page-layout";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
 import { DaySelector, defaultDaysForWeekCount } from "@/components/goal/DaySelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, Trophy, AlertCircle, AlertTriangle, Info, Calendar as CalendarIcon, Zap, Pencil } from "lucide-react";
-import { format, parse } from "date-fns";
+import { Target, AlertCircle, AlertTriangle, Info, Calendar as CalendarIcon, Zap, Pencil } from "lucide-react";
+import { differenceInDays, format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -174,14 +174,12 @@ export default function GoalTab() {
   const [changeWarning, setChangeWarning] = useState<boolean>(false);
   const [isDefining, setIsDefining] = useState<boolean>(true);
   const [isChanging, setIsChanging] = useState<boolean>(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingGoal, setIsLoadingGoal] = useState(true);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [detectedLevel, setDetectedLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner");
   const [selectedPlan, setSelectedPlan] = useState<TrainingPlan | null>(null);
-  const [showPlanPreview, setShowPlanPreview] = useState(false);
   const [showCustomDistance, setShowCustomDistance] = useState(false);
   const [showCustomRaceDistance, setShowCustomRaceDistance] = useState(false);
-  const [hasNoGoalDefined, setHasNoGoalDefined] = useState(false);
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [showCustomPlanBuilder, setShowCustomPlanBuilder] = useState(false);
   const [customWeeks, setCustomWeeks] = useState(12);
@@ -196,7 +194,7 @@ export default function GoalTab() {
         setIsDefining(true);
         setIsChanging(false);
         setRecentRuns([]);
-        setIsLoading(false);
+        setIsLoadingGoal(false);
         return;
       }
 
@@ -222,9 +220,8 @@ export default function GoalTab() {
           setFormData({ ...defaultData, level: autoDetectedLevel });
           setSelectedPlan(null);
           setSavedAt(null);
-          setIsDefining(false);
+          setIsDefining(true);
           setIsChanging(false);
-          setHasNoGoalDefined(true);
           setShowCustomDistance(false);
           setShowCustomRaceDistance(false);
           return;
@@ -325,8 +322,6 @@ export default function GoalTab() {
         setShowCustomDistance(Number(newFormData.distanceKm) > 0 && !["5", "10", "20", "21.097", "42.195"].includes(newFormData.distanceKm));
         setShowCustomRaceDistance(newFormData.raceType === "other");
         setFormData(newFormData);
-        setHasNoGoalDefined(false);
-
         if (goalData && typeof goalData === "object" && !Array.isArray(goalData)) {
           setSavedAt("Enregistré");
           setIsDefining(false);
@@ -340,42 +335,13 @@ export default function GoalTab() {
         setFormData(defaultData);
         setSavedAt(null);
         setIsDefining(true);
-        setHasNoGoalDefined(false);
       } finally {
-        setIsLoading(false);
+        setIsLoadingGoal(false);
       }
     };
 
     void loadProfile();
   }, [user]);
-
-  const activeGoalSummary = useMemo(() => {
-    if (formData.goalType === "none") {
-      return "Sans objectif précis — vous courez librement";
-    }
-    if (formData.goalType === "weight" && formData.targetWeightKg) {
-      return `Objectif choisi : poids ${formData.targetWeightKg} kg`;
-    }
-    if (formData.goalType === "race" && formData.raceDistanceKm) {
-      const raceLabel =
-        formData.raceType === "marathon"
-          ? "marathon"
-          : formData.raceType === "semi"
-            ? "semi-marathon"
-            : formData.raceType === "20k"
-              ? "20 km"
-              : formData.raceType === "10k"
-                ? "10 km"
-                : formData.raceType === "5k"
-                  ? "5 km"
-                  : `${formData.raceDistanceKm} km`;
-      return `Objectif choisi : ${raceLabel}`;
-    }
-    if (formData.goalType === "distance" && formData.distanceKm) {
-      return `Objectif choisi : distance ${formData.distanceKm} km`;
-    }
-    return "Complétez votre objectif pour afficher un résumé.";
-  }, [formData]);
 
   const activeGoalDetails = useMemo(() => {
     const details: Array<{ label: string; value: string }> = [];
@@ -433,6 +399,46 @@ export default function GoalTab() {
 
     return details;
   }, [formData]);
+
+  /** Titre court pour la carte « objectif actuel » (état enregistré). */
+  const goalHeaderTitle = useMemo(() => {
+    if (formData.goalType === "none") return "Sans objectif précis";
+    if (formData.goalType === "weight") return formData.targetWeightKg ? `Poids ${formData.targetWeightKg} kg` : "Objectif poids";
+    if (formData.goalType === "distance") return formData.distanceKm ? `${formData.distanceKm} km` : "Objectif distance";
+    if (formData.raceType === "marathon") return "Marathon";
+    if (formData.raceType === "semi") return "Semi-marathon";
+    if (formData.raceType === "20k") return "20 km";
+    if (formData.raceType === "10k") return "10 km";
+    if (formData.raceType === "5k") return "5 km";
+    if (formData.raceDistanceKm) return `${formData.raceDistanceKm} km`;
+    return "Course";
+  }, [formData]);
+
+  const planLevelSubtitle = useMemo(() => {
+    if (selectedPlan?.name) return selectedPlan.name;
+    if (formData.level === "intermediate") return "Intermédiaire";
+    if (formData.level === "advanced") return "Avancé";
+    return "Débutant";
+  }, [selectedPlan?.name, formData.level]);
+
+  const goalHeaderEmoji = useMemo(() => {
+    if (formData.goalType === "none") return "🎯";
+    if (formData.selectedPlanId === "regular_running") return "📅";
+    const match = GOAL_OPTIONS.find((g) => g.id === formData.raceType);
+    return match?.emoji ?? selectedPlan?.emoji ?? "🏃";
+  }, [formData.goalType, formData.raceType, formData.selectedPlanId, selectedPlan?.emoji]);
+
+  const raceProgress = useMemo(() => {
+    const raw = formData.raceTargetDate;
+    if (!raw) return { daysLeft: null as number | null, pct: 0 as number, formatted: null as string | null };
+    const end = new Date(raw);
+    if (Number.isNaN(end.getTime())) return { daysLeft: null, pct: 0, formatted: null };
+    const daysLeft = Math.max(0, differenceInDays(end, new Date()));
+    const formatted = format(end, "d MMM yyyy", { locale: fr });
+    const horizon = Math.max(14, (selectedPlan?.durationWeeks ?? 12) * 7);
+    const pct = Math.min(100, Math.max(0, Math.round((1 - Math.min(daysLeft, horizon) / horizon) * 100)));
+    return { daysLeft, pct, formatted };
+  }, [formData.raceTargetDate, selectedPlan?.durationWeeks]);
 
   const updateField = <K extends keyof ProfileGoalData>(key: K, value: ProfileGoalData[K]) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -687,14 +693,20 @@ export default function GoalTab() {
       setSavedAt(new Date().toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }));
       setIsDefining(false);
       setIsChanging(false);
-      setHasNoGoalDefined(false);
     } catch {
       setSaveError("Impossible d'enregistrer le profil pour le moment.");
     }
   };
 
-  if (isLoading) {
-    return <div className="space-y-4" />;
+  if (isLoadingGoal) {
+    return (
+      <div className="min-h-[22rem] space-y-4 animate-pulse">
+        <div className="h-32 rounded-xl bg-muted" />
+        <div className="h-4 w-2/3 rounded bg-muted" />
+        <div className="h-4 w-1/2 rounded bg-muted" />
+        <div className="h-12 w-full rounded-xl bg-muted" />
+      </div>
+    );
   }
 
   const handleChangeGoal = () => {
@@ -702,155 +714,190 @@ export default function GoalTab() {
     setIsDefining(false);
   };
 
+  const renderGoalIntroGrid = () => (
+    <div className="flex flex-col items-center space-y-6 px-4 py-6 text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-3xl">🎯</div>
+      <div>
+        <h2 className="text-xl font-bold text-foreground">Quel est votre objectif ?</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Choisissez un objectif pour obtenir un plan personnalisé</p>
+      </div>
+      <div className="grid w-full grid-cols-2 gap-3">
+        {GOAL_OPTIONS.map((option) => {
+          const selected =
+            (option.id === "none" && formData.goalType === "none") ||
+            (option.id === "regular" && formData.selectedPlanId === "regular_running") ||
+            (option.id !== "none" &&
+              option.id !== "regular" &&
+              formData.goalType === "race" &&
+              formData.raceType === option.id);
+          return (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => applyGoalOption(option.id)}
+              className={cn(
+                "flex flex-col items-center gap-2 rounded-xl border-2 bg-card p-4 transition-all active:scale-95",
+                selected ? "border-accent bg-accent/10 shadow-sm" : "border-border",
+              )}
+            >
+              <span className="text-2xl">{option.emoji}</span>
+              <span className="text-sm font-semibold text-foreground">{option.label}</span>
+              <span className="text-xs text-muted-foreground">{option.description}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const showDefinitionFlow = isChanging || (isDefining && !savedAt);
+
   return (
     <div className="space-y-4">
       {changeWarning && (
         <ScrollReveal>
-          <div className="rounded-lg bg-red-50 border border-red-200 p-3 flex gap-2">
-            <AlertCircle className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
-            <p className="text-xs text-red-700">Votre objectif a changé ? Le plan généré pour cet objectif écrasera celui en cours.</p>
+          <div className="flex gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+            <p className="text-xs text-red-700">
+              Votre objectif a changé ? Le plan généré pour cet objectif écrasera celui en cours.
+            </p>
           </div>
         </ScrollReveal>
       )}
 
-      {/* État initial : Aucun objectif défini */}
-      {hasNoGoalDefined && !isDefining && !isChanging && (
-        <ScrollReveal>
-          <Card className="border-accent/30 bg-card/95">
-            <CardContent className="space-y-4 p-5">
-              <div className="rounded-xl bg-accent/10 p-3 text-accent">
-                <Target className="h-5 w-5" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">Vous courez sans objectif défini.</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Vous pouvez en ajouter un à tout moment pour personnaliser votre plan.
-                </p>
-              </div>
-              <Button
-                className="w-full bg-accent text-accent-foreground"
-                onClick={() => {
-                  setIsDefining(true);
-                  setHasNoGoalDefined(false);
-                }}
-              >
-                Définir un objectif
-              </Button>
-            </CardContent>
-          </Card>
-        </ScrollReveal>
-      )}
-
-      {!savedAt && !isDefining && !hasNoGoalDefined && (
-        <ScrollReveal>
-          <button
-            onClick={() => setIsDefining(true)}
-            className="w-full rounded-xl border-2 border-dashed border-accent bg-accent/5 p-6 transition-all hover:bg-accent/10 text-center"
-          >
-            <Target className="h-8 w-8 mx-auto mb-2 text-accent" />
-            <p className="text-sm font-bold text-accent">Définir un objectif</p>
-            <p className="text-xs text-muted-foreground mt-1">Commençons par créer votre premier objectif</p>
-          </button>
-        </ScrollReveal>
-      )}
-
-      {/* État : objectif enregistré — résumé toujours visible pendant une modification */}
-      {savedAt && !hasNoGoalDefined && formData.goalType && (
-        <ScrollReveal>
-          <div className="mb-2 flex justify-end">
-            {isChanging ? (
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsChanging(false)}>
-                Annuler la modification
-              </Button>
-            ) : (
-              <button
-                type="button"
-                onClick={handleChangeGoal}
-                className="flex items-center gap-1.5 rounded-xl border border-accent/30 px-3 py-1.5 text-sm font-medium text-accent transition-all hover:bg-accent/10 active:scale-95"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Modifier mon objectif
-              </button>
-            )}
-          </div>
-          <Card className="border-2 border-accent/40 bg-accent/5">
-            <CardContent className="space-y-3 p-4">
-              <div className="space-y-1">
-                <p className="text-sm font-bold">{activeGoalSummary}</p>
-                {activeGoalDetails.length > 0 && (
-                  <div className="space-y-1 pt-2">
-                    {activeGoalDetails.map((detail) => (
-                      <p key={`${detail.label}-${detail.value}`} className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{detail.label} :</span> {detail.value}
-                      </p>
-                    ))}
-                  </div>
-                )}
-                {!isChanging ? (
-                  <p className="text-xs text-muted-foreground">
-                    Cliquez sur « Modifier mon objectif » pour choisir un autre format ou niveau.
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">
-                    Votre objectif actuel reste affiché pendant que vous choisissez les modifications ci-dessous.
-                  </p>
-                )}
-              </div>
-              {!isChanging ? (
-                <Button variant="outline" className="w-full" onClick={handleChangeGoal}>
-                  Changer d&apos;objectif
-                </Button>
-              ) : null}
-            </CardContent>
-          </Card>
-        </ScrollReveal>
-      )}
-
-      {/* Bloc de sélection d'objectif */}
-      {(isDefining || isChanging) && (
+      {/* État B — objectif enregistré (aperçu stable, action secondaire en bas uniquement) */}
+      {savedAt && formData.goalType && !isChanging && !isDefining && (
         <>
           <ScrollReveal>
-            <p className="text-sm font-semibold">
-              {isChanging ? "Choisir un nouvel objectif" : "Choisir votre objectif"}
-            </p>
-          </ScrollReveal>
-          <div className="space-y-3">
-            {GOAL_OPTIONS.map((goal, i) => {
-              const selected =
-                (goal.id === "none" && formData.goalType === "none") ||
-                (goal.id === "regular" && formData.selectedPlanId === "regular_running") ||
-                (goal.id !== "none" &&
-                  goal.id !== "regular" &&
-                  formData.goalType === "race" &&
-                  formData.raceType === goal.id);
-              return (
-                <ScrollReveal key={goal.id} delay={i === 0 ? 0 : i < 3 ? 0.05 : 0}>
-                  <button
-                    type="button"
-                    onClick={() => applyGoalOption(goal.id)}
-                    className={cn(
-                      "w-full rounded-xl border-2 p-4 text-left transition-all",
-                      selected ? "border-accent bg-accent/10 shadow-md" : "border-border bg-card hover:bg-muted/50",
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl" aria-hidden>
-                        {goal.emoji}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className={cn("text-sm font-bold", selected && "text-accent-foreground")}>{goal.label}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">{goal.description}</p>
-                      </div>
+            <AppCard className="relative min-h-[9.5rem] overflow-hidden border-accent/20">
+              <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/10" />
+              <div className="relative flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    Objectif actuel
+                  </p>
+                  <p className="text-xl font-bold text-foreground">{goalHeaderTitle}</p>
+                  <p className="mt-0.5 text-sm font-semibold text-accent">{planLevelSubtitle}</p>
+                  {activeGoalDetails.length > 0 ? (
+                    <div className="mt-2 space-y-0.5">
+                      {activeGoalDetails.slice(0, 4).map((detail) => (
+                        <p key={`${detail.label}-${detail.value}`} className="text-xs text-muted-foreground">
+                          <span className="font-medium text-foreground">{detail.label} :</span> {detail.value}
+                        </p>
+                      ))}
                     </div>
-                  </button>
-                </ScrollReveal>
-              );
-            })}
+                  ) : null}
+                </div>
+                <span className="shrink-0 text-3xl">{goalHeaderEmoji}</span>
+              </div>
+              <div className="relative mt-3 min-h-[52px]">
+                {raceProgress.daysLeft !== null && raceProgress.formatted ? (
+                  <>
+                    <div className="mb-1 flex justify-between text-xs text-muted-foreground">
+                      <span>{raceProgress.daysLeft} jours restants</span>
+                      <span>{raceProgress.formatted}</span>
+                    </div>
+                    <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${raceProgress.pct}%` }}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-[52px]" aria-hidden />
+                )}
+              </div>
+            </AppCard>
+          </ScrollReveal>
+
+          {selectedPlan && formData.goalType !== "none" ? (
+            <ScrollReveal>
+              <Card className="border-accent/30 bg-accent/5">
+                <CardContent className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="flex items-center gap-2 text-sm font-semibold text-accent">
+                        <Zap className="h-4 w-4" />
+                        Plan sélectionné
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">{selectedPlan.name}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="rounded-lg bg-card p-2">
+                      <p className="text-xs text-muted-foreground">Durée</p>
+                      <p className="text-sm font-bold text-accent">{selectedPlan.durationWeeks}w</p>
+                    </div>
+                    <div className="rounded-lg bg-card p-2">
+                      <p className="text-xs text-muted-foreground">Séances</p>
+                      <p className="text-sm font-bold text-accent">{selectedPlan.daysPerWeek}j/sem</p>
+                    </div>
+                    <div className="rounded-lg bg-card p-2">
+                      <p className="text-xs text-muted-foreground">Niveau</p>
+                      <p className="text-sm font-bold capitalize text-accent">
+                        {selectedPlan.legacyLevel === "beginner"
+                          ? "Début"
+                          : selectedPlan.legacyLevel === "intermediate"
+                            ? "Inter"
+                            : "Avancé"}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+          ) : null}
+
+          {saveError ? (
+            <ScrollReveal>
+              <Alert variant="destructive" className="py-3">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="text-sm">{saveError}</AlertDescription>
+              </Alert>
+            </ScrollReveal>
+          ) : null}
+          {warnings.length > 0 ? (
+            <ScrollReveal>
+              <div className="space-y-2">
+                {warnings.map((warning, i) => (
+                  <Alert key={i} variant="destructive" className="py-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">{warning}</AlertDescription>
+                  </Alert>
+                ))}
+              </div>
+            </ScrollReveal>
+          ) : null}
+
+          <div className="pb-4 pt-2">
+            <button
+              type="button"
+              onClick={handleChangeGoal}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground transition-all hover:bg-muted/50"
+            >
+              <Pencil className="h-4 w-4" />
+              Modifier mon objectif
+            </button>
           </div>
         </>
       )}
 
-      {(isDefining || isChanging) && formData.goalType === "none" && (
+      {/* État A / édition — sélection + assistant (intro grille ou flux modification) */}
+      {showDefinitionFlow && (
+        <>
+          {isChanging ? (
+            <div className="flex shrink-0">
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsChanging(false)}>
+                Annuler
+              </Button>
+            </div>
+          ) : null}
+          <ScrollReveal>{renderGoalIntroGrid()}</ScrollReveal>
+        </>
+      )}
+
+      {showDefinitionFlow && formData.goalType === "none" && (
         <ScrollReveal>
           <p className="text-sm text-muted-foreground">
             Aucun plan imposé. Vous pourrez affiner votre objectif plus tard dans cet onglet.
@@ -858,7 +905,7 @@ export default function GoalTab() {
         </ScrollReveal>
       )}
 
-      {(isDefining || isChanging) && selectedDistanceForPlans && (
+      {showDefinitionFlow && selectedDistanceForPlans && (
         <ScrollReveal>
           <Alert className="border-accent/40 bg-accent/5 py-3">
             <Info className="h-4 w-4 text-accent" />
@@ -883,7 +930,7 @@ export default function GoalTab() {
         </ScrollReveal>
       )}
 
-      {(isDefining || isChanging) &&
+      {showDefinitionFlow &&
         formData.goalType === "race" &&
         selectedDistanceForPlans &&
         !showCustomPlanBuilder && (
@@ -932,7 +979,7 @@ export default function GoalTab() {
           </ScrollReveal>
         )}
 
-      {(isDefining || isChanging) && showCustomPlanBuilder && (
+      {showDefinitionFlow && showCustomPlanBuilder && (
         <ScrollReveal>
           <div className="space-y-4 rounded-xl border border-border bg-muted/30 p-4">
             <h3 className="font-semibold text-foreground">Mon plan personnalisé</h3>
@@ -1010,7 +1057,7 @@ export default function GoalTab() {
         </ScrollReveal>
       )}
 
-      {(isDefining || isChanging) &&
+      {showDefinitionFlow &&
         formData.goalType === "race" &&
         formData.selectedPlanId &&
         !showCustomPlanBuilder && (
@@ -1119,7 +1166,7 @@ export default function GoalTab() {
           </ScrollReveal>
         )}
 
-      {(isDefining || isChanging) && formData.goalType === "weight" && (
+      {showDefinitionFlow && formData.goalType === "weight" && (
         <ScrollReveal>
           <Alert>
             <Info className="h-4 w-4" />
@@ -1130,7 +1177,7 @@ export default function GoalTab() {
           </Alert>
         </ScrollReveal>
       )}
-      {(isDefining || isChanging) && formData.goalType === "distance" && (
+      {showDefinitionFlow && formData.goalType === "distance" && (
         <ScrollReveal>
           <Alert>
             <Info className="h-4 w-4" />
@@ -1142,7 +1189,7 @@ export default function GoalTab() {
         </ScrollReveal>
       )}
 
-      {(isDefining || isChanging) && (
+      {showDefinitionFlow && (
         <>
           {selectedPlan && formData.goalType !== "none" && (
             <ScrollReveal>
@@ -1204,34 +1251,6 @@ export default function GoalTab() {
           <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
             <Target className="h-4 w-4 mr-2" />
             Sauvegarder profil et plan
-          </Button>
-        </>
-      )}
-      {!(isDefining || isChanging) && (
-        <>
-          {saveError && (
-            <ScrollReveal>
-              <Alert variant="destructive" className="py-3">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-sm">{saveError}</AlertDescription>
-              </Alert>
-            </ScrollReveal>
-          )}
-          {warnings.length > 0 && (
-            <ScrollReveal>
-              <div className="space-y-2">
-                {warnings.map((warning, i) => (
-                  <Alert key={i} variant="destructive" className="py-3">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription className="text-sm">{warning}</AlertDescription>
-                  </Alert>
-                ))}
-              </div>
-            </ScrollReveal>
-          )}
-          <Button className="w-full bg-accent text-accent-foreground" onClick={saveProfileGoal}>
-            <Target className="h-4 w-4 mr-2" />
-            Sauvegarder profil et objectif
           </Button>
         </>
       )}
