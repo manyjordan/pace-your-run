@@ -162,9 +162,12 @@ export function useRunSession({
   const [distance, setDistance] = useState(0);
   const [routeProgress, setRouteProgress] = useState(0);
   const [currentKmSplit, setCurrentKmSplit] = useState<CurrentKmSplit | null>(null);
+  const [completedKmSplits, setCompletedKmSplits] = useState<Array<{ km: number; paceSecPerKm: number }>>([]);
 
   const runStartedAtRef = useRef<string | null>(null);
   const prevStatusRef = useRef<RunStatus>("idle");
+  const prevKmFloorRef = useRef(0);
+  const segmentStartElapsedRef = useRef(0);
 
   const bumpDistance = useCallback((deltaKm: number) => {
     setDistance((d) => d + deltaKm);
@@ -251,6 +254,28 @@ export function useRunSession({
   }, [currentKmSplit, distance, elapsed]);
 
   useEffect(() => {
+    if (status !== "running") return;
+    const newFloor = Math.floor(distance);
+    if (newFloor <= prevKmFloorRef.current) return;
+
+    const nKm = newFloor - prevKmFloorRef.current;
+    const totalTime = elapsed - segmentStartElapsedRef.current;
+    const timePerKm = totalTime / nKm;
+    const paceSecPerKm = timePerKm;
+
+    setCompletedKmSplits((prev) => {
+      const add: Array<{ km: number; paceSecPerKm: number }> = [];
+      for (let k = 1; k <= nKm; k++) {
+        add.push({ km: prevKmFloorRef.current + k, paceSecPerKm });
+      }
+      return [...prev, ...add];
+    });
+
+    segmentStartElapsedRef.current = elapsed;
+    prevKmFloorRef.current = newFloor;
+  }, [distance, elapsed, status]);
+
+  useEffect(() => {
     statusRef.current = status;
   }, [status, statusRef]);
 
@@ -303,6 +328,9 @@ export function useRunSession({
     setElapsed(0);
     setDistance(0);
     setCurrentKmSplit(null);
+    setCompletedKmSplits([]);
+    prevKmFloorRef.current = 0;
+    segmentStartElapsedRef.current = 0;
     setGpsTrace([]);
     setRollingPaceSecondsPerKm(0);
     setElevationGain(0);
@@ -493,6 +521,9 @@ export function useRunSession({
     setElapsed(0);
     setDistance(0);
     setCurrentKmSplit(null);
+    setCompletedKmSplits([]);
+    prevKmFloorRef.current = 0;
+    segmentStartElapsedRef.current = 0;
     setGpsTrace([]);
     setRollingPaceSecondsPerKm(0);
     setElevationGain(0);
@@ -574,6 +605,7 @@ export function useRunSession({
     setRouteProgress,
     currentKmSplit,
     currentKmPaceSec,
+    completedKmSplits,
     elevationGain,
     gradeAdjustedPace,
     start,

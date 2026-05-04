@@ -1,7 +1,8 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Pause, Play, Square, Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMemo } from "react";
+import { formatSplitPace } from "@/lib/splitCalculator";
+import { useEffect, useMemo, useState } from "react";
 import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
 import { useCadence } from "@/hooks/useCadence";
 import { InfoTooltip } from "@/components/InfoTooltip";
@@ -47,6 +48,7 @@ type Props = {
     distanceAtKmStart: number;
   } | null;
   currentKmPaceSec?: number;
+  completedSplits?: Array<{ km: number; paceSecPerKm: number }>;
 };
 
 export function RunMainTimerCard({
@@ -75,7 +77,14 @@ export function RunMainTimerCard({
   showEstimatedFinish = true,
   currentKmSplit = null,
   currentKmPaceSec = 0,
+  completedSplits = [],
 }: Props) {
+  const [tick, setTick] = useState(false);
+  useEffect(() => {
+    if (status !== "running") return;
+    setTick((t) => !t);
+  }, [elapsed, status]);
+
   const { cadence } = useCadence(status === "running");
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
   const heartRate = bluetooth.heartRate ?? 0;
@@ -89,7 +98,10 @@ export function RunMainTimerCard({
     if (!heartRate || heartRate <= 0) return null;
     return getZoneForBpm(heartRate, hrZones);
   }, [heartRate, hrZones]);
-  const formattedElapsed = formatTime(elapsed);
+  const colonPulseClass = cn("transition-opacity duration-200", tick ? "opacity-100" : "opacity-40");
+  const hPart = Math.floor(elapsed / 3600);
+  const mPart = Math.floor((elapsed % 3600) / 60);
+  const sPart = elapsed % 60;
   const formattedPace = displayPace > 0 ? formatPace(displayPace).replace(` /${distanceUnitShortLabel}`, "") : "--:--";
   const formattedGap =
     gradeAdjustedPace > 0 ? formatPace(gradeAdjustedPace / 60).replace(` /${distanceUnitShortLabel}`, "") : null;
@@ -105,9 +117,26 @@ export function RunMainTimerCard({
 
   if (isLandscape && status === "running") {
     return (
-      <div className="flex h-screen w-full items-center justify-between px-8 py-4">
+      <div className="flex h-screen w-full flex-col">
+        <div className="flex flex-1 items-center justify-between px-8 py-4">
         <div className="flex flex-col items-center">
-          <div className="font-metric text-7xl font-black leading-none text-foreground">{formattedElapsed}</div>
+          <div className="font-metric flex items-baseline justify-center gap-0 text-7xl font-black leading-none text-foreground">
+            {hPart > 0 ? (
+              <>
+                <span>{hPart}</span>
+                <span className="opacity-100">:</span>
+                <span>{String(mPart).padStart(2, "0")}</span>
+                <span className={colonPulseClass}>:</span>
+                <span>{String(sPart).padStart(2, "0")}</span>
+              </>
+            ) : (
+              <>
+                <span>{String(mPart).padStart(2, "0")}</span>
+                <span className={colonPulseClass}>:</span>
+                <span>{String(sPart).padStart(2, "0")}</span>
+              </>
+            )}
+          </div>
           <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">durée</div>
         </div>
 
@@ -158,6 +187,29 @@ export function RunMainTimerCard({
             </div>
           ) : null}
         </div>
+        </div>
+
+        {completedSplits.length > 0 && (
+          <div className="w-full shrink-0 border-t border-border/40 px-8 pb-safe pt-2">
+            <p className="mb-1.5 text-center text-xs uppercase tracking-wider text-muted-foreground">Splits</p>
+            <div className="flex justify-center gap-2">
+              {completedSplits.slice(-3).map((split, i, arr) => (
+                <div
+                  key={split.km}
+                  className={cn(
+                    "flex-1 max-w-[120px] rounded-xl py-1.5 text-center",
+                    i === arr.length - 1 ? "bg-accent/10" : "bg-muted/50",
+                  )}
+                >
+                  <p className="text-[11px] text-muted-foreground">km {split.km}</p>
+                  <p className="text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                    {formatSplitPace(split.paceSecPerKm)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -173,10 +225,24 @@ export function RunMainTimerCard({
         )}
 
         <div
-          className="font-metric mb-1 text-8xl font-black leading-none text-foreground"
+          className="font-metric mb-1 flex items-baseline justify-center gap-0 text-8xl font-black leading-none text-foreground"
           style={{ letterSpacing: "-0.04em" }}
         >
-          {formattedElapsed}
+          {hPart > 0 ? (
+            <>
+              <span>{hPart}</span>
+              <span className="opacity-100">:</span>
+              <span>{String(mPart).padStart(2, "0")}</span>
+              <span className={colonPulseClass}>:</span>
+              <span>{String(sPart).padStart(2, "0")}</span>
+            </>
+          ) : (
+            <>
+              <span>{String(mPart).padStart(2, "0")}</span>
+              <span className={colonPulseClass}>:</span>
+              <span>{String(sPart).padStart(2, "0")}</span>
+            </>
+          )}
         </div>
 
         <div className="mb-8 mt-6 flex w-full items-center justify-center gap-8">
@@ -246,6 +312,28 @@ export function RunMainTimerCard({
             </>
           )}
         </div>
+
+        {status === "running" && completedSplits.length > 0 && (
+          <div className="mb-6 w-full px-1">
+            <p className="mb-2 text-center text-xs uppercase tracking-wider text-muted-foreground">Splits</p>
+            <div className="flex justify-center gap-2">
+              {completedSplits.slice(-3).map((split, i, arr) => (
+                <div
+                  key={`${split.km}-${i}`}
+                  className={cn(
+                    "flex-1 max-w-[110px] rounded-xl py-2 text-center",
+                    i === arr.length - 1 ? "bg-accent/10" : "bg-muted/50",
+                  )}
+                >
+                  <p className="text-xs text-muted-foreground">km {split.km}</p>
+                  <p className="text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                    {formatSplitPace(split.paceSecPerKm)}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {showGpsStatus && status === "running" && (
           <div className="mb-6 flex items-center gap-1.5">

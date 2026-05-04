@@ -120,6 +120,7 @@ export default function Run() {
     setRouteProgress,
     currentKmSplit,
     currentKmPaceSec,
+    completedKmSplits,
     start,
     pause,
     resume,
@@ -475,6 +476,7 @@ export default function Run() {
               showGpsStatus={false}
               currentKmSplit={currentKmSplit}
               currentKmPaceSec={currentKmPaceSec}
+              completedSplits={completedKmSplits}
             />
 
             <div className="flex justify-center gap-6 pb-6 pb-safe">
@@ -578,6 +580,7 @@ export default function Run() {
             isLandscape={isLandscape}
             currentKmSplit={currentKmSplit}
             currentKmPaceSec={currentKmPaceSec}
+            completedSplits={completedKmSplits}
           />
         )}
 
