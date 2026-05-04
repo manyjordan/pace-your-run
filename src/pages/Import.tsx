@@ -1,8 +1,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
-import { Check, Loader2, Upload } from "lucide-react";
+import { ArrowLeft, Loader2, Upload } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { ScrollReveal } from "@/components/ScrollReveal";
 import { useAuth } from "@/contexts/AuthContext";
 import { getRuns, saveRun } from "@/lib/database";
 import { parseAppleHealthFile } from "@/lib/parsers/appleHealthParser";
@@ -14,6 +13,38 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { sourceConfig, type ImportSource } from "@/lib/importInstructions";
 import { cache } from "@/lib/cache";
+
+const GUIDED_IMPORT_SOURCES: Array<{
+  icon: string;
+  name: string;
+  description: string;
+  accepts: string;
+  source: ImportSource;
+}> = [
+  {
+    icon: "🟠",
+    name: "Strava",
+    description: "Exportez votre archive depuis Strava → Paramètres → Mon compte → Télécharger mes données",
+    accepts: ".zip",
+    source: "strava",
+  },
+  {
+    icon: "🟣",
+    name: "Garmin",
+    description: "Exportez en GPX depuis Garmin Connect → Activité → Exporter",
+    accepts: ".gpx,.fit",
+    source: "garmin",
+  },
+  {
+    icon: "📁",
+    name: "Fichier GPX / FIT",
+    description: "Importez directement un fichier GPX ou FIT",
+    accepts: ".gpx,.fit",
+    source: "gpx",
+  },
+];
+
+const OTHER_IMPORT_SOURCES: ImportSource[] = ["nike", "apple", "suunto"];
 
 function normalizeStartedAt(value: string) {
   const normalized = new Date(value);
@@ -83,8 +114,9 @@ export default function ImportPage() {
   const navigate = useNavigate();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [currentStep, setCurrentStep] = useState<1 | 3>(1);
   const [selectedSource, setSelectedSource] = useState<ImportSource | null>(null);
+  const [acceptFilter, setAcceptFilter] = useState<string | null>(null);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: number } | null>(null);
   const [stravaImportMode, setStravaImportMode] = useState<"zip" | "csv">("zip");
   const [isDragActive, setIsDragActive] = useState(false);
@@ -94,11 +126,13 @@ export default function ImportPage() {
 
   const selectedSourceConfig = selectedSource ? sourceConfig[selectedSource] : null;
 
-  const acceptedExtensions = selectedSource === "strava"
-    ? stravaImportMode === "zip"
-      ? ".zip"
-      : ".csv"
-    : selectedSourceConfig?.acceptedExtensions ?? "";
+  const acceptedExtensions =
+    acceptFilter ??
+    (selectedSource === "strava"
+      ? stravaImportMode === "zip"
+        ? ".zip"
+        : ".csv"
+      : selectedSourceConfig?.acceptedExtensions ?? "");
 
   async function saveRunsBulk(runsToSave: Array<Record<string, unknown>>) {
     if (!user?.id) return;
@@ -223,42 +257,36 @@ export default function ImportPage() {
     await handleFileImport(file);
   }
 
-  return (
-    <div className="space-y-6">
-      <ScrollReveal>
-        <div className="rounded-2xl border border-accent/60 bg-accent px-5 py-5 text-accent-foreground shadow-[0_18px_44px_hsl(var(--accent)/0.2)]">
-          <h1 className="text-2xl font-bold tracking-tight">Importer mon historique de course</h1>
-          <p className="mt-2 text-sm text-accent-foreground/85">
-            Import guidé en 3 étapes. Analyse locale, aucun partage externe.
-          </p>
-        </div>
-      </ScrollReveal>
+  function handleImportSource(accepts: string, source: ImportSource) {
+    const normalized = accepts.replace(/\s/g, "");
+    setSelectedSource(source);
+    setAcceptFilter(normalized);
+    setError(null);
+    if (source === "strava") setStravaImportMode("zip");
+    setCurrentStep(3);
+    window.setTimeout(() => inputRef.current?.click(), 0);
+  }
 
-      <div className="flex items-center gap-2 mb-6">
-        {[1, 2, 3].map((s) => (
-          <div key={s} className="flex items-center gap-2">
-            <div className={cn(
-              "flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-colors",
-              currentStep >= s
-                ? "bg-accent text-accent-foreground"
-                : "bg-muted text-muted-foreground"
-            )}>
-              {currentStep > s ? <Check className="h-3.5 w-3.5" /> : s}
-            </div>
-            {s < 3 && (
-              <div className={cn(
-                "h-0.5 w-8 transition-colors",
-                currentStep > s ? "bg-accent" : "bg-muted"
-              )} />
-            )}
-          </div>
-        ))}
-        <span className="ml-2 text-sm text-muted-foreground">
-          {currentStep === 1 ? "Source" : currentStep === 2 ? "Instructions" : "Import"}
-        </span>
+  return (
+    <div className="min-h-screen pb-safe">
+      <div className="sticky top-0 z-10 border-b border-border bg-background/95 backdrop-blur">
+        <div className="pt-safe" />
+        <div className="flex items-center gap-3 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2 transition-all active:scale-95"
+          >
+            <ArrowLeft className="h-5 w-5" />
+            <span className="text-sm font-medium">Retour</span>
+          </button>
+          <h1 className="font-semibold text-foreground">Importer des courses</h1>
+        </div>
       </div>
 
+      <div className="space-y-6 px-0 pt-2">
       {importResult ? (
+        <div className="px-4">
         <Card>
           <CardContent className="pt-6">
             <div className="space-y-4 text-center">
@@ -278,6 +306,7 @@ export default function ImportPage() {
                   onClick={() => {
                     setCurrentStep(1);
                     setSelectedSource(null);
+                    setAcceptFilter(null);
                     setImportResult(null);
                     setError(null);
                     setProgress(0);
@@ -298,79 +327,60 @@ export default function ImportPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       ) : (
         <>
           {currentStep === 1 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Sélection de la source</CardTitle>
-                <CardDescription>Choisissez la plateforme de provenance</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {Object.entries(sourceConfig).map(([key, source]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        setSelectedSource(key as ImportSource);
-                        setError(null);
-                        setTimeout(() => setCurrentStep(2), 300);
-                      }}
-                      className={cn(
-                        "flex flex-col items-center gap-2 rounded-xl border-2 p-4 text-center transition-all",
-                        selectedSource === key
-                          ? "border-accent bg-accent/10"
-                          : "border-border hover:border-accent/50"
-                      )}
-                    >
-                      <source.icon className="h-6 w-6 text-accent" />
-                      <span className="text-sm font-semibold">{source.label}</span>
-                    </button>
-                  ))}
+            <div className="space-y-3 px-4 pt-4">
+              <p className="text-sm text-muted-foreground">
+                Importez vos courses depuis vos applications favorites.
+              </p>
+
+              {GUIDED_IMPORT_SOURCES.map((sourceRow) => (
+                <button
+                  key={sourceRow.name}
+                  type="button"
+                  onClick={() => handleImportSource(sourceRow.accepts, sourceRow.source)}
+                  className="flex w-full items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all active:scale-95"
+                >
+                  <span className="text-2xl">{sourceRow.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-foreground">{sourceRow.name}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{sourceRow.description}</p>
+                  </div>
+                  <Upload className="h-4 w-4 shrink-0 text-muted-foreground" />
+                </button>
+              ))}
+
+              <details className="rounded-xl border border-border bg-card">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+                  Autres sources (Nike, Apple Santé, Suunto…)
+                </summary>
+                <div className="grid grid-cols-2 gap-2 border-t border-border p-3 sm:grid-cols-3">
+                  {OTHER_IMPORT_SOURCES.map((key) => {
+                    const source = sourceConfig[key];
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => handleImportSource(source.acceptedExtensions, key)}
+                        className={cn(
+                          "flex flex-col items-center gap-2 rounded-xl border-2 p-3 text-center transition-all",
+                          selectedSource === key ? "border-accent bg-accent/10" : "border-border hover:border-accent/50",
+                        )}
+                      >
+                        <source.icon className="h-6 w-6 text-accent" />
+                        <span className="text-xs font-semibold leading-tight">{source.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {currentStep === 2 && selectedSourceConfig && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Instructions</CardTitle>
-                <CardDescription>{selectedSourceConfig.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {selectedSourceConfig.instructions.map((instruction, i) => (
-                    <div key={i} className="flex gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent text-sm font-bold text-accent-foreground">
-                        {i + 1}
-                      </div>
-                      <div className="flex-1 pt-1">
-                        <p className="text-sm font-semibold">{instruction.title}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{instruction.description}</p>
-                      </div>
-                    </div>
-                  ))}
-
-                  <Button
-                    className="w-full mt-4 bg-accent text-accent-foreground"
-                    onClick={() => setCurrentStep(3)}
-                  >
-                    J'ai mon fichier, continuer
-                  </Button>
-
-                  <button
-                    onClick={() => { setCurrentStep(1); setSelectedSource(null); }}
-                    className="w-full text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Choisir une autre source
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
+              </details>
+            </div>
           )}
 
           {currentStep === 3 && selectedSourceConfig && (
+            <div className="px-4 pb-8">
             <Card>
               <CardHeader>
                 <CardTitle>Import</CardTitle>
@@ -378,11 +388,15 @@ export default function ImportPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 {selectedSource === "strava" && (
-                  <div className="space-y-3 mb-4">
+                  <div className="mb-4 space-y-3">
                     <p className="text-sm font-medium">Choisissez votre type de fichier :</p>
                     <div className="grid grid-cols-2 gap-3">
                       <button
-                        onClick={() => setStravaImportMode("zip")}
+                        type="button"
+                        onClick={() => {
+                          setStravaImportMode("zip");
+                          setAcceptFilter(null);
+                        }}
                         className={cn(
                           "rounded-lg border-2 p-3 text-left transition-all",
                           stravaImportMode === "zip" ? "border-accent bg-accent/10" : "border-border"
@@ -392,7 +406,11 @@ export default function ImportPage() {
                         <p className="text-xs text-muted-foreground">Complet — avec traces GPS</p>
                       </button>
                       <button
-                        onClick={() => setStravaImportMode("csv")}
+                        type="button"
+                        onClick={() => {
+                          setStravaImportMode("csv");
+                          setAcceptFilter(null);
+                        }}
                         className={cn(
                           "rounded-lg border-2 p-3 text-left transition-all",
                           stravaImportMode === "csv" ? "border-accent bg-accent/10" : "border-border"
@@ -451,16 +469,24 @@ export default function ImportPage() {
                 )}
 
                 <button
-                  onClick={() => setCurrentStep(2)}
+                  type="button"
+                  onClick={() => {
+                    setCurrentStep(1);
+                    setSelectedSource(null);
+                    setAcceptFilter(null);
+                    setError(null);
+                  }}
                   className="w-full text-sm text-muted-foreground hover:text-foreground"
                 >
-                  Retour aux instructions
+                  Choisir une autre source
                 </button>
               </CardContent>
             </Card>
+            </div>
           )}
         </>
       )}
+      </div>
     </div>
   );
 }
