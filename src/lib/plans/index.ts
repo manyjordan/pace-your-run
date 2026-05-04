@@ -1,18 +1,11 @@
 export * from "./types";
-export { weightPlans } from "./weightPlans";
-export { distancePlans } from "./distancePlans";
-export { racePlans } from "./racePlans";
+export * from "./allPlans";
 
-import { weightPlans } from "./weightPlans";
-import { distancePlans } from "./distancePlans";
-import { racePlans } from "./racePlans";
+import { ALL_PLANS } from "./allPlans";
 import type { TrainingPlan } from "./types";
 
-export const TRAINING_PLANS: TrainingPlan[] = [...weightPlans, ...distancePlans, ...racePlans];
-
-export function getPlanById(id: string): TrainingPlan | undefined {
-  return TRAINING_PLANS.find((plan) => plan.id === id);
-}
+/** @deprecated use ALL_PLANS — kept for backward imports */
+export const TRAINING_PLANS: TrainingPlan[] = ALL_PLANS;
 
 const MAP_DAY_ORDER = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
 
@@ -33,6 +26,7 @@ export function mapSessionsToDays(plan: TrainingPlan, availableDays: string[]): 
         sessions: sessions.map((session, index) => ({
           ...session,
           day: sortedDays[index]!,
+          duration: session.duration,
         })),
         totalDistance: Number(sessions.reduce((sum, s) => sum + s.distance, 0).toFixed(1)),
       };

@@ -332,7 +332,7 @@ export function useRunSession({
     routeArrivalAnnouncedRef.current = false;
     bluetooth.clearErrorAndSamplesForRunStart();
     treadmill.resetTreadmillForFreshRun();
-    setTitle(activeSession?.session.type ?? "");
+    setTitle(activeSession?.session.label ?? activeSession?.session.type ?? "");
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
     }

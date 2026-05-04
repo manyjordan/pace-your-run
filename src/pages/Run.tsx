@@ -371,7 +371,7 @@ export default function Run() {
               {activeSession ? (
                 <div className="rounded-2xl border border-accent/20 bg-accent/10 px-6 py-3 text-center">
                   <p className="text-xs uppercase tracking-wider text-muted-foreground">Session programmée</p>
-                  <p className="mt-0.5 font-bold text-accent">{activeSession.session.type}</p>
+                  <p className="mt-0.5 font-bold text-accent">{activeSession.session.label}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {activeSession.session.distance} km · {activeSession.session.pace} /km
                   </p>

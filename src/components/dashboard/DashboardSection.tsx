@@ -122,7 +122,7 @@ export const DashboardSection = ({
           return sessionDay >= dayOfWeek;
         })
         .map((session, idx) => ({
-          type: session.type,
+          type: session.label,
           distance: `${session.distance.toFixed(1)}km`,
           pace: session.pace,
           day: session.day,

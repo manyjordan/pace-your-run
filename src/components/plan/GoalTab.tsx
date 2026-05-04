@@ -979,7 +979,13 @@ export default function GoalTab() {
                     </div>
                     <div className="rounded-lg bg-card p-2">
                       <p className="text-xs text-muted-foreground">Niveau</p>
-                      <p className="text-sm font-bold text-accent capitalize">{selectedPlan.level === "beginner" ? "Début" : selectedPlan.level === "intermediate" ? "Inter" : "Avancé"}</p>
+                      <p className="text-sm font-bold text-accent capitalize">
+                        {selectedPlan.legacyLevel === "beginner"
+                          ? "Début"
+                          : selectedPlan.legacyLevel === "intermediate"
+                            ? "Inter"
+                            : "Avancé"}
+                      </p>
                     </div>
                   </div>
                 </CardContent>

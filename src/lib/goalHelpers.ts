@@ -79,7 +79,7 @@ export function calculateWeeksAvailable(targetDate?: string | null, fallback = 1
 
   const diffMs = date.getTime() - Date.now();
   const diffWeeks = Math.ceil(diffMs / (1000 * 60 * 60 * 24 * 7));
-  return Math.max(4, Math.min(16, diffWeeks || fallback));
+  return Math.max(4, Math.min(28, diffWeeks || fallback));
 }
 
 export function parseTimeToSeconds(time: string) {

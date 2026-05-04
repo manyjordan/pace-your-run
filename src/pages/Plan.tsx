@@ -13,6 +13,9 @@ import { getProfile, getRuns, type RunRow } from "@/lib/database";
 import GoalTab from "@/components/plan/GoalTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
 import type { Session, TrainingPlan } from "@/lib/plans/types";
+import { getPlanById, mapSessionsToDays } from "@/lib/trainingPlans";
+import { selectPlan } from "@/lib/planSelector";
+import { calculateWeeksAvailable, mapDistanceToTargetDistance } from "@/lib/goalHelpers";
 
 type PlanGoal = {
   goalType?: string;
@@ -61,8 +64,6 @@ export default function PlanPage() {
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [userGoal, setUserGoal] = useState<PlanGoal | null>(null);
   const [availableDays, setAvailableDays] = useState<string[]>([]);
-  const [plansModule, setPlansModule] = useState<typeof import("@/lib/plans") | null>(null);
-
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) {
@@ -155,57 +156,71 @@ export default function PlanPage() {
     },
     [recentRuns, weekStart, weekEnd],
   );
-  useEffect(() => {
-    let cancelled = false;
-    if (!normalizedGoalType || normalizedGoalType === "none") {
-      setPlansModule(null);
-      return;
-    }
-
-    void import("@/lib/plans")
-      .then((mod) => {
-        if (!cancelled) setPlansModule(mod);
-      })
-      .catch(() => {
-        if (!cancelled) setPlansModule(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [normalizedGoalType]);
-
   const selectedPlan = useMemo((): TrainingPlan | null => {
-    if (!plansModule || !normalizedGoalType) return null;
-    const { TRAINING_PLANS, getPlanById, mapSessionsToDays } = plansModule;
+    if (!normalizedGoalType || normalizedGoalType === "none") return null;
 
-    let planId: string | null = null;
-    if (normalizedGoalType === "marathon" || normalizedRaceType === "marathon" || numericTargetDistance >= 40) {
-      planId = "marathon_beginner_4days_16weeks";
-    } else if (normalizedGoalType === "semi" || normalizedRaceType === "semi" || numericTargetDistance >= 20) {
-      planId = "semi_beginner_3days_16weeks";
-    } else if (numericTargetDistance >= 10) {
-      planId = "distance_10k_beginner_3days_12weeks";
-    } else if (normalizedGoalType === "weight") {
-      planId = "weight_beginner_3days_8weeks";
+    const ug = userGoal as {
+      selectedPlanId?: string;
+      level?: string;
+      fitnessLevel?: string;
+      distanceKm?: string;
+    } | null;
+
+    let basePlan: TrainingPlan | null = null;
+    if (ug?.selectedPlanId) {
+      basePlan = getPlanById(ug.selectedPlanId) ?? null;
     }
 
-    const exactPlan = planId ? getPlanById(planId) : null;
-    const basePlan =
-      exactPlan ??
-      TRAINING_PLANS.find((plan) => {
-        if (normalizedGoalType === "weight") return plan.goal === "weight";
-        if (normalizedGoalType === "distance") return plan.goal === "distance";
-        if (normalizedRaceType === "marathon" || numericTargetDistance >= 40) return plan.targetDistance === "marathon";
-        if (normalizedRaceType === "semi" || numericTargetDistance >= 20) return plan.targetDistance === "semi";
-        if (numericTargetDistance >= 10) return plan.targetDistance === "10k";
-        return plan.goal === "distance";
-      }) ??
-      null;
+    const level =
+      ug?.level === "intermediate" || ug?.fitnessLevel === "intermediate"
+        ? "intermediate"
+        : ug?.level === "advanced" || ug?.fitnessLevel === "advanced"
+          ? "advanced"
+          : "beginner";
+
+    const daysCount = availableDays.length >= 2 ? Math.min(5, availableDays.length) : 3;
+
+    let targetDistance: "5k" | "10k" | "20k" | "semi" | "marathon" | undefined;
+    if (normalizedGoalType === "race") {
+      if (normalizedRaceType === "marathon" || numericTargetDistance >= 40) targetDistance = "marathon";
+      else if (normalizedRaceType === "semi" || (numericTargetDistance >= 20 && numericTargetDistance < 40))
+        targetDistance = "semi";
+      else if (normalizedRaceType === "10k" || (numericTargetDistance >= 10 && numericTargetDistance < 20))
+        targetDistance = "10k";
+      else if (normalizedRaceType === "5k" || (numericTargetDistance > 0 && numericTargetDistance < 10))
+        targetDistance = "5k";
+      else if (normalizedRaceType === "20k") targetDistance = "20k";
+    } else if (normalizedGoalType === "distance") {
+      const km = Number.parseFloat(String(ug?.distanceKm ?? "0").replace(",", "."));
+      if (Number.isFinite(km) && km > 0) {
+        const raw = mapDistanceToTargetDistance(km);
+        targetDistance = raw === "20k" ? "semi" : raw;
+      }
+    }
+
+    const weeksAvailable = targetDate ? calculateWeeksAvailable(targetDate) : undefined;
+
+    if (!basePlan) {
+      basePlan = selectPlan({
+        goal: normalizedGoalType === "weight" ? "weight" : normalizedGoalType === "race" ? "race" : "distance",
+        targetDistance,
+        level,
+        daysPerWeek: daysCount,
+        availableDays: availableDays.length >= 2 ? availableDays : undefined,
+        weeksAvailable,
+      });
+    }
 
     if (!basePlan) return null;
     return availableDays.length > 0 ? mapSessionsToDays(basePlan, availableDays) : basePlan;
-  }, [availableDays, normalizedGoalType, normalizedRaceType, numericTargetDistance, plansModule]);
+  }, [
+    availableDays,
+    normalizedGoalType,
+    normalizedRaceType,
+    numericTargetDistance,
+    targetDate,
+    userGoal,
+  ]);
 
   const currentPlanWeek = useMemo((): number => {
     if (!targetDate || !selectedPlan) return 1;
@@ -219,7 +234,8 @@ export default function PlanPage() {
   const raceDaySession = useMemo<Session>(
     () => ({
       day: targetDate ? format(new Date(targetDate), "EEE", { locale: fr }) : "Dim",
-      type: "Jour de course",
+      type: "race",
+      label: "Jour de course",
       distance: (() => {
         const parsed = Number.parseFloat(String(targetDistanceKm ?? "").replace(",", "."));
         return (Number.isFinite(parsed) && parsed > 0 ? parsed : null) ?? (numericTargetDistance > 0 ? numericTargetDistance : 42.195);
@@ -405,7 +421,7 @@ export default function PlanPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">{session.type}</p>
+                        <p className="text-sm font-semibold text-foreground">{session.label}</p>
                         {isToday ? (
                           <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-medium text-white">
                             Aujourd&apos;hui

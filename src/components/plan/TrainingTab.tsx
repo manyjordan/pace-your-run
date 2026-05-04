@@ -43,13 +43,14 @@ const intensityColors: Record<string, string> = {
 const intensityLabels: Record<string, string> = {
   easy: "Facile",
   moderate: "Modéré",
+  hard: "Intense",
   tempo: "Tempo",
   interval: "Intervalle",
   race: "Course",
 };
 
 function getSessionBadge(session: Session) {
-  const type = session.type.toLowerCase();
+  const type = `${session.label} ${session.type}`.toLowerCase();
   const description = session.description.toLowerCase();
 
   if (type.includes("récup")) {

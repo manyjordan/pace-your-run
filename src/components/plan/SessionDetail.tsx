@@ -9,6 +9,7 @@ import type { Session } from "@/lib/trainingPlans";
 const intensityColors: Record<string, string> = {
   easy: "hsl(200, 80%, 55%)",
   moderate: "hsl(200, 100%, 50%)",
+  hard: "hsl(0, 72%, 51%)",
   tempo: "hsl(38, 92%, 50%)",
   interval: "hsl(0, 72%, 51%)",
   race: "hsl(270, 100%, 60%)",
@@ -94,7 +95,10 @@ export default function SessionDetail({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const guide = sessionGuides[session.type] || sessionGuides["Footing facile"];
+  const guide =
+    sessionGuides[session.label] ||
+    sessionGuides[session.type] ||
+    sessionGuides["Footing facile"];
   const sessionColor = intensityColors[session.intensity] || intensityColors.easy;
 
   const handleLaunchRun = () => {

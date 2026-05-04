@@ -1,175 +1,79 @@
-export type Intensity = "easy" | "moderate" | "tempo" | "interval" | "race";
+export type PlanLevel = "finisher" | "performance" | "competitor" | "elite";
 
-export type IntervalSet = {
-  reps: number;
-  distanceM?: number;
-  durationSeconds?: number;
-  pace: string;
-  recoverySeconds: number;
-  recoveryType: "walk" | "jog" | "rest";
-  recoveryPace?: string;
-};
+export type PlanDistance = "5k" | "10k" | "semi" | "marathon" | "regular" | "custom";
 
-export type Session = {
+export type PlanSessionType = "easy" | "tempo" | "interval" | "long" | "rest" | "race";
+
+export interface PlanSession {
   day: string;
-  type: string;
+  type: PlanSessionType;
+  label: string;
+  description: string;
   distance: number;
   pace: string;
+  intensity: "easy" | "moderate" | "hard" | "race";
+  /** Duration in minutes (for UI / session recap) */
   duration: number;
-  description: string;
-  intensity: Intensity;
-  warmupMinutes?: number;
-  cooldownMinutes?: number;
-  intervals?: IntervalSet;
-};
+}
 
-export type Week = {
+/** Alias used across the app for a scheduled workout */
+export type Session = PlanSession;
+
+export interface PlanWeek {
+  weekNumber: number;
+  /** Legacy alias — same as weekNumber (TrainingTab / dashboard) */
   week: number;
-  sessions: Session[];
+  phase: "base" | "build" | "peak" | "taper";
   totalDistance: number;
   focus: string;
-};
+  sessions: PlanSession[];
+}
 
-export type TrainingPlan = {
+export interface TrainingPlan {
   id: string;
+  distance: PlanDistance;
+  level: PlanLevel;
   name: string;
+  description: string;
+  emoji: string;
+  targetTime?: string;
+  durationWeeks: number;
+  sessionsPerWeek: 3 | 4 | 5;
+  weeklySchedule: PlanWeek[];
+  /** Selection & legacy UI */
   goal: "weight" | "distance" | "race";
-  targetDistance?: "5k" | "10k" | "20k" | "semi" | "marathon";
-  level: "beginner" | "intermediate" | "advanced";
-  daysPerWeek: 2 | 3 | 4 | 5;
-  durationWeeks: 4 | 8 | 12 | 16;
   summary: string;
-  weeklySchedule: Week[];
+  daysPerWeek: 3 | 4 | 5;
+  legacyLevel: "beginner" | "intermediate" | "advanced";
+  targetDistance?: "5k" | "10k" | "20k" | "semi" | "marathon";
   equipmentTips: string[];
   nutritionTips: string[];
   shoeTips: string[];
-};
-
-// Helper to calculate pace to minutes
-export function paceToMinutes(pace: string): number {
-  const [m, s] = pace.split(":").map(Number);
-  return m + s / 60;
 }
 
-// Helper to calculate duration in minutes
-export function calculateDuration(distance: number, pace: string): number {
-  return Math.round(distance * paceToMinutes(pace));
+function parsePaceToken(token: string): number | null {
+  const t = token.trim().replace("/km", "");
+  const parts = t.split(":");
+  if (parts.length !== 2) return null;
+  const mm = Number(parts[0]);
+  const ss = Number(parts[1]);
+  if (!Number.isFinite(mm) || !Number.isFinite(ss)) return null;
+  return mm + ss / 60;
 }
 
-// Generate weeks with progressive overload
-export function generateWeeklyTemplate(
-  baseDistance: number,
-  basePace: string,
-  daysPerWeek: 2 | 3 | 4 | 5,
-  weekNumber: number,
-  totalWeeks: number
-): Session[] {
-  const sessions: Session[] = [];
-  
-  // Alternate between easy, moderate, and tempo days
-  const intensities: Array<{ type: string; intensity: Intensity; pace: string; multiplier: number }> = [];
-  
-  if (daysPerWeek === 2) {
-    intensities.push(
-      { type: "Sortie facile", intensity: "easy", pace: basePace, multiplier: 1 },
-      { type: "Sortie facile", intensity: "easy", pace: basePace, multiplier: 1 }
-    );
-  } else if (daysPerWeek === 3) {
-    intensities.push(
-      { type: "Sortie facile", intensity: "easy", pace: basePace, multiplier: 1 },
-      { type: "Sortie tempo", intensity: "tempo", pace: minusSeconds(basePace, 30), multiplier: 0.7 },
-      { type: "Sortie facile", intensity: "easy", pace: basePace, multiplier: 1 }
-    );
-  } else if (daysPerWeek === 4) {
-    intensities.push(
-      { type: "Sortie facile", intensity: "easy", pace: basePace, multiplier: 1 },
-      { type: "Sortie tempo", intensity: "tempo", pace: minusSeconds(basePace, 30), multiplier: 0.75 },
-      { type: "Récupération active", intensity: "easy", pace: addSeconds(basePace, 20), multiplier: 0.8 },
-      { type: "Sortie longue", intensity: "easy", pace: addSeconds(basePace, 10), multiplier: 1.3 }
-    );
-  } else {
-    // 5 days
-    intensities.push(
-      { type: "Sortie facile", intensity: "easy", pace: basePace, multiplier: 1 },
-      { type: "Intervalles courts", intensity: "interval", pace: minusSeconds(basePace, 60), multiplier: 0.8 },
-      { type: "Récupération active", intensity: "easy", pace: addSeconds(basePace, 20), multiplier: 0.7 },
-      { type: "Sortie tempo", intensity: "tempo", pace: minusSeconds(basePace, 30), multiplier: 0.85 },
-      { type: "Sortie longue", intensity: "easy", pace: addSeconds(basePace, 10), multiplier: 1.4 }
-    );
-  }
-  
-  // Calculate volume progression with recovery weeks every 4 weeks
-  let volumeMultiplier = 1;
-  const progressionWeek = ((weekNumber - 1) % 4) + 1;
-  
-  if (progressionWeek === 1) volumeMultiplier = 0.95;
-  else if (progressionWeek === 2) volumeMultiplier = 1.05;
-  else if (progressionWeek === 3) volumeMultiplier = 1.08;
-  else if (progressionWeek === 4) volumeMultiplier = 0.8; // Recovery week
-  
-  // Taper for last 2 weeks
-  if (weekNumber > totalWeeks - 2) {
-    volumeMultiplier *= (0.65 + (weekNumber - (totalWeeks - 2)) * 0.2);
-  }
-  
-  const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
-  
-  intensities.forEach((config, idx) => {
-    sessions.push({
-      day: days[idx % 7],
-      type: config.type,
-      distance: Math.round(baseDistance * config.multiplier * volumeMultiplier * 10) / 10,
-      pace: config.pace,
-      duration: calculateDuration(Math.round(baseDistance * config.multiplier * volumeMultiplier * 10) / 10, config.pace),
-      description: `${config.type} - Semaine ${weekNumber}`,
-      intensity: config.intensity,
-    });
-  });
-  
-  return sessions;
+/** Midpoint pace in min/km from "5:40" or "5:30-6:00" */
+export function midPaceMinutes(pace: string): number | null {
+  const trimmed = pace.replace("/km", "").trim();
+  if (!trimmed.includes("-")) return parsePaceToken(trimmed);
+  const [a, b] = trimmed.split("-").map((x) => x.trim());
+  const pa = parsePaceToken(a);
+  const pb = parsePaceToken(b);
+  if (pa === null || pb === null) return pa ?? pb;
+  return (pa + pb) / 2;
 }
 
-// Utility to modify pace
-export function minusSeconds(pace: string, seconds: number): string {
-  const [m, s] = pace.split(":").map(Number);
-  let totalSeconds = m * 60 + s - seconds;
-  if (totalSeconds < 0) totalSeconds = 0;
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
-}
-
-export function addSeconds(pace: string, seconds: number): string {
-  const [m, s] = pace.split(":").map(Number);
-  const totalSeconds = m * 60 + s + seconds;
-  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, "0")}`;
-}
-
-// Generate complete schedule for a plan
-export function generateSchedule(
-  baseDistance: number,
-  basePace: string,
-  daysPerWeek: 2 | 3 | 4 | 5,
-  durationWeeks: 4 | 8 | 12 | 16
-): Week[] {
-  const schedule: Week[] = [];
-  
-  for (let week = 1; week <= durationWeeks; week++) {
-    const sessions = generateWeeklyTemplate(baseDistance, basePace, daysPerWeek, week, durationWeeks);
-    const totalDistance = Math.round(sessions.reduce((sum, s) => sum + s.distance, 0) * 10) / 10;
-    
-    let focus = "Progression régulière";
-    const progressionWeek = ((week - 1) % 4) + 1;
-    
-    if (progressionWeek === 4) focus = "Semaine de récupération - Volume réduit de 20%";
-    else if (week > durationWeeks - 2) focus = "Phase d'affûtage - Réduire le volume et garder la vitesse";
-    else if (progressionWeek === 1) focus = "Début d'un nouveau cycle de 4 semaines";
-    
-    schedule.push({
-      week,
-      sessions,
-      totalDistance,
-      focus,
-    });
-  }
-  
-  return schedule;
+export function estimateSessionMinutes(distanceKm: number, pace: string): number {
+  const m = midPaceMinutes(pace);
+  if (m === null || m <= 0) return Math.round(distanceKm * 6);
+  return Math.max(5, Math.round(distanceKm * m));
 }
