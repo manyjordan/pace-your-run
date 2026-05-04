@@ -1,11 +1,4 @@
-export interface Achievement {
-  id: string;
-  emoji: string;
-  title: string;
-  description: string;
-  color: string;
-  check: (stats: AchievementStats) => boolean;
-}
+import { getWeek, subWeeks } from "date-fns";
 
 export interface AchievementStats {
   totalKm: number;
@@ -14,6 +7,43 @@ export interface AchievementStats {
   weeklyStreak: number;
   bestPaceSecPerKm: number;
   totalHours: number;
+}
+
+/** Consecutive ISO weeks (Mon→Sun) with at least one run, counting backward from today (same logic as the dashboard). */
+export function computeWeeklyStreakFromRuns(runs: Array<{ started_at?: string | null }>): number {
+  const weekKeys = new Set(
+    runs
+      .filter((run) => Boolean(run.started_at))
+      .map((run) => {
+        const d = new Date(run.started_at as string);
+        const year = d.getFullYear();
+        const week = getWeek(d, { weekStartsOn: 1 });
+        return `${year}-W${String(week).padStart(2, "0")}`;
+      }),
+  );
+  let streak = 0;
+  let checkDate = new Date();
+  for (let i = 0; i < 104; i++) {
+    const year = checkDate.getFullYear();
+    const week = getWeek(checkDate, { weekStartsOn: 1 });
+    const key = `${year}-W${String(week).padStart(2, "0")}`;
+    if (weekKeys.has(key)) {
+      streak += 1;
+      checkDate = subWeeks(checkDate, 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+export interface Achievement {
+  id: string;
+  emoji: string;
+  title: string;
+  description: string;
+  color: string;
+  check: (stats: AchievementStats) => boolean;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
