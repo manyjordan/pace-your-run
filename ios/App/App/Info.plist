@@ -64,11 +64,11 @@
 		<string>audio</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activitÃƒÆ’Ã‚Â©.</string>
+	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activité.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course, mÃƒÆ’Ã‚Âªme lorsque l'ÃƒÆ’Ã‚Â©cran est verrouillÃƒÆ’Ã‚Â©.</string>
+	<string>Pace utilise votre position pour enregistrer votre course même en arrière-plan.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course, mÃƒÆ’Ã‚Âªme lorsque l'ÃƒÆ’Ã‚Â©cran est verrouillÃƒÆ’Ã‚Â©.</string>
+	<string>Pace utilise votre position pour enregistrer votre course même en arrière-plan.</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
