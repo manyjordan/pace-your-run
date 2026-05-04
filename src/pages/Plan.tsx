@@ -106,10 +106,10 @@ export default function PlanPage() {
   const targetDate = userGoal?.target_date || userGoal?.raceTargetDate || userGoal?.distanceTargetDate || userGoal?.weightTargetDate || null;
   const daysUntilGoal = useMemo(() => {
     if (!targetDate) return null;
-    const diff = differenceInDays(new Date(targetDate), new Date());
-    return Math.max(0, diff);
+    return differenceInDays(new Date(targetDate), new Date());
   }, [targetDate]);
-  const weeksUntilGoal = daysUntilGoal !== null ? Math.floor(daysUntilGoal / 7) : null;
+  const goalIsExpired = daysUntilGoal !== null && daysUntilGoal < 0;
+  const [goalTabChangeNonce, setGoalTabChangeNonce] = useState(0);
   const raceLabel = useMemo(() => {
     if (!userGoal?.goalType && !userGoal?.goal_type) return null;
     if (normalizedGoalType === "race") {
@@ -310,175 +310,220 @@ export default function PlanPage() {
       </div>
 
       <TabsContent value="goal" className="space-y-6">
-        <GoalTab />
+        <GoalTab openChangeGoalNonce={goalTabChangeNonce} />
 
-        {targetDate && daysUntilGoal !== null && daysUntilGoal <= 7 ? (
-        <ScrollReveal>
-          <AppCard className="border-2 border-accent">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent">
-                <Trophy className="h-5 w-5 text-white" />
-              </div>
+        {goalIsExpired ? (
+          <ScrollReveal>
+            <div className="flex flex-col items-center space-y-5 px-6 py-12 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-3xl">🏅</div>
               <div>
-                <p className="text-lg font-bold text-foreground">🏁 Jour de course !</p>
-                <p className="text-sm text-muted-foreground">
-                  {format(new Date(targetDate), "EEEE dd MMMM yyyy", { locale: fr })}
+                <h2 className="text-xl font-bold text-foreground">Course terminée !</h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {raceLabel
+                    ? `Votre ${raceLabel} est passé${raceLabel === "Course" ? "" : "e"}. `
+                    : null}
+                  Prêt pour un nouvel objectif ?
                 </p>
-                {raceLabel ? (
-                  <p className="mt-0.5 text-xs font-semibold text-accent">{raceLabel}</p>
-                ) : null}
               </div>
+              {runsThisWeek.length > 0 ? (
+                <AppCard className="w-full text-left">
+                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Cette semaine</p>
+                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                    {runsThisWeek.reduce((s, r) => s + (r.distance_km ?? 0), 0).toFixed(1)} km
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {runsThisWeek.length} sortie{runsThisWeek.length > 1 ? "s" : ""} cette semaine
+                  </p>
+                </AppCard>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setGoalTabChangeNonce((n) => n + 1)}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 font-semibold text-white transition-all active:scale-95"
+              >
+                <Target className="h-4 w-4" />
+                Définir un nouvel objectif
+              </button>
+              <button
+                type="button"
+                onClick={() => setGoalTabChangeNonce((n) => n + 1)}
+                className="text-sm text-muted-foreground underline"
+              >
+                Modifier mon objectif actuel
+              </button>
             </div>
-          </AppCard>
-        </ScrollReveal>
-        ) : null}
-
-        <ScrollReveal>
-        <AppCard>
-          <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Cette semaine</h3>
-          <div className="flex justify-between">
-            {DAYS.map((day, i) => {
-              const dayIndex = i === 6 ? 0 : i + 1;
-              const isToday = dayIndex === now.getDay();
-              const hasRun = runsThisWeek.some((run) => run.started_at && new Date(run.started_at).getDay() === dayIndex);
-              return (
-                <div key={`${day}-${i}`} className="flex flex-col items-center gap-2">
-                  <span className={cn("text-xs font-medium", isToday ? "text-accent" : "text-muted-foreground")}>{day}</span>
-                  <div
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
-                      hasRun ? "bg-accent text-white" : isToday ? "border-2 border-accent text-accent" : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    {hasRun ? "✓" : isToday ? "•" : ""}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </AppCard>
-        </ScrollReveal>
-
-        {selectedPlan && currentWeekData ? (
-        <ScrollReveal>
-          <AppCard>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-xs uppercase tracking-wider text-muted-foreground">{selectedPlan.name}</p>
-                <p className="font-semibold text-foreground">
-                  Semaine {currentPlanWeek}/{selectedPlan.durationWeeks}
-                </p>
-                <p className="mt-0.5 text-xs text-accent">{currentWeekData.focus}</p>
-              </div>
-              <div className="text-right">
-                <p className="font-metric text-2xl font-black text-foreground">{displayTotalKm}</p>
-                <p className="text-xs text-muted-foreground">km cette semaine</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              {sessionsToShow.map((session, i) => {
-                const intensityColors: Record<string, string> = {
-                  easy: "#4ade80",
-                  moderate: "#60a5fa",
-                  tempo: "#fb923c",
-                  interval: "#f43f5e",
-                  race: "#1DB954",
-                };
-                const color = intensityColors[session.intensity] ?? "#9CA3AF";
-                const normalizedDay = session.day.toLowerCase();
-                const isToday =
-                  normalizedDay.startsWith(todayShort.toLowerCase()) ||
-                  (todayShort === "Lun" && normalizedDay.startsWith("lundi")) ||
-                  (todayShort === "Mar" && normalizedDay.startsWith("mardi")) ||
-                  (todayShort === "Mer" && normalizedDay.startsWith("mercredi")) ||
-                  (todayShort === "Jeu" && normalizedDay.startsWith("jeudi")) ||
-                  (todayShort === "Ven" && normalizedDay.startsWith("vendredi")) ||
-                  (todayShort === "Sam" && normalizedDay.startsWith("samedi")) ||
-                  (todayShort === "Dim" && normalizedDay.startsWith("dimanche"));
-                const completed = isSessionCompleted(session, currentPlanWeek);
-
-                return (
-                  <div
-                    key={`${session.day}-${session.type}-${i}`}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl p-3 transition-all",
-                      completed
-                        ? "border border-accent/20 bg-accent/10 opacity-75"
-                        : isToday
-                          ? "border border-accent/20 bg-accent/10"
-                          : "bg-muted/30",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full",
-                        completed ? "bg-accent" : "bg-muted",
-                      )}
-                    >
-                      {completed ? (
-                        <Check className="h-3.5 w-3.5 text-white" />
-                      ) : (
-                        <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
-                      )}
+          </ScrollReveal>
+        ) : (
+          <div className="space-y-6">
+            {targetDate && daysUntilGoal !== null && daysUntilGoal <= 7 && daysUntilGoal >= 0 ? (
+              <ScrollReveal>
+                <AppCard className="border-2 border-accent">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-accent">
+                      <Trophy className="h-5 w-5 text-white" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-foreground">{session.label}</p>
-                        {isToday ? (
-                          <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-medium text-white">
-                            Aujourd&apos;hui
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {session.day} · {session.description}
+                    <div>
+                      <p className="text-lg font-bold text-foreground">🏁 Jour de course !</p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(targetDate), "EEEE dd MMMM yyyy", { locale: fr })}
                       </p>
-                    </div>
-                    <div className="flex-shrink-0 text-right">
-                      <p className="font-metric text-sm font-bold text-foreground">{session.distance} km</p>
-                      <p className="text-xs text-muted-foreground">{session.pace}</p>
+                      {raceLabel ? (
+                        <p className="mt-0.5 text-xs font-semibold text-accent">{raceLabel}</p>
+                      ) : null}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </AppCard>
-        </ScrollReveal>
-        ) : null}
+                </AppCard>
+              </ScrollReveal>
+            ) : null}
 
-        {selectedPlan && currentPlanWeek < selectedPlan.durationWeeks ? (
-        <ScrollReveal>
-          <AppCard>
-            <p className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">Prochaines semaines</p>
-            <div className="space-y-2">
-              {selectedPlan.weeklySchedule.slice(currentPlanWeek, currentPlanWeek + 3).map((week, i) => (
-                <div
-                  key={`next-week-${week.week}-${i}`}
-                  className="flex items-center justify-between border-b border-border py-2 last:border-0"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-foreground">Semaine {currentPlanWeek + 1 + i}</p>
-                    <p className="max-w-[200px] truncate text-xs text-muted-foreground">{week.focus}</p>
-                  </div>
-                  <p className="font-metric text-sm font-bold text-foreground">{week.totalDistance} km</p>
+            <ScrollReveal>
+              <AppCard>
+                <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">Cette semaine</h3>
+                <div className="flex justify-between">
+                  {DAYS.map((day, i) => {
+                    const dayIndex = i === 6 ? 0 : i + 1;
+                    const isToday = dayIndex === now.getDay();
+                    const hasRun = runsThisWeek.some((run) => run.started_at && new Date(run.started_at).getDay() === dayIndex);
+                    return (
+                      <div key={`${day}-${i}`} className="flex flex-col items-center gap-2">
+                        <span className={cn("text-xs font-medium", isToday ? "text-accent" : "text-muted-foreground")}>{day}</span>
+                        <div
+                          className={cn(
+                            "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
+                            hasRun ? "bg-accent text-white" : isToday ? "border-2 border-accent text-accent" : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {hasRun ? "✓" : isToday ? "•" : ""}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
-          </AppCard>
-        </ScrollReveal>
-        ) : null}
+              </AppCard>
+            </ScrollReveal>
 
-        {!selectedPlan && normalizedGoalType ? (
-        <ScrollReveal>
-          <AppCard className="py-6 text-center">
-            <p className="text-sm text-muted-foreground">Aucun plan disponible pour cet objectif.</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Modifiez votre objectif pour accéder aux plans d&apos;entraînement.
-            </p>
-          </AppCard>
-        </ScrollReveal>
-        ) : null}
+            {selectedPlan && currentWeekData ? (
+              <ScrollReveal>
+                <AppCard>
+                  <div className="mb-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-muted-foreground">{selectedPlan.name}</p>
+                      <p className="font-semibold text-foreground">
+                        Semaine {currentPlanWeek}/{selectedPlan.durationWeeks}
+                      </p>
+                      <p className="mt-0.5 text-xs text-accent">{currentWeekData.focus}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-metric text-2xl font-black text-foreground">{displayTotalKm}</p>
+                      <p className="text-xs text-muted-foreground">km cette semaine</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    {sessionsToShow.map((session, i) => {
+                      const intensityColors: Record<string, string> = {
+                        easy: "#4ade80",
+                        moderate: "#60a5fa",
+                        tempo: "#fb923c",
+                        interval: "#f43f5e",
+                        race: "#1DB954",
+                      };
+                      const color = intensityColors[session.intensity] ?? "#9CA3AF";
+                      const normalizedDay = session.day.toLowerCase();
+                      const isToday =
+                        normalizedDay.startsWith(todayShort.toLowerCase()) ||
+                        (todayShort === "Lun" && normalizedDay.startsWith("lundi")) ||
+                        (todayShort === "Mar" && normalizedDay.startsWith("mardi")) ||
+                        (todayShort === "Mer" && normalizedDay.startsWith("mercredi")) ||
+                        (todayShort === "Jeu" && normalizedDay.startsWith("jeudi")) ||
+                        (todayShort === "Ven" && normalizedDay.startsWith("vendredi")) ||
+                        (todayShort === "Sam" && normalizedDay.startsWith("samedi")) ||
+                        (todayShort === "Dim" && normalizedDay.startsWith("dimanche"));
+                      const completed = isSessionCompleted(session, currentPlanWeek);
+
+                      return (
+                        <div
+                          key={`${session.day}-${session.type}-${i}`}
+                          className={cn(
+                            "flex items-center gap-3 rounded-xl p-3 transition-all",
+                            completed
+                              ? "border border-accent/20 bg-accent/10 opacity-75"
+                              : isToday
+                                ? "border border-accent/20 bg-accent/10"
+                                : "bg-muted/30",
+                          )}
+                        >
+                          <div
+                            className={cn(
+                              "flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full",
+                              completed ? "bg-accent" : "bg-muted",
+                            )}
+                          >
+                            {completed ? (
+                              <Check className="h-3.5 w-3.5 text-white" />
+                            ) : (
+                              <div className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground">{session.label}</p>
+                              {isToday ? (
+                                <span className="rounded-full bg-accent px-1.5 py-0.5 text-xs font-medium text-white">
+                                  Aujourd&apos;hui
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {session.day} · {session.description}
+                            </p>
+                          </div>
+                          <div className="flex-shrink-0 text-right">
+                            <p className="font-metric text-sm font-bold text-foreground">{session.distance} km</p>
+                            <p className="text-xs text-muted-foreground">{session.pace}</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </AppCard>
+              </ScrollReveal>
+            ) : null}
+
+            {selectedPlan && currentPlanWeek < selectedPlan.durationWeeks ? (
+              <ScrollReveal>
+                <AppCard>
+                  <p className="mb-3 text-xs uppercase tracking-wider text-muted-foreground">Prochaines semaines</p>
+                  <div className="space-y-2">
+                    {selectedPlan.weeklySchedule.slice(currentPlanWeek, currentPlanWeek + 3).map((week, i) => (
+                      <div
+                        key={`next-week-${week.week}-${i}`}
+                        className="flex items-center justify-between border-b border-border py-2 last:border-0"
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-foreground">Semaine {currentPlanWeek + 1 + i}</p>
+                          <p className="max-w-[200px] truncate text-xs text-muted-foreground">{week.focus}</p>
+                        </div>
+                        <p className="font-metric text-sm font-bold text-foreground">{week.totalDistance} km</p>
+                      </div>
+                    ))}
+                  </div>
+                </AppCard>
+              </ScrollReveal>
+            ) : null}
+
+            {!selectedPlan && normalizedGoalType ? (
+              <ScrollReveal>
+                <AppCard className="py-6 text-center">
+                  <p className="text-sm text-muted-foreground">Aucun plan disponible pour cet objectif.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Modifiez votre objectif pour accéder aux plans d&apos;entraînement.
+                  </p>
+                </AppCard>
+              </ScrollReveal>
+            ) : null}
+          </div>
+        )}
       </TabsContent>
       <TabsContent value="equipment">
         <EquipmentTab />

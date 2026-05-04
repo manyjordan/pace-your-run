@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Target, AlertCircle, AlertTriangle, Info, Calendar as CalendarIcon, Zap, Pencil } from "lucide-react";
 import { differenceInDays, format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, upsertProfile, getRuns, type RunRow } from "@/lib/database";
 import { selectPlan, detectLevel } from "@/lib/planSelector";
@@ -166,8 +166,14 @@ function GoalDatePicker({
   );
 }
 
-export default function GoalTab() {
+type GoalTabProps = {
+  /** Incrémenter depuis le parent (ex. onglet Plan) pour ouvrir le flux « modifier l’objectif ». */
+  openChangeGoalNonce?: number;
+};
+
+export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
   const { user } = useAuth();
+  const lastOpenNonceRef = useRef(0);
   const [formData, setFormData] = useState<ProfileGoalData>(defaultData);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
@@ -343,6 +349,26 @@ export default function GoalTab() {
     void loadProfile();
   }, [user]);
 
+  useEffect(() => {
+    if (openChangeGoalNonce <= 0 || openChangeGoalNonce === lastOpenNonceRef.current) return;
+    lastOpenNonceRef.current = openChangeGoalNonce;
+    setIsChanging(true);
+    setIsDefining(false);
+  }, [openChangeGoalNonce]);
+
+  const raceDateMeta = useMemo(() => {
+    if (!formData.raceTargetDate || formData.goalType !== "race") {
+      return { raceIsExpired: false, daysToRace: null as number | null };
+    }
+    const parsed = parse(formData.raceTargetDate, "yyyy-MM-dd", new Date());
+    if (Number.isNaN(parsed.getTime())) {
+      return { raceIsExpired: false, daysToRace: null };
+    }
+    const raceIsExpired = new Date(formData.raceTargetDate) < new Date();
+    const daysToRace = differenceInDays(parsed, new Date());
+    return { raceIsExpired, daysToRace };
+  }, [formData.raceTargetDate, formData.goalType]);
+
   const activeGoalDetails = useMemo(() => {
     const details: Array<{ label: string; value: string }> = [];
 
@@ -430,14 +456,26 @@ export default function GoalTab() {
 
   const raceProgress = useMemo(() => {
     const raw = formData.raceTargetDate;
-    if (!raw) return { daysLeft: null as number | null, pct: 0 as number, formatted: null as string | null };
-    const end = new Date(raw);
-    if (Number.isNaN(end.getTime())) return { daysLeft: null, pct: 0, formatted: null };
-    const daysLeft = Math.max(0, differenceInDays(end, new Date()));
+    if (!raw) {
+      return {
+        daysLeft: null as number | null,
+        pct: 0 as number,
+        formatted: null as string | null,
+        expired: false,
+      };
+    }
+    const end = parse(raw, "yyyy-MM-dd", new Date());
+    if (Number.isNaN(end.getTime())) {
+      return { daysLeft: null, pct: 0, formatted: null, expired: false };
+    }
+    const daysLeft = differenceInDays(end, new Date());
     const formatted = format(end, "d MMM yyyy", { locale: fr });
+    if (daysLeft < 0) {
+      return { daysLeft, pct: 100, formatted, expired: true };
+    }
     const horizon = Math.max(14, (selectedPlan?.durationWeeks ?? 12) * 7);
     const pct = Math.min(100, Math.max(0, Math.round((1 - Math.min(daysLeft, horizon) / horizon) * 100)));
-    return { daysLeft, pct, formatted };
+    return { daysLeft, pct, formatted, expired: false };
   }, [formData.raceTargetDate, selectedPlan?.durationWeeks]);
 
   const updateField = <K extends keyof ProfileGoalData>(key: K, value: ProfileGoalData[K]) => {
@@ -776,7 +814,20 @@ export default function GoalTab() {
                   <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Objectif actuel
                   </p>
-                  <p className="text-xl font-bold text-foreground">{goalHeaderTitle}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-xl font-bold text-foreground">{goalHeaderTitle}</p>
+                    {formData.goalType === "race" && formData.raceTargetDate ? (
+                      raceDateMeta.raceIsExpired ? (
+                        <span className="rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-600 dark:bg-orange-950/40 dark:text-orange-400">
+                          Course passée
+                        </span>
+                      ) : raceDateMeta.daysToRace !== null && raceDateMeta.daysToRace > 0 ? (
+                        <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">
+                          J-{raceDateMeta.daysToRace}
+                        </span>
+                      ) : null
+                    ) : null}
+                  </div>
                   <p className="mt-0.5 text-sm font-semibold text-accent">{planLevelSubtitle}</p>
                   {activeGoalDetails.length > 0 ? (
                     <div className="mt-2 space-y-0.5">
@@ -791,7 +842,11 @@ export default function GoalTab() {
                 <span className="shrink-0 text-3xl">{goalHeaderEmoji}</span>
               </div>
               <div className="relative mt-3 min-h-[52px]">
-                {raceProgress.daysLeft !== null && raceProgress.formatted ? (
+                {raceProgress.expired ? (
+                  <p className="text-xs text-muted-foreground">
+                    La date de course est dépassée. Modifiez votre objectif pour un nouveau plan.
+                  </p>
+                ) : raceProgress.daysLeft !== null && raceProgress.formatted ? (
                   <>
                     <div className="mb-1 flex justify-between text-xs text-muted-foreground">
                       <span>{raceProgress.daysLeft} jours restants</span>
