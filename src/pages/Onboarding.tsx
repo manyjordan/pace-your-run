@@ -5,35 +5,53 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DaySelector } from "@/components/goal/DaySelector";
-import { DistanceSelector } from "@/components/goal/DistanceSelector";
 import { GoalTimePicker } from "@/components/goal/GoalTimePicker";
 import { useAuth } from "@/contexts/AuthContext";
 import { upsertProfile } from "@/lib/database";
-import {
-  calculateWeeksAvailable,
-  mapDistanceToTargetDistance,
-  mapRaceTypeToTargetDistance,
-  validateRaceTargetTime,
-} from "@/lib/goalHelpers";
-import { selectPlan } from "@/lib/planSelector";
 import { logger } from "@/lib/logger";
-import { mapSessionsToDays } from "@/lib/plans";
+import { cn } from "@/lib/utils";
+import { getPlanById, getPlansForDistance, mapSessionsToDays } from "@/lib/plans";
+import type { PlanDistance } from "@/lib/plans/types";
+
+export type OnboardingGoalPick = "marathon" | "semi" | "10k" | "5k" | "regular" | "none";
+
+export const GOAL_OPTIONS: Array<{
+  id: OnboardingGoalPick;
+  emoji: string;
+  label: string;
+  description: string;
+}> = [
+  { id: "marathon", emoji: "🏅", label: "Marathon", description: "42.195 km" },
+  { id: "semi", emoji: "🥈", label: "Semi-marathon", description: "21.1 km" },
+  { id: "10k", emoji: "🏃", label: "10 km", description: "Course populaire" },
+  { id: "5k", emoji: "👟", label: "5 km", description: "Parfait pour débuter" },
+  { id: "regular", emoji: "📅", label: "Courir régulièrement", description: "3 fois/semaine" },
+  { id: "none", emoji: "🎯", label: "Sans objectif précis", description: "Je cours librement" },
+];
 
 type OnboardingData = {
   firstName: string;
   gender: "homme" | "femme" | null;
   dateOfBirth: string;
   fitnessLevel: "beginner" | "intermediate" | "advanced" | null;
-  goalType: "weight" | "distance" | "race" | "none" | null;
-  raceType?: "5k" | "10k" | "20k" | "semi" | "marathon" | "other";
-  raceDistance?: string;
+  goalPick: OnboardingGoalPick | null;
+  selectedPlanId: string | null;
   raceTargetDate?: string;
   raceTargetTime?: string;
   availableDays: string[];
 };
 
+function goalPickToPlanDistance(pick: OnboardingGoalPick): PlanDistance | null {
+  if (pick === "marathon") return "marathon";
+  if (pick === "semi") return "semi";
+  if (pick === "10k") return "10k";
+  if (pick === "5k") return "5k";
+  if (pick === "regular") return "regular";
+  return null;
+}
+
 function buildOnboardingPlanData(data: OnboardingData) {
-  if (data.goalType === "none") {
+  if (!data.goalPick || data.goalPick === "none") {
     return {
       goalData: {
         goalType: "none",
@@ -50,50 +68,40 @@ function buildOnboardingPlanData(data: OnboardingData) {
     };
   }
 
-  const targetDistance =
-    data.goalType === "race"
-      ? mapRaceTypeToTargetDistance(data.raceType || "5k")
-      : data.goalType === "distance"
-        ? mapDistanceToTargetDistance(Number(data.raceDistance || 0))
-        : undefined;
-  const weeksAvailable =
-    data.goalType === "race"
-      ? calculateWeeksAvailable(data.raceTargetDate)
-      : calculateWeeksAvailable(undefined);
-
-  const daysCount = data.availableDays?.length ? Math.min(5, Math.max(2, data.availableDays.length)) : 3;
-  let plan = selectPlan({
-    goal: data.goalType || "distance",
-    daysPerWeek: daysCount,
-    availableDays: data.availableDays?.length >= 2 ? data.availableDays : undefined,
-    weeksAvailable,
-    level: data.fitnessLevel || "beginner",
-    targetDistance,
-  });
-  if (data.availableDays?.length >= 2) {
-    plan = mapSessionsToDays(plan, data.availableDays);
+  const preset = data.selectedPlanId ? getPlanById(data.selectedPlanId) : undefined;
+  if (!preset) {
+    return { goalData: null, plan: null };
   }
 
+  const plan =
+    data.availableDays.length >= 2 ? mapSessionsToDays(preset, data.availableDays) : preset;
+
+  const daysCount = data.availableDays.length >= 2 ? Math.min(5, Math.max(2, data.availableDays.length)) : 3;
+
+  const raceMeta =
+    data.goalPick === "marathon"
+      ? { raceType: "marathon" as const, raceDistanceKm: "42.195" }
+      : data.goalPick === "semi"
+        ? { raceType: "semi" as const, raceDistanceKm: "21.097" }
+        : data.goalPick === "10k"
+          ? { raceType: "10k" as const, raceDistanceKm: "10" }
+          : data.goalPick === "5k"
+            ? { raceType: "5k" as const, raceDistanceKm: "5" }
+            : { raceType: "10k" as const, raceDistanceKm: "10" };
+
   const goalData = {
-    goalType: data.goalType,
-    goal_type: data.goalType,
+    goalType: "race",
+    goal_type: "race",
     level: data.fitnessLevel,
     fitnessLevel: data.fitnessLevel,
     availableDays: data.availableDays ?? [],
     availableDaysPerWeek: String(daysCount),
     daysPerWeek: daysCount,
-    ...(data.goalType === "distance" && {
-      raceType: data.raceType,
-      raceDistanceKm: data.raceDistance,
-      distanceKm: data.raceDistance,
-    }),
-    ...(data.goalType === "race" && {
-      raceType: data.raceType,
-      raceDistanceKm: data.raceDistance,
-      raceTargetDate: data.raceTargetDate,
-      raceTargetTime: data.raceTargetTime,
-    }),
-    selectedPlanId: plan.id,
+    raceType: raceMeta.raceType,
+    raceDistanceKm: raceMeta.raceDistanceKm,
+    raceTargetDate: data.raceTargetDate,
+    raceTargetTime: data.raceTargetTime,
+    selectedPlanId: preset.id,
     goalSavedAt: new Date().toISOString(),
   };
 
@@ -111,7 +119,8 @@ const Onboarding = () => {
     gender: null,
     dateOfBirth: "",
     fitnessLevel: null,
-    goalType: null,
+    goalPick: null,
+    selectedPlanId: null,
     availableDays: [],
   });
 
@@ -165,14 +174,19 @@ const Onboarding = () => {
     setIsLoading(true);
     try {
       const { goalData } = buildOnboardingPlanData(data);
+      if (data.goalPick && data.goalPick !== "none" && goalData == null) {
+        logger.error("Onboarding: plan introuvable pour la sélection");
+        setIsLoading(false);
+        return;
+      }
 
       await persistOnboardingCompleted({
         first_name: data.firstName,
         gender: data.gender,
         date_of_birth: data.dateOfBirth || null,
-        goal_type: data.goalType,
-        goal_data: data.goalType === "none" ? null : goalData,
-        available_days: data.goalType === "none" ? [] : (data.availableDays ?? []),
+        goal_type: !data.goalPick || data.goalPick === "none" ? "none" : "race",
+        goal_data: !data.goalPick || data.goalPick === "none" ? null : goalData,
+        available_days: !data.goalPick || data.goalPick === "none" ? [] : (data.availableDays ?? []),
       });
 
       setIsLoading(false);
@@ -722,33 +736,27 @@ function Step4Goal({
   setData: (data: OnboardingData) => void;
   onNext: () => void;
 }) {
-  const [showCustomDistance, setShowCustomDistance] = useState(
-    data.goalType === "distance" && data.raceType === "other",
-  );
-  const [showCustomRaceDistance, setShowCustomRaceDistance] = useState(
-    data.goalType === "race" && data.raceType === "other",
-  );
-  const raceDistanceKm = Number(data.raceDistance || 0);
-  const targetTimeError =
-    data.goalType === "race" ? validateRaceTargetTime(raceDistanceKm, data.raceTargetTime || "") : null;
-  const goals: Array<{ id: "weight" | "distance" | "race" | "none"; title: string; desc: string }> = [
-    {
-      id: "weight",
-      title: "Perdre du poids",
-      desc: "Brûler des calories et améliorer ma condition physique",
-    },
-    { id: "distance", title: "Courir une distance", desc: "M'entraîner pour atteindre une distance cible" },
-    {
-      id: "race",
-      title: "Préparer une course",
-      desc: "M'entraîner pour une compétition avec un objectif de temps",
-    },
-    {
-      id: "none",
-      title: "Je cours sans objectif précis",
-      desc: "Continuer à courir librement, sans objectif de course ou de distance.",
-    },
-  ];
+  const planDistance = data.goalPick ? goalPickToPlanDistance(data.goalPick) : null;
+  const availablePlans =
+    planDistance && planDistance !== "none" ? getPlansForDistance(planDistance) : [];
+
+  const pickGoal = (id: OnboardingGoalPick) => {
+    if (id === "none") {
+      setData({ ...data, goalPick: "none", selectedPlanId: null });
+      return;
+    }
+    if (id === "regular") {
+      setData({ ...data, goalPick: "regular", selectedPlanId: "regular_running" });
+      return;
+    }
+    const d = goalPickToPlanDistance(id);
+    const first = d ? getPlansForDistance(d)[0] : undefined;
+    setData({
+      ...data,
+      goalPick: id,
+      selectedPlanId: first?.id ?? null,
+    });
+  };
 
   return (
     <div className="space-y-6">
@@ -757,100 +765,66 @@ function Step4Goal({
       </div>
 
       <div className="space-y-3">
-        {goals.map((goal) => (
+        {GOAL_OPTIONS.map((goal) => (
           <button
             key={goal.id}
-            onClick={() => setData({ ...data, goalType: goal.id })}
-            className={`w-full rounded-lg border-2 p-4 text-left transition-all ${
-              data.goalType === goal.id
+            type="button"
+            onClick={() => pickGoal(goal.id)}
+            className={cn(
+              "w-full rounded-lg border-2 p-4 text-left transition-all",
+              data.goalPick === goal.id
                 ? "border-accent bg-accent/10 shadow-[0_0_0_2px_hsl(var(--accent))]"
-                : "border-border hover:border-accent/50"
-            }`}
+                : "border-border hover:border-accent/50",
+            )}
           >
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent/20 text-sm font-bold text-accent">
-                {goal.id === "weight" ? "W" : goal.id === "distance" ? "D" : "R"}
-              </div>
+              <span className="text-2xl" aria-hidden>
+                {goal.emoji}
+              </span>
               <div className="flex-1">
-                <p className="font-semibold">{goal.title}</p>
-                <p className="text-sm text-muted-foreground">{goal.desc}</p>
+                <p className="font-semibold">{goal.label}</p>
+                <p className="text-sm text-muted-foreground">{goal.description}</p>
               </div>
             </div>
           </button>
         ))}
       </div>
 
-      {/* Distance selector */}
-      {data.goalType === "distance" && (
+      {data.goalPick && ["marathon", "semi", "10k", "5k"].includes(data.goalPick) && availablePlans.length > 0 ? (
         <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <DistanceSelector
-            label="Distance cible"
-            options={["5k", "10k", "20k", "semi", "marathon"]}
-            selectedValue={data.raceType || ""}
-            customValue={data.raceType === "other" ? data.raceDistance || "" : ""}
-            showCustom={showCustomDistance}
-            onSelectPreset={(value) => {
-              setShowCustomDistance(false);
-              setData({
-                ...data,
-                raceType: value as OnboardingData["raceType"],
-                raceDistance:
-                  value === "5k"
-                    ? "5"
-                    : value === "10k"
-                      ? "10"
-                      : value === "20k"
-                        ? "20"
-                        : value === "semi"
-                          ? "21.097"
-                          : "42.195",
-              });
-            }}
-            onToggleCustom={() => {
-              setShowCustomDistance((current) => !current);
-              setData({ ...data, raceType: "other", raceDistance: data.raceDistance });
-            }}
-            onCustomChange={(value) => setData({ ...data, raceType: "other", raceDistance: value })}
-          />
-        </div>
-      )}
-
-      {/* Race selector */}
-      {data.goalType === "race" && (
-        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-200">
-          <DistanceSelector
-            label="Distance de la course"
-            options={["5k", "10k", "20k", "semi", "marathon"]}
-            selectedValue={data.raceType || ""}
-            customValue={data.raceType === "other" ? data.raceDistance || "" : ""}
-            showCustom={showCustomRaceDistance}
-            onSelectPreset={(value) => {
-              setShowCustomRaceDistance(false);
-              setData({
-                ...data,
-                raceType: value as OnboardingData["raceType"],
-                raceDistance:
-                  value === "5k"
-                    ? "5"
-                    : value === "10k"
-                      ? "10"
-                      : value === "20k"
-                        ? "20"
-                        : value === "semi"
-                          ? "21.097"
-                          : "42.195",
-              });
-            }}
-            onToggleCustom={() => {
-              setShowCustomRaceDistance((current) => !current);
-              setData({ ...data, raceType: "other", raceDistance: data.raceDistance });
-            }}
-            onCustomChange={(value) => setData({ ...data, raceType: "other", raceDistance: value })}
-          />
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+            Choisissez votre niveau
+          </h3>
+          {availablePlans.map((plan) => (
+            <button
+              key={plan.id}
+              type="button"
+              onClick={() => setData({ ...data, selectedPlanId: plan.id })}
+              className={cn(
+                "flex w-full items-center gap-4 rounded-xl border-2 p-4 text-left transition-all",
+                data.selectedPlanId === plan.id
+                  ? "border-accent bg-accent/10"
+                  : "border-border bg-card",
+              )}
+            >
+              <span className="text-3xl">{plan.emoji}</span>
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-foreground">{plan.name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{plan.description}</p>
+                {plan.targetTime ? (
+                  <p className="mt-1 text-xs font-semibold text-accent">🎯 {plan.targetTime}</p>
+                ) : null}
+              </div>
+              <div className="shrink-0 text-right">
+                <p className="text-xs text-muted-foreground">{plan.durationWeeks} sem.</p>
+                <p className="text-xs text-muted-foreground">{plan.sessionsPerWeek}j/sem</p>
+              </div>
+            </button>
+          ))}
 
           <OnboardingDatePicker
             id="raceDate"
-            label="Date de la course"
+            label="Date de la course (optionnel)"
             value={data.raceTargetDate || ""}
             onChange={(date) => setData({ ...data, raceTargetDate: date })}
             preset="future"
@@ -858,17 +832,18 @@ function Step4Goal({
 
           <div className="space-y-3">
             <GoalTimePicker
-              label="Objectif de temps"
+              label="Objectif de temps (optionnel)"
               value={data.raceTargetTime || "00:45:00"}
               onChange={(time) => setData({ ...data, raceTargetTime: time })}
             />
-            <p className="text-xs text-muted-foreground">Ce temps sera utilisé pour personnaliser votre plan d'entraînement</p>
-            {targetTimeError ? <p className="text-xs text-destructive">{targetTimeError}</p> : null}
+            <p className="text-xs text-muted-foreground">
+              Ces informations aident à personnaliser votre plan ; vous pourrez les modifier plus tard.
+            </p>
           </div>
         </div>
-      )}
+      ) : null}
 
-      {data.goalType !== "none" ? (
+      {data.goalPick && data.goalPick !== "none" ? (
         <div className="space-y-2 rounded-xl border border-border bg-card/50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <Label>Quels jours pouvez-vous vous entraîner ?</Label>
           <DaySelector
@@ -876,21 +851,20 @@ function Step4Goal({
             onChange={(days) => setData({ ...data, availableDays: days })}
           />
         </div>
-      ) : (
+      ) : data.goalPick === "none" ? (
         <div className="rounded-xl border border-border bg-card/50 p-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
           <p className="text-sm text-muted-foreground">
             Aucun objectif précis sélectionné. Vous pourrez en définir un plus tard depuis l&apos;onglet Plan.
           </p>
         </div>
-      )}
+      ) : null}
 
       <Button
         onClick={onNext}
         disabled={
-          !data.goalType ||
-          (data.goalType !== "none" && data.availableDays.length < 2) ||
-          (data.goalType !== "weight" && data.goalType !== "none" && !data.raceType) ||
-          (data.goalType === "race" && (!data.raceTargetTime || Boolean(targetTimeError)))
+          !data.goalPick ||
+          (data.goalPick !== "none" && data.availableDays.length < 2) ||
+          (["marathon", "semi", "10k", "5k"].includes(data.goalPick ?? "") && !data.selectedPlanId)
         }
         className="w-full bg-accent text-accent-foreground hover:bg-accent/90"
       >
@@ -914,12 +888,12 @@ function Step5Summary({
 }) {
   const { plan } = buildOnboardingPlanData(data);
   const resolvedDaysPerWeek = data.availableDays.length >= 2 ? data.availableDays.length : 3;
-  const goalLabels: Record<string, string> = {
-    weight: "Perte de poids",
-    distance: `Courir ${data.raceDistance || data.raceType?.toUpperCase()}`,
-    race: `Préparer ${data.raceDistance ? `une ${data.raceDistance}km` : `une ${data.raceType?.toUpperCase()}`}`,
-    none: "Course libre sans objectif précis",
-  };
+  const goalSummaryLabel =
+    data.goalPick === "none" || !data.goalPick
+      ? "Course libre sans objectif précis"
+      : GOAL_OPTIONS.find((g) => g.id === data.goalPick)?.label ?? "Course";
+  const planLabel =
+    plan?.name ?? (data.selectedPlanId ? getPlanById(data.selectedPlanId)?.name : null) ?? "—";
 
   const levelLabels: Record<string, string> = {
     beginner: "Débutant",
@@ -944,7 +918,7 @@ function Step5Summary({
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Objectif</p>
-            <p className="font-semibold">{goalLabels[data.goalType || "distance"]}</p>
+            <p className="font-semibold">{goalSummaryLabel}</p>
           </div>
         </div>
 
@@ -982,7 +956,7 @@ function Step5Summary({
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Plan proposé</p>
-              <p className="font-semibold">{plan.name}</p>
+              <p className="font-semibold">{planLabel}</p>
             </div>
           </div>
         ) : (

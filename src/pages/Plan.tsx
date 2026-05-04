@@ -13,7 +13,8 @@ import { getProfile, getRuns, type RunRow } from "@/lib/database";
 import GoalTab from "@/components/plan/GoalTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
 import type { Session, TrainingPlan } from "@/lib/plans/types";
-import { getPlanById, mapSessionsToDays } from "@/lib/trainingPlans";
+import { getPlanById, mapSessionsToDays } from "@/lib/plans";
+import { resolveTrainingPlan } from "@/lib/trainingPlan";
 import { selectPlan } from "@/lib/planSelector";
 import { calculateWeeksAvailable, mapDistanceToTargetDistance } from "@/lib/goalHelpers";
 
@@ -30,6 +31,8 @@ type PlanGoal = {
   distanceKm?: string;
   distanceTargetDate?: string;
   weightTargetDate?: string;
+  selectedPlanId?: string;
+  embeddedPlan?: unknown;
 };
 
 const DAYS = ["L", "M", "M", "J", "V", "S", "D"];
@@ -166,8 +169,8 @@ export default function PlanPage() {
       distanceKm?: string;
     } | null;
 
-    let basePlan: TrainingPlan | null = null;
-    if (ug?.selectedPlanId) {
+    let basePlan: TrainingPlan | null = resolveTrainingPlan(userGoal) ?? null;
+    if (!basePlan && ug?.selectedPlanId) {
       basePlan = getPlanById(ug.selectedPlanId) ?? null;
     }
 

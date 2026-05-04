@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Play, Clock, Map, Zap, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { saveActiveSession } from "@/lib/activeSession";
-import type { Session } from "@/lib/trainingPlans";
+import type { Session } from "@/lib/plans/types";
 
 const intensityColors: Record<string, string> = {
   easy: "hsl(200, 80%, 55%)",

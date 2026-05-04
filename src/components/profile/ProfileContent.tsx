@@ -10,7 +10,7 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getRuns, uploadProfileAvatar, upsertProfile } from "@/lib/database";
-import { getPlanById } from "@/lib/trainingPlans";
+import { resolveTrainingPlan } from "@/lib/trainingPlan";
 import { format, parse } from "date-fns";
 import { fr } from "date-fns/locale";
 import { birthDateDayPickerProps } from "@/lib/dateCalendarSettings";
@@ -539,18 +539,18 @@ function ProfileDetails({
         </div>
       </ScrollReveal>
 
-      {goalData.selectedPlanId && (
+      {resolveTrainingPlan(goalData as Record<string, unknown>) ? (
         <ScrollReveal>
           <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
             <CardHeader>
               <CardTitle className="text-lg">Mon plan actuel</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <PlanSummary planId={goalData.selectedPlanId} goalSavedAt={goalData.goalSavedAt} />
+              <PlanSummary goalData={goalData as Record<string, unknown>} goalSavedAt={goalData.goalSavedAt} />
             </CardContent>
           </Card>
         </ScrollReveal>
-      )}
+      ) : null}
     </>
   );
 }
@@ -667,8 +667,8 @@ function StatisticsGrid({ runs }: { runs: RunRow[] }) {
   );
 }
 
-function PlanSummary({ planId, goalSavedAt }: { planId: string; goalSavedAt?: string }) {
-  const plan = getPlanById(planId);
+function PlanSummary({ goalData, goalSavedAt }: { goalData: Record<string, unknown>; goalSavedAt?: string }) {
+  const plan = resolveTrainingPlan(goalData);
 
   if (!plan) {
     return <p className="text-sm text-muted-foreground">Plan non trouvé</p>;

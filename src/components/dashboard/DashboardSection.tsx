@@ -5,7 +5,7 @@ import { Calendar, type LucideIcon } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import type { MetricChartPeriod, MetricKind } from "@/lib/dashboardHelpers";
 import { formatXLabel, getMetricPeriodLabel, getWeekOverWeekChange } from "@/lib/dashboardHelpers";
-import { getPlanById } from "@/lib/trainingPlans";
+import { resolveTrainingPlan } from "@/lib/trainingPlan";
 import { cn } from "@/lib/utils";
 
 type ProfileGoalData = {
@@ -72,19 +72,22 @@ export const DashboardSection = ({
   onPeriodChange: (p: DashboardPeriod) => void;
 }) => {
   const computedUpcomingSessions = useMemo<UpcomingSession[]>(() => {
-    const profileWithPlan = userGoal as (ProfileGoalData & { selectedPlanId?: string; goalSavedAt?: string }) | null;
+    const profileWithPlan = userGoal as (ProfileGoalData & {
+      selectedPlanId?: string;
+      goalSavedAt?: string;
+      embeddedPlan?: unknown;
+    }) | null;
 
-    if (!profileWithPlan?.selectedPlanId) {
+    const plan = profileWithPlan ? resolveTrainingPlan(profileWithPlan as Record<string, unknown>) : undefined;
+    if (!plan) {
       return [];
     }
 
     try {
-      const plan = getPlanById(profileWithPlan.selectedPlanId);
-      if (!plan) return [];
 
       // Calculate current week
       let currentWeek = 1;
-      if (profileWithPlan.goalSavedAt) {
+      if (profileWithPlan?.goalSavedAt) {
         const savedDate = new Date(profileWithPlan.goalSavedAt);
         const now = new Date();
         const weeksDiff = Math.floor((now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24 * 7));

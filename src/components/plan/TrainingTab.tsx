@@ -7,9 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { getProfile, getWeekSessions, toggleSessionCompleted } from "@/lib/database";
 import { normalizeGoalData } from "@/lib/goalHelpers";
 import { logger } from "@/lib/logger";
-import { getPlanById } from "@/lib/trainingPlans";
+import type { TrainingPlan, Session } from "@/lib/plans/types";
+import { resolveTrainingPlan } from "@/lib/trainingPlan";
 import SessionDetail from "./SessionDetail";
-import type { TrainingPlan, Session } from "@/lib/trainingPlans";
 import type { TrainingPlanSessionRow } from "@/lib/database";
 
 type GoalType = "weight" | "race" | "distance";
@@ -148,25 +148,19 @@ export default function TrainingTab() {
           };
           setProfile(newProfile);
 
-          // Load the selected plan
-          if (newProfile.selectedPlanId) {
-            const plan = getPlanById(newProfile.selectedPlanId);
-            if (plan) {
-              setSelectedPlan(plan);
-              
-              // Calculate current week based on when goal was saved
-              if (newProfile.goalSavedAt) {
-                const savedDate = new Date(newProfile.goalSavedAt);
-                const now = new Date();
-                const weeksDiff = Math.floor((now.getTime() - savedDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
-                const calculatedWeek = Math.min(Math.max(1, weeksDiff + 1), plan.durationWeeks);
-                setCurrentWeek(calculatedWeek);
-
-                // Load week sessions
-                const sessions = await getWeekSessions(user.id, newProfile.selectedPlanId, calculatedWeek);
-                setWeekSessions(sessions);
-              }
+          // Load the selected plan (preset id or embedded custom plan)
+          const plan = resolveTrainingPlan(goalData as Record<string, unknown>);
+          if (plan) {
+            setSelectedPlan(plan);
+            let calculatedWeek = 1;
+            if (newProfile.goalSavedAt) {
+              const savedDate = new Date(newProfile.goalSavedAt);
+              const weeksDiff = Math.floor((Date.now() - savedDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+              calculatedWeek = Math.min(Math.max(1, weeksDiff + 1), plan.durationWeeks);
             }
+            setCurrentWeek(calculatedWeek);
+            const sessions = await getWeekSessions(user.id, plan.id, calculatedWeek);
+            setWeekSessions(sessions);
           }
         } else {
           setProfile(defaultProfile);

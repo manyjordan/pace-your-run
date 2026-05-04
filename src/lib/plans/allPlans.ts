@@ -738,6 +738,80 @@ export const fivekmSub25 = buildRacePlan({
 
 export const regularRunning = buildRegularRunning();
 
+/** Build a personalized schedule (used by « Créer mon plan »). */
+export function generateCustomTrainingPlan(params: {
+  durationWeeks: number;
+  runsPerWeek: 3 | 4 | 5;
+  distance: PlanDistance;
+  currentWeeklyKm?: number;
+}): TrainingPlan {
+  const templateDist: Exclude<PlanDistance, "regular" | "custom"> =
+    params.distance === "regular" || params.distance === "custom" ? "10k" : params.distance;
+  const template =
+    ALL_PLANS.find((p) => p.distance === templateDist && p.sessionsPerWeek === params.runsPerWeek) ??
+    ALL_PLANS.find((p) => p.distance === templateDist) ??
+    marathonFinisher;
+
+  const w = Math.min(24, Math.max(6, Math.round(params.durationWeeks)));
+  const cw = params.currentWeeklyKm ?? 18;
+  const startKm = Math.max(12, Math.min(48, cw * 0.92));
+  const peakKm = Math.min(
+    95,
+    startKm * (templateDist === "marathon" ? 2.1 : templateDist === "semi" ? 1.95 : 1.75),
+  );
+  const longCap =
+    templateDist === "marathon" ? 38 : templateDist === "semi" ? 22 : templateDist === "10k" ? 14 : 11;
+  const quality: "low" | "mid" | "high" =
+    template.level === "finisher" ? "low" : template.level === "performance" ? "mid" : "high";
+
+  const firstEasy = template.weeklySchedule[0]?.sessions.find((s) => s.type === "easy");
+  const paces: Paces = {
+    easy: firstEasy?.pace ?? "6:00-6:30",
+    tempo: "5:15-5:35",
+    long: "5:50-6:15",
+    interval: "4:55-5:15",
+  };
+
+  const km = makeKmSeries(w, startKm, peakKm);
+  const weeklySchedule = km.map((kmW, i) =>
+    buildWeek(i + 1, w, kmW, params.runsPerWeek, paces, longCap, quality, templateDist),
+  );
+
+  const outDist: PlanDistance = params.distance === "regular" ? "regular" : params.distance;
+  const targetD: TrainingPlan["targetDistance"] =
+    outDist === "marathon"
+      ? "marathon"
+      : outDist === "semi"
+        ? "semi"
+        : outDist === "10k"
+          ? "10k"
+          : outDist === "5k"
+            ? "5k"
+            : "10k";
+
+  return {
+    ...template,
+    id: "custom_training",
+    distance: outDist === "custom" ? "custom" : outDist,
+    name: "Mon plan personnalisé",
+    description: "Plan généré à partir de vos paramètres",
+    emoji: "✏️",
+    durationWeeks: w,
+    sessionsPerWeek: params.runsPerWeek,
+    daysPerWeek: params.runsPerWeek,
+    weeklySchedule,
+    goal: "race",
+    summary: "Plan personnalisé — charge adaptée à votre volume récent.",
+    legacyLevel: template.legacyLevel,
+    level: template.level,
+    targetDistance: outDist === "custom" ? undefined : targetD,
+    targetTime: undefined,
+    equipmentTips: DEFAULT_EQUIPMENT,
+    nutritionTips: DEFAULT_NUTRITION,
+    shoeTips: DEFAULT_SHOES,
+  };
+}
+
 export const ALL_PLANS: TrainingPlan[] = [
   marathonFinisher,
   marathonSub4h,

@@ -1,5 +1,5 @@
 export type GoalLevel = "beginner" | "intermediate" | "advanced";
-export type GoalType = "weight" | "distance" | "race";
+export type GoalType = "weight" | "distance" | "race" | "none";
 export type GoalRaceType = "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
 
 export type GoalDataShape = {
@@ -21,6 +21,7 @@ export type GoalDataShape = {
   distanceTargetDate?: string | null;
   selectedPlanId?: string | null;
   goalSavedAt?: string | null;
+  embeddedPlan?: unknown;
 };
 
 export const racePresetDistance: Record<GoalRaceType, string> = {
@@ -55,6 +56,7 @@ export function normalizeGoalData(raw: GoalDataShape | null | undefined) {
     distanceTargetDate: raw?.distanceTargetDate ?? "",
     selectedPlanId: raw?.selectedPlanId ?? undefined,
     goalSavedAt: raw?.goalSavedAt ?? undefined,
+    embeddedPlan: raw?.embeddedPlan,
   };
 }
 
