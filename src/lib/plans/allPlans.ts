@@ -58,9 +58,18 @@ function mk(
   };
 }
 
-function phaseForWeek(weekNumber: number, totalWeeks: number): PlanWeek["phase"] {
-  if (weekNumber > totalWeeks - 2) return "taper";
-  if (weekNumber >= totalWeeks - 4) return "peak";
+/**
+ * Phases alignées sur `taperWeeks` : affûtage en fin de plan (ex. 2 semaines avant une course le dimanche,
+ * volume max en S-2, charge basse à partir de ~J-4 dans la dernière semaine côté calendrier).
+ */
+function phaseForWeek(
+  weekNumber: number,
+  totalWeeks: number,
+  taperWeeks: number = 2,
+): PlanWeek["phase"] {
+  const tw = Math.min(Math.max(1, taperWeeks), Math.max(1, totalWeeks - 1));
+  if (weekNumber > totalWeeks - tw) return "taper";
+  if (weekNumber >= totalWeeks - tw - 2) return "peak";
   const t = weekNumber / totalWeeks;
   if (t <= 0.38) return "base";
   return "build";
@@ -73,32 +82,47 @@ function focusFor(phase: PlanWeek["phase"], weekNumber: number): string {
   return `Construction — semaine ${weekNumber}, progression maîtrisée`;
 }
 
-/** Weekly km curve: ramp to peak, optional recovery dips, 2-week taper */
-function makeKmSeries(
-  weeks: number,
-  startKm: number,
-  peakKm: number,
-  opts?: { recoverMod?: number },
-): number[] {
+type MakeKmSeriesOpts = {
+  recoverMod?: number;
+  /**
+   * Semaines d’affûtage en fin de plan (volume réduit). Défaut 2 — pic sur la semaine `weeks - taperWeeks`
+   * (ex. course dimanche S : pic S-2, puis baisse ; ~J-4 tombe dans la dernière semaine allégée).
+   */
+  taperWeeks?: number;
+};
+
+/** Weekly km curve: ramp to peak on last full week before taper, optional recovery dips, linear taper band */
+function makeKmSeries(weeks: number, startKm: number, peakKm: number, opts?: MakeKmSeriesOpts): number[] {
   const recoverMod = opts?.recoverMod ?? 0.88;
+  if (weeks <= 0) return [];
+  if (weeks === 1) return [Math.round(peakKm)];
+
+  const taperWeeks = Math.min(Math.max(1, opts?.taperWeeks ?? 2), weeks - 1);
+  const peakWeekIndex = weeks - taperWeeks;
+  const firstTaperFrac = 0.58;
+  const lastTaperFrac = 0.36;
+
   const out: number[] = [];
-  const taperStart = weeks - 1;
   for (let w = 1; w <= weeks; w++) {
-    if (w >= taperStart) {
-      const peakProxy = out[w - 2] ?? peakKm;
-      if (w === taperStart) out.push(Math.round(peakProxy * 0.58));
-      else out.push(Math.round(peakProxy * 0.36));
+    if (w > peakWeekIndex) {
+      if (taperWeeks === 1) {
+        out.push(Math.round(peakKm * lastTaperFrac));
+        continue;
+      }
+      const ti = w - peakWeekIndex;
+      const u = (ti - 1) / (taperWeeks - 1);
+      const frac = firstTaperFrac + (lastTaperFrac - firstTaperFrac) * u;
+      out.push(Math.round(peakKm * frac));
       continue;
     }
-    const rampEnd = Math.max(2, Math.floor(weeks * 0.72));
-    let km: number;
-    if (w <= rampEnd) {
-      const t = (w - 1) / Math.max(1, rampEnd - 1);
-      km = startKm + (peakKm - startKm) * t;
-    } else {
-      km = peakKm * (0.96 + 0.04 * Math.sin((w - rampEnd) * 0.8));
+    if (w === peakWeekIndex) {
+      out.push(Math.round(peakKm));
+      continue;
     }
-    if (w % 4 === 0 && w < taperStart - 1) km *= recoverMod;
+    const rampSpan = Math.max(1, peakWeekIndex - 1);
+    const t = (w - 1) / rampSpan;
+    let km = startKm + (peakKm - startKm) * t;
+    if (w % 4 === 0 && w < peakWeekIndex) km *= recoverMod;
     out.push(Math.max(startKm * 0.85, Math.round(km)));
   }
   return out;
@@ -122,15 +146,16 @@ function buildWeek(
   longCap: number,
   quality: "low" | "mid" | "high",
   distance: PlanDistance,
+  taperWeeks: number = 2,
 ): PlanWeek {
-  const phase = phaseForWeek(weekNumber, totalWeeks);
+  const tw = Math.min(Math.max(1, taperWeeks), Math.max(1, totalWeeks - 1));
+  const phase = phaseForWeek(weekNumber, totalWeeks, tw);
   const longFrac = spw >= 5 ? 0.36 : spw === 4 ? 0.4 : 0.48;
   let long = Math.min(weeklyKm * longFrac, longCap);
   long = roundKm(long);
   const remainder = Math.max(0, weeklyKm - long);
   const sessions: PlanSession[] = [];
-  const wantQuality =
-    quality !== "low" && weekNumber % 4 !== 0 && weekNumber < totalWeeks - 1 && phase !== "taper";
+  const wantQuality = quality !== "low" && weekNumber % 4 !== 0 && phase !== "taper";
 
   if (spw === 3) {
     const [a, b] = splitLongRemainder(weeklyKm, long, 2);
@@ -269,10 +294,15 @@ function buildRacePlan(def: {
   longCap: number;
   quality: "low" | "mid" | "high";
   recoverMod?: number;
+  taperWeeks?: number;
 }): TrainingPlan {
-  const km = makeKmSeries(def.weeks, def.startKm, def.peakKm, { recoverMod: def.recoverMod });
+  const taperWeeks = def.taperWeeks ?? 2;
+  const km = makeKmSeries(def.weeks, def.startKm, def.peakKm, {
+    recoverMod: def.recoverMod,
+    taperWeeks,
+  });
   const weeklySchedule = km.map((kmW, i) =>
-    buildWeek(i + 1, def.weeks, kmW, def.spw, def.paces, def.longCap, def.quality, def.distance),
+    buildWeek(i + 1, def.weeks, kmW, def.spw, def.paces, def.longCap, def.quality, def.distance, taperWeeks),
   );
   return {
     id: def.id,
@@ -305,10 +335,11 @@ function buildRegularRunning(): TrainingPlan {
     long: "6:15-6:45",
     interval: "5:20-5:40",
   };
-  const km = makeKmSeries(weeks, 14, 34, { recoverMod: 0.9 });
+  const taperWeeks = 2;
+  const km = makeKmSeries(weeks, 14, 34, { recoverMod: 0.9, taperWeeks });
   const weeklySchedule = km.map((kmW, i) => {
     const wn = i + 1;
-    const phase = phaseForWeek(wn, weeks);
+    const phase = phaseForWeek(wn, weeks, taperWeeks);
     const [a, b] = splitLongRemainder(kmW, Math.min(kmW * 0.45, 16), 2);
     const sessions: PlanSession[] = [
       mk("Mar", "easy", "Course facile", "Habitude et plaisir, intensité basse", a, paces.easy, "easy"),
@@ -772,9 +803,10 @@ export function generateCustomTrainingPlan(params: {
     interval: "4:55-5:15",
   };
 
-  const km = makeKmSeries(w, startKm, peakKm);
+  const taperWeeks = 2;
+  const km = makeKmSeries(w, startKm, peakKm, { taperWeeks });
   const weeklySchedule = km.map((kmW, i) =>
-    buildWeek(i + 1, w, kmW, params.runsPerWeek, paces, longCap, quality, templateDist),
+    buildWeek(i + 1, w, kmW, params.runsPerWeek, paces, longCap, quality, templateDist, taperWeeks),
   );
 
   const outDist: PlanDistance = params.distance === "regular" ? "regular" : params.distance;
