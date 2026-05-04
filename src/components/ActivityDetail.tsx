@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
-import { ArrowLeft, BarChart3, Clock, Download, Heart, Mountain, Play, Route, TrendingUp, Zap } from "lucide-react";
+import { ArrowLeft, Download, Footprints, Heart } from "lucide-react";
 import { logger } from "@/lib/logger";
-import { getRunWithGps, type RunRow } from "@/lib/database";
+import { getRunWithGps, getShoes, type RunRow, type ShoeRow } from "@/lib/database";
 import { useAuth } from "@/contexts/AuthContext";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { formatDistance, formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
+import { formatDuration, formatPace, formatPaceFromSeconds, type GPSTracePoint } from "@/lib/runFormatters";
 import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 import { LineChartSvg } from "@/components/charts/LineChartSvg";
 import { calculateSplits, formatSplitPace, type SplitTracePoint } from "@/lib/splitCalculator";
@@ -64,6 +64,14 @@ type ActivityDetailProps = {
   allActivities?: RunRow[];
   fallbackTrace?: GPSTracePoint[];
 };
+
+function formatMinPerKm(paceMinPerKm: number): string {
+  if (!Number.isFinite(paceMinPerKm) || paceMinPerKm <= 0) return "--:--";
+  const wholeMin = Math.floor(paceMinPerKm);
+  const secs = Math.round((paceMinPerKm - wholeMin) * 60);
+  const safeSecs = secs === 60 ? 59 : secs;
+  return `${wholeMin}:${String(safeSecs).padStart(2, "0")}`;
+}
 
 function formatClockLabel(seconds: number) {
   const safeSeconds = Math.max(0, Math.round(seconds));
@@ -144,6 +152,7 @@ export function ActivityDetail({
   const [fullRun, setFullRun] = useState<RunRow | null>(null);
   const [gpsLoading, setGpsLoading] = useState(true);
   const [weather, setWeather] = useState<RunWeather | null>(null);
+  const [shoe, setShoe] = useState<ShoeRow | null>(null);
   const traceLen = Array.isArray(activity?.gps_trace) ? activity.gps_trace.length : 0;
   const [maxHR, setMaxHR] = useState<number>(() => {
     const saved = localStorage.getItem("pace_max_hr");
@@ -230,6 +239,24 @@ export function ActivityDetail({
       cancelled = true;
     };
   }, [fullRun?.gps_trace, activity?.started_at]);
+
+  useEffect(() => {
+    if (!activity.shoe_id || !resolvedUserId) {
+      setShoe(null);
+      return;
+    }
+    let cancelled = false;
+    void getShoes(resolvedUserId)
+      .then((list) => {
+        if (!cancelled) setShoe(list.find((s) => s.id === activity.shoe_id) ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setShoe(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [activity.shoe_id, resolvedUserId]);
 
   const resolvedActivity = useMemo(() => normalizeActivityDetailInput(activity), [activity]);
   const normalizedAllActivities = useMemo(
@@ -411,7 +438,16 @@ export function ActivityDetail({
   }, [kmSplits]);
   const displayTrace = analysis.trace;
   const showMovingMetrics = Math.abs(resolvedActivity.elapsed_time - resolvedActivity.moving_time) > 30;
-  const hasGpsTrace = Array.isArray(fullRun?.gps_trace) && fullRun.gps_trace.length > 0;
+  const hasExportableGpx =
+    Boolean(fullRun?.gps_trace) && Array.isArray(fullRun?.gps_trace) && (fullRun?.gps_trace?.length ?? 0) > 0;
+  const statsPaceDisplay = useMemo(() => {
+    const ap = activity.average_pace;
+    if (typeof ap === "number" && Number.isFinite(ap) && ap > 0) return formatMinPerKm(ap);
+    return formatPaceFromSeconds(
+      activity.moving_time_seconds ?? activity.duration_seconds ?? 0,
+      (activity.distance_km ?? 0) * 1000,
+    ).replace(" /km", "");
+  }, [activity.average_pace, activity.moving_time_seconds, activity.duration_seconds, activity.distance_km]);
   const averageCadence = useMemo(() => {
     const cadenceFromRun = (fullRun as RunRow & { average_cadence?: number | null } | null)?.average_cadence;
     if (typeof cadenceFromRun === "number" && Number.isFinite(cadenceFromRun) && cadenceFromRun > 0) {
@@ -499,144 +535,124 @@ export function ActivityDetail({
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      <div className="bg-background pt-safe" />
+      <div className="pt-safe bg-background" />
       <div className="flex items-center justify-between border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
         <button
           type="button"
           onClick={onClose}
-          className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2 transition-all hover:bg-muted/80 active:scale-95"
+          className="flex shrink-0 items-center gap-2 rounded-xl bg-muted px-3 py-2 transition-all active:scale-95"
           aria-label="Retour"
         >
           <ArrowLeft className="h-5 w-5" />
           <span className="text-sm font-medium">Retour</span>
         </button>
-        <h2 className="font-semibold text-foreground">Activité</h2>
-        {hasGpsTrace ? (
-          <button
-            type="button"
-            onClick={handleExportGpx}
-            className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-medium transition-all hover:bg-muted/80 active:scale-95"
-            aria-label="Exporter en GPX"
-          >
-            <Download className="h-4 w-4" />
-            GPX
-          </button>
-        ) : (
-          <div className="w-20" />
-        )}
+        <h2 className="max-w-[160px] min-w-0 flex-1 truncate text-center text-base font-semibold text-foreground">
+          {activity.title || "Activité"}
+        </h2>
+        <div className="flex min-w-[88px] shrink-0 justify-end">
+          {hasExportableGpx ? (
+            <button
+              type="button"
+              onClick={handleExportGpx}
+              className="flex items-center gap-1.5 rounded-xl bg-muted px-3 py-2 text-sm font-medium transition-all active:scale-95"
+              aria-label="Exporter en GPX"
+            >
+              <Download className="h-4 w-4" />
+              GPX
+            </button>
+          ) : null}
+        </div>
       </div>
 
-      <div ref={scrollContainerRef} className="flex-1 space-y-4 overflow-y-auto px-4 pb-safe pt-2">
-        <div className="rounded-lg border border-accent/20 bg-card p-4">
-          {activity.run_type === "treadmill" && (
-            <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">
-              Tapis roulant
-            </Badge>
-          )}
-          <p className="text-xs font-medium text-muted-foreground">Date</p>
-          <p className="mt-1 text-sm font-semibold">
-            {analysis.startDate.toLocaleDateString("fr-FR", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              year: "numeric",
-            })}
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
-            <div className="flex items-center gap-1.5">
-              <Route className="h-4 w-4 text-lime" />
-              <span className="text-xs text-muted-foreground">Distance</span>
-            </div>
-            <p className="font-metric mt-2 text-lg font-bold">{formatDistance(resolvedActivity.distance)}</p>
-          </div>
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
-            <div className="flex items-center gap-1.5">
-              <Clock className="h-4 w-4 text-lime" />
-              <span className="text-xs text-muted-foreground">Durée totale</span>
-            </div>
-            <p className="font-metric mt-2 text-lg font-bold">{formatDuration(resolvedActivity.elapsed_time)}</p>
-          </div>
-          {showMovingMetrics ? (
-            <div className="rounded-lg border border-accent/20 bg-card p-3">
-              <div className="flex items-center gap-1.5">
-                <Play className="h-4 w-4 text-lime" />
-                <span className="text-xs text-muted-foreground">Temps de course</span>
-              </div>
-              <p className="font-metric mt-2 text-lg font-bold text-accent">{formatDuration(resolvedActivity.moving_time)}</p>
-            </div>
-          ) : null}
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
-            <div className="flex items-center gap-1.5">
-              <Zap className="h-4 w-4 text-lime" />
-              <span className="text-xs text-muted-foreground">{showMovingMetrics ? "Allure de course" : "Allure moyenne"}</span>
-            </div>
-            <p className="font-metric mt-2 text-lg font-bold">
-              {formatPaceFromSeconds(
-                showMovingMetrics ? resolvedActivity.moving_time : resolvedActivity.elapsed_time,
-                resolvedActivity.distance,
-              )}
-            </p>
-          </div>
-          {showMovingMetrics ? (
-            <div className="rounded-lg border border-accent/20 bg-card p-3">
-              <div className="flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4 text-lime" />
-                <span className="text-xs text-muted-foreground">Allure moyenne</span>
-              </div>
-              <p className="font-metric mt-2 text-lg font-bold">
-                {formatPaceFromSeconds(resolvedActivity.elapsed_time, resolvedActivity.distance)}
-              </p>
-            </div>
-          ) : null}
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
-            <div className="flex items-center gap-1.5">
-              <Mountain className="h-4 w-4 text-lime" />
-              <span className="text-xs text-muted-foreground">Dénivelé</span>
-            </div>
-            <p className="mt-2 text-lg font-bold">{Math.round(resolvedActivity.total_elevation_gain ?? 0)} m</p>
-          </div>
-          {averageCadence ? (
-            <div className="rounded-lg border border-accent/20 bg-card p-3">
-              <div className="flex items-center gap-1.5">
-                <Zap className="h-4 w-4 text-lime" />
-                <span className="text-xs text-muted-foreground">Cadence moyenne</span>
-              </div>
-              <p className="font-metric mt-2 text-lg font-bold">{averageCadence} spm</p>
-            </div>
-          ) : null}
-        </div>
-
-        {weather ? (
-          <div className="flex items-center gap-3 rounded-xl bg-muted/30 px-4 py-3">
-            <span className="text-2xl">{weather.emoji}</span>
-            <div className="flex-1">
-              <p className="text-sm font-medium text-foreground">{weather.description}</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {weather.temperature}°C · Vent {weather.windSpeed} km/h · Humidité {weather.humidity}%
-              </p>
-            </div>
-          </div>
-        ) : null}
-
-        <div className="rounded-lg border border-accent/20 bg-card p-3">
-          <p className="mb-3 text-xs font-medium text-muted-foreground">Trace GPS</p>
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto pb-safe">
+        <div className="w-full">
           {gpsLoading ? (
-            <div className="h-[180px] rounded-xl bg-muted animate-pulse flex items-center justify-center">
+            <div className="flex h-[200px] items-center justify-center bg-muted animate-pulse">
               <p className="text-xs text-muted-foreground">Chargement du tracé...</p>
             </div>
           ) : displayTrace && displayTrace.length > 1 ? (
-            <div className="rounded-xl overflow-hidden border border-accent/20 bg-muted/30">
-              <GpsTraceSvg trace={displayTrace} height={180} />
-            </div>
+            <GpsTraceSvg trace={displayTrace} height={220} className="w-full" />
           ) : (
-            <div className="h-[120px] rounded-xl bg-muted/30 flex items-center justify-center">
+            <div className="flex h-[160px] items-center justify-center bg-muted/30">
               <p className="text-xs text-muted-foreground">Pas de données GPS disponibles</p>
             </div>
           )}
         </div>
+
+        <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
+          <div className="px-4 py-4 text-center">
+            <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              {activity.distance_km != null ? activity.distance_km.toFixed(2) : "--"}
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">km</p>
+          </div>
+          <div className="px-4 py-4 text-center">
+            <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              {formatDuration(activity.duration_seconds ?? 0)}
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">durée</p>
+          </div>
+          <div className="px-4 py-4 text-center">
+            <p className="text-2xl font-black text-accent" style={{ fontFamily: "var(--font-mono-display)" }}>
+              {statsPaceDisplay}
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">allure</p>
+          </div>
+        </div>
+
+        <div className="space-y-4 px-4 pb-6 pt-4">
+          <div className="rounded-lg border border-accent/20 bg-card p-4">
+            {activity.run_type === "treadmill" && (
+              <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">
+                Tapis roulant
+              </Badge>
+            )}
+            <p className="text-xs font-medium text-muted-foreground">Date</p>
+            <p className="mt-1 text-sm font-semibold">
+              {analysis.startDate.toLocaleDateString("fr-FR", {
+                weekday: "long",
+                day: "numeric",
+                month: "long",
+                year: "numeric",
+              })}
+            </p>
+          </div>
+
+          {(showMovingMetrics || Math.round(resolvedActivity.total_elevation_gain ?? 0) > 0 || averageCadence) ? (
+            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+              {showMovingMetrics ? (
+                <span className="rounded-lg bg-muted/50 px-3 py-1.5">
+                  Temps de course ·{" "}
+                  <span className="font-semibold text-foreground">{formatDuration(resolvedActivity.moving_time)}</span>
+                </span>
+              ) : null}
+              {Math.round(resolvedActivity.total_elevation_gain ?? 0) > 0 ? (
+                <span className="rounded-lg bg-muted/50 px-3 py-1.5">
+                  D+ ·{" "}
+                  <span className="font-semibold text-foreground">
+                    {Math.round(resolvedActivity.total_elevation_gain ?? 0)} m
+                  </span>
+                </span>
+              ) : null}
+              {averageCadence ? (
+                <span className="rounded-lg bg-muted/50 px-3 py-1.5">
+                  Cadence · <span className="font-semibold text-foreground">{averageCadence} spm</span>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+
+          {weather ? (
+            <div className="flex items-center gap-3 rounded-xl bg-muted/30 px-4 py-3">
+              <span className="text-2xl">{weather.emoji}</span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">{weather.description}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {weather.temperature}°C · Vent {weather.windSpeed} km/h · Humidité {weather.humidity}%
+                </p>
+              </div>
+            </div>
+          ) : null}
 
         {kmSplits.length > 0 ? (
           <div className="space-y-2 rounded-lg border border-accent/20 bg-card p-3">
@@ -679,44 +695,6 @@ export function ActivityDetail({
               })}
             </div>
           </div>
-        ) : null}
-
-        {similarRuns.length > 0 ? (
-          <AppCard>
-            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Même itinéraire
-            </h3>
-            <div className="space-y-2">
-              {similarRuns.map(({ run }) => {
-                const currentPace = (activity.duration_seconds ?? 0) / Math.max(activity.distance_km ?? 1, 0.001);
-                const runPace = run.duration_seconds / Math.max(run.distance_km, 0.001);
-                const diffSec = Math.round(currentPace - runPace);
-                const isFaster = diffSec < 0;
-
-                return (
-                  <div key={run.id} className="flex items-center justify-between border-b border-border py-2 last:border-0">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">
-                        {format(new Date(run.started_at), "dd MMM yyyy", { locale: fr })}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {run.distance_km.toFixed(2)} km · {formatDuration(run.duration_seconds)}
-                      </p>
-                    </div>
-                    <div
-                      className={cn(
-                        "font-metric rounded-lg px-2 py-1 text-sm font-bold",
-                        isFaster ? "bg-accent/10 text-accent" : "bg-orange-50 text-orange-500",
-                      )}
-                    >
-                      {isFaster ? "" : "+"}
-                      {Math.abs(diffSec)}s {isFaster ? "plus rapide" : "plus lent"}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </AppCard>
         ) : null}
 
         {elevationData.length > 5 ? (
@@ -769,40 +747,6 @@ export function ActivityDetail({
           </div>
         ) : null}
 
-        {analysis.hasDetailedSplits && (
-          <div className="rounded-lg border border-accent/20 bg-card p-4 shadow-[0_12px_30px_hsl(var(--accent)/0.06)]">
-            <div className="mb-4 flex items-center gap-2">
-              <BarChart3 className="h-4 w-4 text-lime" />
-              <h3 className="text-lg font-bold">Temps intermédiaires</h3>
-            </div>
-
-            <div className="mb-3 grid grid-cols-[44px_72px_1fr_56px_54px] items-center gap-3 px-1 text-sm text-muted-foreground">
-              <span>Km</span>
-              <span>Allure</span>
-              <span />
-              <span className="text-right">Élév.</span>
-              <span className="text-right">FC</span>
-            </div>
-
-            <div className="space-y-2">
-              {analysis.splitChartData.map((split) => (
-                <div key={split.km} className="grid grid-cols-[44px_72px_1fr_56px_54px] items-center gap-3">
-                  <span className="text-base font-semibold tabular-nums text-foreground">{split.km}</span>
-                  <span className="text-base font-semibold tabular-nums text-foreground">{split.paceLabel}</span>
-                  <div className="h-10 rounded-xl bg-transparent">
-                    <div
-                      className="flex h-full items-center rounded-xl bg-accent px-3 text-accent-foreground shadow-[0_8px_20px_hsl(var(--accent)/0.18)]"
-                      style={{ width: `${split.barWidth}%` }}
-                    />
-                  </div>
-                  <span className="text-right text-base font-semibold tabular-nums text-foreground">{split.elevation}</span>
-                  <span className="text-right text-base font-semibold tabular-nums text-foreground">{split.heartRate}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
         {analysis.hasHeartRateCurve && (
           <div className="rounded-lg border border-accent/20 bg-card p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -825,27 +769,60 @@ export function ActivityDetail({
           </div>
         )}
 
-        {analysis.avgHr > 0 && (
-          <div className="rounded-lg border border-accent/20 bg-card p-4">
-            <p className="mb-3 text-xs font-medium text-muted-foreground">Temps passé dans les zones de fréquence cardiaque</p>
+        {similarRuns.length > 0 ? (
+          <AppCard>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Même itinéraire
+            </h3>
             <div className="space-y-2">
-              {analysis.zones.map((zone) => (
-                <div key={zone.label}>
-                  <div className="mb-1 flex items-center justify-between text-xs">
-                    <span className="font-medium">{zone.label} · {zone.range}</span>
-                    <span className="text-muted-foreground">{zone.durationLabel} · {zone.percentage}%</span>
-                  </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+              {similarRuns.map(({ run }) => {
+                const currentPace = (activity.duration_seconds ?? 0) / Math.max(activity.distance_km ?? 1, 0.001);
+                const runPace = run.duration_seconds / Math.max(run.distance_km, 0.001);
+                const diffSec = Math.round(currentPace - runPace);
+                const isFaster = diffSec < 0;
+
+                return (
+                  <div key={run.id} className="flex items-center justify-between border-b border-border py-2 last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {format(new Date(run.started_at), "dd MMM yyyy", { locale: fr })}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {run.distance_km.toFixed(2)} km · {formatDuration(run.duration_seconds)}
+                      </p>
+                    </div>
                     <div
-                      className="h-full rounded-full transition-all"
-                      style={{ width: `${zone.percentage}%`, backgroundColor: zone.color }}
-                    />
+                      className={cn(
+                        "font-metric rounded-lg px-2 py-1 text-sm font-bold",
+                        isFaster ? "bg-accent/10 text-accent" : "bg-orange-50 text-orange-500",
+                      )}
+                    >
+                      {isFaster ? "" : "+"}
+                      {Math.abs(diffSec)}s {isFaster ? "plus rapide" : "plus lent"}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
-          </div>
-        )}
+          </AppCard>
+        ) : null}
+
+        {activity.shoe_id ? (
+          <AppCard>
+            <div className="mb-2 flex items-center gap-2">
+              <Footprints className="h-4 w-4 text-muted-foreground" />
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Chaussures</h3>
+            </div>
+            {shoe ? (
+              <p className="text-base font-medium text-foreground">
+                {[shoe.brand, shoe.name].filter(Boolean).join(" · ") || shoe.name}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Chaussure liée à cette course</p>
+            )}
+          </AppCard>
+        ) : null}
+        </div>
       </div>
     </div>
   );
