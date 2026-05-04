@@ -24,7 +24,7 @@ import { ActivityDetail } from "@/components/ActivityDetail";
 import { DashboardSection } from "@/components/dashboard/DashboardSection";
 import { SkeletonHeroBanner } from "@/components/dashboard/SkeletonHeroBanner";
 import { SkeletonMetricCard } from "@/components/dashboard/SkeletonMetricCard";
-import { AppCard, PageContainer } from "@/components/ui/page-layout";
+import { AppCard, PageContainer, SectionTitle } from "@/components/ui/page-layout";
 import {
   buildMetricData,
   getAggregationUnit,
@@ -628,28 +628,35 @@ const Dashboard = () => {
             <div className="space-y-4">
               {lifetimeStats ? (
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold text-foreground">Mes statistiques</p>
+                  <div className="mb-3 flex items-center justify-between">
+                    <SectionTitle>Mes statistiques</SectionTitle>
+                    <span className="text-xs text-muted-foreground">Depuis le début</span>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     <AppCard className="py-3 text-center">
                       <p className="font-metric text-xl font-black text-foreground">
                         {Math.round(lifetimeStats.totalKm).toLocaleString("fr")}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">km au total</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground/80">depuis le début</p>
                     </AppCard>
 
                     <AppCard className="py-3 text-center">
                       <p className="font-metric text-xl font-black text-foreground">{lifetimeStats.totalRuns}</p>
                       <p className="mt-1 text-xs text-muted-foreground">courses</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground/80">depuis le début</p>
                     </AppCard>
 
                     <AppCard className="py-3 text-center">
                       <p className="font-metric text-xl font-black text-accent">{Math.round(lifetimeStats.totalHours)}h</p>
                       <p className="mt-1 text-xs text-muted-foreground">heures de course</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground/80">depuis le début</p>
                     </AppCard>
 
                     <AppCard className="py-3 text-center">
                       <p className="font-metric text-xl font-black text-foreground">{lifetimeStats.longestRun.toFixed(1)}</p>
                       <p className="mt-1 text-xs text-muted-foreground">km (plus longue)</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground/80">depuis le début</p>
                     </AppCard>
 
                     <AppCard className="py-3 text-center">
@@ -673,6 +680,7 @@ const Dashboard = () => {
                           ) : null}
                         </div>
                         <p className="text-xs text-muted-foreground">dénivelé total</p>
+                        <p className="text-[10px] text-muted-foreground/80">depuis le début</p>
                       </div>
                     </AppCard>
 
@@ -684,6 +692,7 @@ const Dashboard = () => {
                         {lifetimeStats.streak}🔥
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">semaines consécutives</p>
+                      <p className="mt-0.5 text-[10px] text-muted-foreground/80">en cours</p>
                     </AppCard>
                   </div>
                 </div>
