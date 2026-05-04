@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
@@ -21,7 +21,7 @@
 	<key>CFBundleShortVersionString</key>
 	<string>1.0.7</string>
 	<key>CFBundleVersion</key>
-	<string>47</string>
+	<string>48</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSRequiresIPhoneOS</key>
@@ -64,11 +64,11 @@
 		<string>audio</string>
 	</array>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activité.</string>
+	<string>Pace utilise votre position GPS pour enregistrer votre course pendant l'activitÃ©.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pace utilise votre position pour enregistrer votre course même en arrière-plan.</string>
+	<string>Pace utilise votre position pour enregistrer votre course mÃªme en arriÃ¨re-plan.</string>
 	<key>NSLocationAlwaysUsageDescription</key>
-	<string>Pace utilise votre position pour enregistrer votre course même en arrière-plan.</string>
+	<string>Pace utilise votre position pour enregistrer votre course mÃªme en arriÃ¨re-plan.</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
