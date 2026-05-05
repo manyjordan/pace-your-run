@@ -6,6 +6,7 @@
       groups:
         - pace-env
         - app-store-credentials
+        - default
       vars:
         BUNDLE_ID: "com.pace.runapp"
         XCODE_SCHEME: "App"
