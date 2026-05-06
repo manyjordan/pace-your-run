@@ -436,7 +436,7 @@ const Dashboard = () => {
   }, [goalTargetDate]);
 
   const elevationChange = useMemo(
-    () => getWeekOverWeekChange(runsForStats, "elevation"),
+    () => getWeekOverWeekChange(runsForStats ?? [], "elevation"),
     [runsForStats],
   );
   const lifetimeStats = useMemo(() => {
@@ -630,7 +630,7 @@ const Dashboard = () => {
                 <div className="space-y-2">
                   <div className="mb-3 flex items-center justify-between">
                     <SectionTitle>Mes statistiques</SectionTitle>
-                    <span className="text-xs text-muted-foreground">Depuis le début</span>
+                    <span className="text-xs text-muted-foreground">Basé sur tout l&apos;historique disponible</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <AppCard className="py-3 text-center">

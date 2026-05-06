@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { differenceInDays, endOfWeek, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar, Check, Footprints, Target, Trophy } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,6 +61,7 @@ function sessionDayIndex(session: Session): number {
 
 export default function PlanPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { session } = useAuth();
   const tabParam = searchParams.get("tab");
   const mainTab = tabParam === "goal" || tabParam === "equipment" ? tabParam : "goal";
@@ -318,38 +319,15 @@ export default function PlanPage() {
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-3xl">🏅</div>
               <div>
                 <h2 className="text-xl font-bold text-foreground">Course terminée !</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {raceLabel
-                    ? `Votre ${raceLabel} est passé${raceLabel === "Course" ? "" : "e"}. `
-                    : null}
-                  Prêt pour un nouvel objectif ?
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">Prêt pour un nouvel objectif ?</p>
               </div>
-              {runsThisWeek.length > 0 ? (
-                <AppCard className="w-full text-left">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">Cette semaine</p>
-                  <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
-                    {runsThisWeek.reduce((s, r) => s + (r.distance_km ?? 0), 0).toFixed(1)} km
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {runsThisWeek.length} sortie{runsThisWeek.length > 1 ? "s" : ""} cette semaine
-                  </p>
-                </AppCard>
-              ) : null}
               <button
                 type="button"
-                onClick={() => setGoalTabChangeNonce((n) => n + 1)}
+                onClick={() => navigate("/plan")}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 font-semibold text-white transition-all active:scale-95"
               >
                 <Target className="h-4 w-4" />
                 Définir un nouvel objectif
-              </button>
-              <button
-                type="button"
-                onClick={() => setGoalTabChangeNonce((n) => n + 1)}
-                className="text-sm text-muted-foreground underline"
-              >
-                Modifier mon objectif actuel
               </button>
             </div>
           </ScrollReveal>
