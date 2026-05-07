@@ -114,6 +114,60 @@ export type RunInput = {
   title?: string | null;
 };
 
+export async function incrementRunStatsLifetime(
+  userId: string,
+  newRun: { distance_km: number; duration_seconds: number; elevation_gain?: number | null },
+): Promise<void> {
+  await requireCurrentUserId(userId);
+  try {
+    // Ensure user row exists before incremental update.
+    await supabase.from("run_stats_lifetime").upsert(
+      {
+        user_id: userId,
+        total_distance_km: 0,
+        total_duration_seconds: 0,
+        total_runs: 0,
+        total_elevation_gain: 0,
+        longest_run_km: 0,
+        best_pace_sec_per_km: 0,
+      },
+      { onConflict: "user_id", ignoreDuplicates: true },
+    );
+
+    const { data: current } = await supabase
+      .from("run_stats_lifetime")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    const currentStats = current as RunStatsLifetimeRow | null;
+    const newPace =
+      newRun.distance_km >= 3 && newRun.duration_seconds > 0 ? newRun.duration_seconds / newRun.distance_km : null;
+    const currentBest = Number(currentStats?.best_pace_sec_per_km ?? 0);
+
+    await supabase
+      .from("run_stats_lifetime")
+      .update({
+        total_distance_km: Number(currentStats?.total_distance_km ?? 0) + Number(newRun.distance_km ?? 0),
+        total_duration_seconds:
+          Number(currentStats?.total_duration_seconds ?? 0) + Number(newRun.duration_seconds ?? 0),
+        total_runs: Number(currentStats?.total_runs ?? 0) + 1,
+        total_elevation_gain:
+          Number(currentStats?.total_elevation_gain ?? 0) + Number(newRun.elevation_gain ?? 0),
+        longest_run_km: Math.max(Number(currentStats?.longest_run_km ?? 0), Number(newRun.distance_km ?? 0)),
+        best_pace_sec_per_km: newPace
+          ? currentBest === 0
+            ? newPace
+            : Math.min(currentBest, newPace)
+          : currentBest,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", userId);
+  } catch (e) {
+    logger.error("incrementRunStatsLifetime failed", e);
+  }
+}
+
 export type SocialPostRow = {
   audience?: "private" | "friends" | "public" | null;
   created_at: string | null;
@@ -357,6 +411,13 @@ export async function saveRun(userId: string, runData: RunInput) {
     .single();
 
   if (error) throw error;
+
+  await incrementRunStatsLifetime(userId, {
+    distance_km: runData.distance_km,
+    duration_seconds: runData.duration_seconds,
+    elevation_gain: runData.elevation_gain ?? 0,
+  });
+
   return data as RunRow;
 }
 
