@@ -5,9 +5,14 @@ import { logger } from "@/lib/logger";
 export function useRunTimer() {
   const [elapsed, internalSetElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const keepAliveSourceRef = useRef<AudioBufferSourceNode | null>(null);
   const keepAliveEnabledRef = useRef(false);
+  const wakeLockRef = useRef<{
+    release: () => Promise<void>;
+    addEventListener: (type: string, listener: () => void) => void;
+  } | null>(null);
   const startTimeRef = useRef<number | null>(null);
   const pausedElapsedRef = useRef<number>(0);
 
@@ -100,12 +105,51 @@ export function useRunTimer() {
     internalSetElapsed(elapsedSeconds);
   }, []);
 
+  const requestWakeLock = useCallback(async () => {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    try {
+      const wl = await (navigator as Navigator & { wakeLock: { request: (type: "screen") => Promise<{
+        release: () => Promise<void>;
+        addEventListener: (type: string, listener: () => void) => void;
+      }> } }).wakeLock.request("screen");
+      wakeLockRef.current = wl;
+      wl.addEventListener("release", () => {
+        if (startTimeRef.current !== null) {
+          void requestWakeLock();
+        }
+      });
+    } catch (e) {
+      logger.error("Wake lock failed", e);
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(() => {
+    void wakeLockRef.current?.release().catch(() => {});
+    wakeLockRef.current = null;
+  }, []);
+
+  const startHeartbeat = useCallback(() => {
+    if (heartbeatRef.current !== null) return;
+    heartbeatRef.current = window.setInterval(() => {
+      localStorage.setItem("pace_heartbeat", String(Date.now()));
+    }, 5000);
+  }, []);
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatRef.current !== null) {
+      clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+  }, []);
+
   const startInterval = useCallback(() => {
     if (intervalRef.current) return;
     startTimeRef.current = Date.now();
     tick();
     intervalRef.current = setInterval(tick, 1000);
-  }, [tick]);
+    startHeartbeat();
+    void requestWakeLock();
+  }, [requestWakeLock, startHeartbeat, tick]);
 
   const stopInterval = useCallback(() => {
     if (startTimeRef.current !== null) {
@@ -117,14 +161,19 @@ export function useRunTimer() {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    stopHeartbeat();
+    releaseWakeLock();
     stopKeepAlive();
-  }, [stopKeepAlive]);
+  }, [releaseWakeLock, stopHeartbeat, stopKeepAlive]);
 
   useEffect(() => {
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
         if (audioContextRef.current?.state === "suspended") {
           void audioContextRef.current.resume().catch(() => {});
+        }
+        if (startTimeRef.current !== null) {
+          void requestWakeLock();
         }
         if (intervalRef.current === null && startTimeRef.current !== null) {
           intervalRef.current = window.setInterval(tick, 1000);
@@ -133,15 +182,17 @@ export function useRunTimer() {
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [tick]);
+  }, [requestWakeLock, tick]);
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      stopHeartbeat();
+      releaseWakeLock();
       stopKeepAlive();
       startTimeRef.current = null;
     };
-  }, [stopKeepAlive]);
+  }, [releaseWakeLock, stopHeartbeat, stopKeepAlive]);
 
   const formatTime = useCallback((s: number) => {
     const h = Math.floor(s / 3600);

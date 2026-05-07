@@ -95,6 +95,13 @@ type CurrentKmSplit = {
   elapsedAtKmStart: number;
   distanceAtKmStart: number;
 };
+type RunRecoveryData = {
+  elapsed: number;
+  distance: number;
+  gpsTrace?: RunGpsPoint[];
+  startedAt: string | null;
+  savedAt: number;
+};
 
 const RACE_DISTANCES = [
   { label: "5km", km: 5 },
@@ -158,11 +165,14 @@ export function useRunSession({
   resetAnnouncementRefsRef,
   resetKilometreAnnouncementRefRef,
 }: UseRunSessionOptions) {
+  const RUN_AUTOSAVE_KEY = "pace_run_autosave";
   const [status, setStatus] = useState<RunStatus>("idle");
   const [distance, setDistance] = useState(0);
   const [routeProgress, setRouteProgress] = useState(0);
   const [currentKmSplit, setCurrentKmSplit] = useState<CurrentKmSplit | null>(null);
   const [completedKmSplits, setCompletedKmSplits] = useState<Array<{ km: number; paceSecPerKm: number }>>([]);
+  const [showRunRecovery, setShowRunRecovery] = useState(false);
+  const [runRecoveryData, setRunRecoveryData] = useState<RunRecoveryData | null>(null);
 
   const runStartedAtRef = useRef<string | null>(null);
   const prevStatusRef = useRef<RunStatus>("idle");
@@ -276,6 +286,37 @@ export function useRunSession({
   }, [distance, elapsed, status]);
 
   useEffect(() => {
+    if (status !== "running") return;
+    const interval = window.setInterval(() => {
+      if (elapsed > 0 && distance > 0) {
+        const payload: RunRecoveryData = {
+          elapsed,
+          distance,
+          gpsTrace: gpsTrace.slice(-100),
+          startedAt: runStartedAtRef.current,
+          savedAt: Date.now(),
+        };
+        localStorage.setItem(RUN_AUTOSAVE_KEY, JSON.stringify(payload));
+      }
+    }, 30_000);
+    return () => clearInterval(interval);
+  }, [distance, elapsed, gpsTrace, status]);
+
+  useEffect(() => {
+    const saved = localStorage.getItem(RUN_AUTOSAVE_KEY);
+    if (!saved) return;
+    try {
+      const data = JSON.parse(saved) as RunRecoveryData;
+      if (Date.now() - data.savedAt < 600_000 && data.distance > 0.1) {
+        setShowRunRecovery(true);
+        setRunRecoveryData(data);
+      }
+    } catch {
+      // ignore invalid autosave payload
+    }
+  }, []);
+
+  useEffect(() => {
     statusRef.current = status;
   }, [status, statusRef]);
 
@@ -341,7 +382,10 @@ export function useRunSession({
     setCompletedPost(null);
     setCompletedPostId(null);
     setShowCompletedActivityDetail(false);
+    setShowRunRecovery(false);
+    setRunRecoveryData(null);
     setSaveError("");
+    localStorage.removeItem(RUN_AUTOSAVE_KEY);
 
     startIntervalRef.current();
     startKeepAliveRef.current();
@@ -379,6 +423,8 @@ export function useRunSession({
     setCompletedPost,
     setCompletedPostId,
     setShowCompletedActivityDetail,
+    setShowRunRecovery,
+    setRunRecoveryData,
     setSaveError,
     lastGpsPointRef,
     speechPrefsRef,
@@ -389,6 +435,32 @@ export function useRunSession({
     bluetooth.clearErrorAndSamplesForRunStart,
     treadmill.resetTreadmillForFreshRun,
   ]);
+
+  const dismissRunRecovery = useCallback(() => {
+    localStorage.removeItem(RUN_AUTOSAVE_KEY);
+    setShowRunRecovery(false);
+    setRunRecoveryData(null);
+  }, []);
+
+  const handleSaveRecoveredRun = useCallback((data: RunRecoveryData) => {
+    const recoveredTrace = Array.isArray(data.gpsTrace) ? data.gpsTrace : [];
+    const recoveredPace = data.distance > 0 ? data.elapsed / 60 / data.distance : 0;
+    const recoveredElevation = calculateElevationGain(recoveredTrace);
+    setElapsed(Math.round(data.elapsed));
+    setDistance(data.distance);
+    setGpsTrace(recoveredTrace);
+    runStartedAtRef.current = data.startedAt ?? new Date().toISOString();
+    setRunSummary({
+      distance: data.distance,
+      duration: Math.round(data.elapsed),
+      movingTime: Math.round(data.elapsed),
+      avgPace: recoveredPace,
+      elevation: recoveredElevation,
+      gpsTrace: recoveredTrace,
+      startedAt: data.startedAt ?? new Date().toISOString(),
+    });
+    dismissRunRecovery();
+  }, [calculateElevationGain, dismissRunRecovery, setDistance, setElapsed, setGpsTrace, setRunSummary]);
 
   const pause = useCallback(() => setStatus("paused"), []);
   const resume = useCallback(() => {
@@ -514,6 +586,7 @@ export function useRunSession({
         setSaveError("Impossible d'enregistrer cette course sans session active.");
       }
     }
+    localStorage.removeItem(RUN_AUTOSAVE_KEY);
 
     bluetooth.disconnectHardware();
     await stopGpsTracking();
@@ -606,6 +679,11 @@ export function useRunSession({
     currentKmSplit,
     currentKmPaceSec,
     completedKmSplits,
+    showRunRecovery,
+    setShowRunRecovery,
+    runRecoveryData,
+    handleSaveRecoveredRun,
+    dismissRunRecovery,
     elevationGain,
     gradeAdjustedPace,
     start,

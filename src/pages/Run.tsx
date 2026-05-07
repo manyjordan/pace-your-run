@@ -27,7 +27,7 @@ import {
   type RunPreferences,
 } from "@/lib/runPreferences";
 import { clearActiveSession, loadActiveSession, type ActiveSession } from "@/lib/activeSession";
-import { PageContainer } from "@/components/ui/page-layout";
+import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { fetchCurrentWeather, type RunWeather } from "@/lib/weather";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -121,6 +121,10 @@ export default function Run() {
     currentKmSplit,
     currentKmPaceSec,
     completedKmSplits,
+    showRunRecovery,
+    runRecoveryData,
+    handleSaveRecoveredRun,
+    dismissRunRecovery,
     start,
     pause,
     resume,
@@ -287,6 +291,34 @@ export default function Run() {
 
   return (
     <PageContainer>
+      {showRunRecovery && runRecoveryData && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center bg-background/90 p-6 backdrop-blur">
+          <AppCard className="w-full max-w-sm space-y-4 text-center">
+            <p className="text-2xl">⚠️</p>
+            <h2 className="text-lg font-bold text-foreground">Course interrompue</h2>
+            <p className="text-sm text-muted-foreground">
+              Une course de {runRecoveryData.distance.toFixed(2)} km a été interrompue. Voulez-vous la sauvegarder ?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => handleSaveRecoveredRun(runRecoveryData)}
+                className="flex-1 rounded-xl bg-accent py-3 font-semibold text-white"
+              >
+                Sauvegarder
+              </button>
+              <button
+                type="button"
+                onClick={dismissRunRecovery}
+                className="flex-1 rounded-xl bg-muted py-3 font-medium text-foreground"
+              >
+                Ignorer
+              </button>
+            </div>
+          </AppCard>
+        </div>
+      )}
+
       <Suspense fallback={null}>
         <RunSpeechBridge
           speechPrefsRef={speechPrefsRef}
