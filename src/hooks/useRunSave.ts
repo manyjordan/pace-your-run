@@ -14,6 +14,7 @@ import { clearActiveSession, type ActiveSession } from "@/lib/activeSession";
 import type { CommunityPost } from "@/lib/runFormatters";
 import { cache } from "@/lib/cache";
 import { simplifyGpsTrace } from "@/lib/gpsSimplify";
+import { logger } from "@/lib/logger";
 
 const OFFLINE_RUNS_KEY = "pace-offline-runs";
 
@@ -141,7 +142,7 @@ export function useRunSave() {
           setCompletedPost((p) => (p ? { ...p, description: updatedDescription } : null));
         }
       } catch (error) {
-        console.error("[Run] operation failed:", error);
+        logger.error("[Run] operation failed", error);
         import("@sentry/react")
           .then(({ captureException }) => {
             captureException(error);
@@ -149,7 +150,7 @@ export function useRunSave() {
           .catch(() => {});
 
         if (isLikelyNetworkError(error)) {
-          console.error("Failed to save run online:", error);
+          logger.error("Failed to save run online", error);
           try {
             const existing = JSON.parse(localStorage.getItem(OFFLINE_RUNS_KEY) ?? "[]");
             const queue = Array.isArray(existing) ? existing : [];
@@ -167,7 +168,7 @@ export function useRunSave() {
             });
             setSaveError("");
           } catch (err) {
-            console.error("[Run] save failed:", err);
+            logger.error("[Run] save failed", err);
             import("@sentry/react").then(({ captureException }) => captureException(err)).catch(() => {});
             setSaveError("Impossible d'enregistrer cette course pour le moment.");
           }

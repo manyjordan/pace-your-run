@@ -32,6 +32,7 @@ import { fetchCurrentWeather, type RunWeather } from "@/lib/weather";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -204,7 +205,7 @@ export default function Run() {
         await updatePostAudience(completedPostId, user.id, value);
         window.dispatchEvent(new Event("pace-community-updated"));
       } catch (error) {
-        console.error("[Run] operation failed:", error);
+        logger.error("[Run] operation failed", error);
         import("@sentry/react")
           .then(({ captureException }) => {
             captureException(error);

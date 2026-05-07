@@ -330,6 +330,11 @@ const SettingsPage = () => {
         </SettingsSection>
       </ScrollReveal>
 
+      <div className="py-6 text-center">
+        <p className="text-xs text-muted-foreground">Pace version 1.0.7 (50)</p>
+        <p className="mt-1 text-xs text-muted-foreground">Fait avec ❤️ pour les coureurs</p>
+      </div>
+
       <AlertDialog open={signOutDialogOpen} onOpenChange={setSignOutDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

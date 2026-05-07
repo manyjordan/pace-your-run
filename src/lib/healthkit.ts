@@ -91,7 +91,7 @@ async function getHealthKit(): Promise<HealthKitModule | null> {
     HealthKit = module.HealthKit as HealthKitModule;
     return HealthKit;
   } catch (e) {
-    console.warn("HealthKit module not available:", e);
+    logger.warn("HealthKit module not available", e);
     return null;
   }
 }

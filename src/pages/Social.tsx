@@ -778,7 +778,7 @@ export default function Social() {
           </div>
           <TabsList className="h-auto w-full gap-2 border-0 bg-transparent px-4 pb-2">
             <TabsTrigger value="feed" className="flex-1 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white">
-              Feed
+              Fil
             </TabsTrigger>
             <TabsTrigger value="forum" className="flex-1 rounded-xl data-[state=active]:bg-accent data-[state=active]:text-white">
               Forum

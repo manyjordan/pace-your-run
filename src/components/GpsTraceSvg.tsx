@@ -11,10 +11,6 @@ interface GpsTraceSvgProps {
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
 
-if (!MAPBOX_TOKEN || MAPBOX_TOKEN === "your_mapbox_public_token_here") {
-  console.warn("Mapbox token missing or placeholder");
-}
-
 function buildMapboxUrl(trace: Point[], width: number, height: number): string | null {
   if (!MAPBOX_TOKEN || trace.length < 2) return null;
 
@@ -48,9 +44,6 @@ export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps
 
   const mapUrl = useMemo(() => {
     const url = buildMapboxUrl(displayTrace, 400, height);
-    // Temporary debug — remove after fix:
-    console.log("MAPBOX_TOKEN available:", !!MAPBOX_TOKEN);
-    console.log("buildMapboxUrl result:", url);
     return url;
   }, [displayTrace, height]);
 

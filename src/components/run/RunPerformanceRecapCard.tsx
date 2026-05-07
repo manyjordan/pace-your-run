@@ -20,6 +20,7 @@ import { format, parseISO } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router-dom";
+import { logger } from "@/lib/logger";
 
 export type RunPerformanceRecapCardProps = {
   runSummary: RunSummary;
@@ -201,7 +202,7 @@ export function RunPerformanceRecapCard({
         URL.revokeObjectURL(url);
       }, "image/png");
     } catch (err) {
-      console.error("[Run] Share failed", err);
+      logger.error("[Run] Share failed", err);
     }
   };
 

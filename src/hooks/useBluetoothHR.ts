@@ -68,7 +68,7 @@ export function useBluetoothHR({ statusRef }: UseBluetoothHROptions) {
         handleBluetoothDisconnect();
       });
     } catch (error) {
-      console.error("[Run] operation failed:", error);
+      logger.error("[Run] operation failed", error);
       import("@sentry/react")
         .then(({ captureException }) => {
           captureException(error);
