@@ -7,10 +7,7 @@ export const PerformanceSection = ({
   runs,
 }: {
   runs: RunRow[];
-  runsForStats: RunRow[];
 }) => {
-  void runsForStats;
-
   return (
     <div className="space-y-6">
       <ScrollReveal>

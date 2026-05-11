@@ -716,7 +716,7 @@ const Dashboard = () => {
             </div>
           ) : (
             <Suspense fallback={<div className="h-32 animate-pulse rounded-xl bg-muted" />}>
-              <PerformanceSection runs={recentRuns} runsForStats={runsForStats} />
+              <PerformanceSection runs={recentRuns} />
             </Suspense>
           )}
         </TabsContent>

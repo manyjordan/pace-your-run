@@ -100,7 +100,7 @@ export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps
         />
       )}
 
-      {mapLoaded && !mapError && <div className="absolute inset-0 bg-black/20" />}
+      {mapLoaded && !mapError && <div className="absolute inset-0 bg-black/10" />}
 
       <svg
         viewBox={`0 0 400 ${height}`}

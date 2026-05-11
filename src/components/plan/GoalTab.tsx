@@ -180,7 +180,12 @@ export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
   const [changeWarning, setChangeWarning] = useState<boolean>(false);
   const [isDefining, setIsDefining] = useState<boolean>(true);
   const [isChanging, setIsChanging] = useState<boolean>(false);
-  const [isLoadingGoal, setIsLoadingGoal] = useState(true);
+  const [isLoadingGoal, setIsLoadingGoal] = useState(() => {
+    const userId = localStorage.getItem("pace_user_id");
+    if (!userId) return false;
+    const cached = localStorage.getItem(`cache_profile_${userId}`);
+    return !cached;
+  });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [detectedLevel, setDetectedLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner");
   const [selectedPlan, setSelectedPlan] = useState<TrainingPlan | null>(null);
@@ -738,11 +743,10 @@ export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
 
   if (isLoadingGoal) {
     return (
-      <div className="min-h-[22rem] space-y-4 animate-pulse">
-        <div className="h-32 rounded-xl bg-muted" />
-        <div className="h-4 w-2/3 rounded bg-muted" />
+      <div className="min-h-[4rem] space-y-3 animate-pulse px-4 pt-4">
         <div className="h-4 w-1/2 rounded bg-muted" />
-        <div className="h-12 w-full rounded-xl bg-muted" />
+        <div className="h-4 w-2/3 rounded bg-muted" />
+        <div className="h-4 w-1/3 rounded bg-muted" />
       </div>
     );
   }
