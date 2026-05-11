@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { differenceInDays, endOfWeek, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar, Check, Footprints, Target, Trophy } from "lucide-react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,7 +61,6 @@ function sessionDayIndex(session: Session): number {
 
 export default function PlanPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { session } = useAuth();
   const tabParam = searchParams.get("tab");
   const mainTab = tabParam === "goal" || tabParam === "equipment" ? tabParam : "goal";
@@ -111,6 +110,7 @@ export default function PlanPage() {
   }, [targetDate]);
   const goalIsExpired = daysUntilGoal !== null && daysUntilGoal < 0;
   const [goalTabChangeNonce, setGoalTabChangeNonce] = useState(0);
+  const [forceGoalReset, setForceGoalReset] = useState(false);
   const raceLabel = useMemo(() => {
     if (!userGoal?.goalType && !userGoal?.goal_type) return null;
     if (normalizedGoalType === "race") {
@@ -311,7 +311,12 @@ export default function PlanPage() {
       </div>
 
       <TabsContent value="goal" className="space-y-6">
-        <GoalTab openChangeGoalNonce={goalTabChangeNonce} />
+        <GoalTab
+          userId={session?.user?.id ?? ""}
+          openChangeGoalNonce={goalTabChangeNonce}
+          forceReset={forceGoalReset}
+          onResetHandled={() => setForceGoalReset(false)}
+        />
 
         {goalIsExpired ? (
           <ScrollReveal>
@@ -323,7 +328,7 @@ export default function PlanPage() {
               </div>
               <button
                 type="button"
-                onClick={() => navigate("/plan")}
+                onClick={() => setForceGoalReset(true)}
                 className="flex w-full items-center justify-center gap-2 rounded-xl bg-accent py-3.5 font-semibold text-white transition-all active:scale-95"
               >
                 <Target className="h-4 w-4" />

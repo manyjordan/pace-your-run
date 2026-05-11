@@ -167,11 +167,18 @@ function GoalDatePicker({
 }
 
 type GoalTabProps = {
+  userId?: string;
   /** Incrémenter depuis le parent (ex. onglet Plan) pour ouvrir le flux « modifier l’objectif ». */
   openChangeGoalNonce?: number;
+  forceReset?: boolean;
+  onResetHandled?: () => void;
 };
 
-export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
+export default function GoalTab({
+  openChangeGoalNonce = 0,
+  forceReset = false,
+  onResetHandled,
+}: GoalTabProps) {
   const { user } = useAuth();
   const lastOpenNonceRef = useRef(0);
   const [formData, setFormData] = useState<ProfileGoalData>(defaultData);
@@ -335,8 +342,21 @@ export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
         setFormData(newFormData);
         if (goalData && typeof goalData === "object" && !Array.isArray(goalData)) {
           setSavedAt("Enregistré");
-          setIsDefining(false);
-          setIsChanging(false);
+          let isExpired = false;
+          if (newFormData.goalType === "race" && newFormData.raceTargetDate) {
+            isExpired = differenceInDays(new Date(newFormData.raceTargetDate), new Date()) < 0;
+          } else if (newFormData.goalType === "distance" && newFormData.distanceTargetDate) {
+            isExpired = differenceInDays(new Date(newFormData.distanceTargetDate), new Date()) < 0;
+          } else if (newFormData.goalType === "weight" && newFormData.weightTargetDate) {
+            isExpired = differenceInDays(new Date(newFormData.weightTargetDate), new Date()) < 0;
+          }
+          if (isExpired) {
+            setIsDefining(true);
+            setIsChanging(false);
+          } else {
+            setIsDefining(false);
+            setIsChanging(false);
+          }
         } else {
           setSavedAt(null);
           setIsDefining(true);
@@ -361,6 +381,14 @@ export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
     setIsDefining(false);
   }, [openChangeGoalNonce]);
 
+  useEffect(() => {
+    if (!forceReset) return;
+    setIsDefining(true);
+    setIsChanging(false);
+    setSavedAt(null);
+    onResetHandled?.();
+  }, [forceReset, onResetHandled]);
+
   const raceDateMeta = useMemo(() => {
     if (!formData.raceTargetDate || formData.goalType !== "race") {
       return { raceIsExpired: false, daysToRace: null as number | null };
@@ -373,6 +401,15 @@ export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
     const daysToRace = differenceInDays(parsed, new Date());
     return { raceIsExpired, daysToRace };
   }, [formData.raceTargetDate, formData.goalType]);
+
+  const goalTargetExpired = useMemo(() => {
+    let dateStr: string | undefined;
+    if (formData.goalType === "race") dateStr = formData.raceTargetDate;
+    else if (formData.goalType === "distance") dateStr = formData.distanceTargetDate;
+    else if (formData.goalType === "weight") dateStr = formData.weightTargetDate;
+    if (!dateStr) return false;
+    return differenceInDays(new Date(dateStr), new Date()) < 0;
+  }, [formData.goalType, formData.raceTargetDate, formData.distanceTargetDate, formData.weightTargetDate]);
 
   const activeGoalDetails = useMemo(() => {
     const details: Array<{ label: string; value: string }> = [];
@@ -792,7 +829,7 @@ export default function GoalTab({ openChangeGoalNonce = 0 }: GoalTabProps) {
     </div>
   );
 
-  const showDefinitionFlow = isChanging || (isDefining && !savedAt);
+  const showDefinitionFlow = isChanging || (isDefining && (!savedAt || goalTargetExpired));
 
   return (
     <div className="space-y-4">

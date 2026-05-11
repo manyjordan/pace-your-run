@@ -27,6 +27,7 @@ export function LineChartSvg({
   formatValue,
 }: LineChartSvgProps) {
   const gradientId = useMemo(() => `grad-${Math.random().toString(36).slice(2)}`, []);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const { points, areaPath, linePath, yLabels } = useMemo(() => {
     if (data.length < 2) return { points: [] as LineDataPoint[], areaPath: "", linePath: "", yLabels: [] as string[] };

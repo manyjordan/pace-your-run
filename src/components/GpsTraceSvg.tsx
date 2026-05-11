@@ -26,7 +26,7 @@ function buildMapboxUrl(trace: Point[], width: number, height: number): string |
 
   const bbox = [minLng - lngPad, minLat - latPad, maxLng + lngPad, maxLat + latPad].map((v) => v.toFixed(6)).join(",");
 
-  const style = "mapbox/light-v11";
+  const style = "mapbox/streets-v12";
   const retina = window.devicePixelRatio >= 2 ? "@2x" : "";
 
   return `https://api.mapbox.com/styles/v1/${style}/static/[${bbox}]/${width}x${height}${retina}?access_token=${MAPBOX_TOKEN}&attribution=false&logo=false`;
@@ -99,8 +99,6 @@ export function GpsTraceSvg({ trace, height = 200, className }: GpsTraceSvgProps
           loading="lazy"
         />
       )}
-
-      {mapLoaded && !mapError && <div className="absolute inset-0 bg-black/10" />}
 
       <svg
         viewBox={`0 0 400 ${height}`}
