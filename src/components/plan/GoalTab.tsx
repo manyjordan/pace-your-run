@@ -112,11 +112,13 @@ function GoalDatePicker({
   label,
   value,
   onChange,
+  onBlur,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  onBlur?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const selectedDate = value ? parse(value, "yyyy-MM-dd", new Date()) : undefined;
@@ -130,6 +132,7 @@ function GoalDatePicker({
             id={id}
             variant="outline"
             className="w-full justify-between rounded-xl border-accent/30 bg-card text-left font-normal hover:border-accent hover:bg-accent/10"
+            onBlur={() => onBlur?.()}
           >
             <span className={selectedDate ? "text-foreground" : "text-muted-foreground"}>
               {selectedDate ? format(selectedDate, "d MMMM yyyy", { locale: fr }) : "Choisir une date"}
@@ -194,6 +197,8 @@ export default function GoalTab({
     return !cached;
   });
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [hasAttemptedSave, setHasAttemptedSave] = useState(false);
+  const [raceTargetDateBlurred, setRaceTargetDateBlurred] = useState(false);
   const [detectedLevel, setDetectedLevel] = useState<"beginner" | "intermediate" | "advanced">("beginner");
   const [selectedPlan, setSelectedPlan] = useState<TrainingPlan | null>(null);
   const [showCustomDistance, setShowCustomDistance] = useState(false);
@@ -212,6 +217,8 @@ export default function GoalTab({
         setIsDefining(true);
         setIsChanging(false);
         setRecentRuns([]);
+        setHasAttemptedSave(false);
+        setRaceTargetDateBlurred(false);
         setIsLoadingGoal(false);
         return;
       }
@@ -377,6 +384,8 @@ export default function GoalTab({
   useEffect(() => {
     if (openChangeGoalNonce <= 0 || openChangeGoalNonce === lastOpenNonceRef.current) return;
     lastOpenNonceRef.current = openChangeGoalNonce;
+    setHasAttemptedSave(false);
+    setRaceTargetDateBlurred(false);
     setIsChanging(true);
     setIsDefining(false);
   }, [openChangeGoalNonce]);
@@ -386,6 +395,8 @@ export default function GoalTab({
     setIsDefining(true);
     setIsChanging(false);
     setSavedAt(null);
+    setHasAttemptedSave(false);
+    setRaceTargetDateBlurred(false);
     onResetHandled?.();
   }, [forceReset, onResetHandled]);
 
@@ -539,6 +550,8 @@ export default function GoalTab({
   }, [formData.goalType, formData.raceType, formData.selectedPlanId]);
 
   const applyGoalOption = (id: (typeof GOAL_OPTIONS)[number]["id"]) => {
+    setHasAttemptedSave(false);
+    setRaceTargetDateBlurred(false);
     if (formData.goalType && savedAt) {
       setChangeWarning(true);
       setTimeout(() => setChangeWarning(false), 5000);
@@ -590,6 +603,8 @@ export default function GoalTab({
   };
 
   const selectPresetPlanId = (planId: string) => {
+    setHasAttemptedSave(false);
+    setRaceTargetDateBlurred(false);
     const preset = getPlanById(planId);
     const next: ProfileGoalData = {
       ...formData,
@@ -741,6 +756,8 @@ export default function GoalTab({
       return;
     }
 
+    setHasAttemptedSave(true);
+
     if (formData.goalType === "race" && formData.raceTargetTime?.trim()) {
       const targetTimeError = validateRaceTargetTime(Number(formData.raceDistanceKm), formData.raceTargetTime);
       if (targetTimeError) {
@@ -789,6 +806,8 @@ export default function GoalTab({
   }
 
   const handleChangeGoal = () => {
+    setHasAttemptedSave(false);
+    setRaceTargetDateBlurred(false);
     setIsChanging(true);
     setIsDefining(false);
   };
@@ -830,6 +849,8 @@ export default function GoalTab({
   );
 
   const showDefinitionFlow = isChanging || (isDefining && (!savedAt || goalTargetExpired));
+  const isFinisherPlan = selectedPlan?.level === "finisher" || formData.selectedPlanId === "regular_running";
+  const showValidationWarnings = hasAttemptedSave || raceTargetDateBlurred;
 
   return (
     <div className="space-y-4">
@@ -953,7 +974,7 @@ export default function GoalTab({
               </Alert>
             </ScrollReveal>
           ) : null}
-          {warnings.length > 0 ? (
+          {showValidationWarnings && warnings.length > 0 ? (
             <ScrollReveal>
               <div className="space-y-2">
                 {warnings.map((warning, i) => (
@@ -984,7 +1005,11 @@ export default function GoalTab({
         <>
           {isChanging ? (
             <div className="flex shrink-0">
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsChanging(false)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => {
+                setHasAttemptedSave(false);
+                setRaceTargetDateBlurred(false);
+                setIsChanging(false);
+              }}>
                 Annuler
               </Button>
             </div>
@@ -1187,6 +1212,7 @@ export default function GoalTab({
                         })}
                       </div>
                     </div>
+                    {!isFinisherPlan ? (
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Votre meilleur temps récent (optionnel)</label>
                       <p className="text-xs text-muted-foreground">Permet de calculer des allures personnalisées</p>
@@ -1210,19 +1236,23 @@ export default function GoalTab({
                         />
                       </div>
                     </div>
+                    ) : null}
                   </div>
                 ) : null}
 
+                {!isFinisherPlan ? (
                 <GoalTimePicker
                   label="Temps cible (optionnel)"
                   value={formData.raceTargetTime || "00:45:00"}
                   onChange={(value) => updateField("raceTargetTime", value)}
                 />
+                ) : null}
                 <GoalDatePicker
                   id="raceTargetDate"
                   label="Date de la course (optionnel)"
                   value={formData.raceTargetDate}
                   onChange={(value) => updateField("raceTargetDate", value)}
+                  onBlur={() => setRaceTargetDateBlurred(true)}
                 />
                 <div className="space-y-2">
                   <Label>Jours disponibles pour aller courir</Label>
@@ -1231,6 +1261,7 @@ export default function GoalTab({
                     onChange={(days) => updateField("availableDays", days)}
                   />
                 </div>
+                {!isFinisherPlan ? (
                 <div className="space-y-2">
                   <Label htmlFor="levelRace">Votre niveau</Label>
                   <p className="text-xs text-muted-foreground">
@@ -1257,6 +1288,7 @@ export default function GoalTab({
                     </SelectContent>
                   </Select>
                 </div>
+                ) : null}
               </CardContent>
             </Card>
           </ScrollReveal>
@@ -1332,7 +1364,7 @@ export default function GoalTab({
               </Alert>
             </ScrollReveal>
           )}
-          {warnings.length > 0 && (
+          {showValidationWarnings && warnings.length > 0 && (
             <ScrollReveal>
               <div className="space-y-2">
                 {warnings.map((warning, i) => (

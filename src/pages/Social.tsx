@@ -418,6 +418,17 @@ export default function Social() {
   const [unreadNotifCount, setUnreadNotifCount] = useState(0);
   const hasLoadedRef = useRef(false);
 
+  useEffect(() => {
+    const userId = localStorage.getItem("pace_user_id");
+    if (!userId) return;
+    const cachedSocial = cache.get<{ posts: FeedPost[]; activities: RunRow[] }>(`social_${userId}`);
+    if (cachedSocial) {
+      setPosts(cachedSocial.posts);
+      setActivities(cachedSocial.activities);
+      setIsLoadingPosts(false);
+    }
+  }, []);
+
   const buildRunFromPost = (post: FeedPost): RunRow => {
     const parseDistance = Number.parseFloat(post.stats.distance.replace(",", "."));
     const [hoursOrMinutes = "0", minutesOrSeconds = "0", seconds = "0"] = post.stats.duration.split(":");

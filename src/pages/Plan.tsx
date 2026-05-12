@@ -67,6 +67,19 @@ export default function PlanPage() {
   const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
   const [userGoal, setUserGoal] = useState<PlanGoal | null>(null);
   const [availableDays, setAvailableDays] = useState<string[]>([]);
+
+  useEffect(() => {
+    const userId = localStorage.getItem("pace_user_id");
+    if (!userId) return;
+    const cachedRuns = cache.get<RunRow[]>(`runs_${userId}`);
+    if (cachedRuns) setRecentRuns(cachedRuns);
+    const cachedProfile = cache.get<{ goal_data?: unknown; available_days?: string[] }>(`profile_${userId}`);
+    if (cachedProfile?.goal_data && typeof cachedProfile.goal_data === "object" && !Array.isArray(cachedProfile.goal_data)) {
+      setUserGoal(cachedProfile.goal_data as PlanGoal);
+    }
+    setAvailableDays(cachedProfile?.available_days ?? []);
+  }, []);
+
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) {

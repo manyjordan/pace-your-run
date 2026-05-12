@@ -794,6 +794,15 @@ const Health = () => {
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    const userId = localStorage.getItem("pace_user_id");
+    if (!userId) return;
+    const cachedLifetime = cache.get<RunStatsLifetimeRow>(`healthLifetime_${userId}`);
+    const cachedWeekly = cache.get<RunStatsWeeklyRow[]>(`healthWeekly_${userId}`);
+    if (cachedLifetime) setLifetimeRow(cachedLifetime);
+    if (cachedWeekly?.length) setWeeklyRows(cachedWeekly);
+  }, []);
+
+  useEffect(() => {
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
     const cachedState = cache.get<{ searchQuery: string }>("health_state");

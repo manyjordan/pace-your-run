@@ -62,7 +62,12 @@ function vo2TrendFromSeries(series: Vo2WeekRow[]): "up" | "down" | "stable" {
   return "stable";
 }
 
-export function VO2maxCard({ runs }: { runs: RunRow[] }) {
+interface VO2maxCardProps {
+  runs: RunRow[];
+  interactive?: boolean;
+}
+
+export function VO2maxCard({ runs, interactive = true }: VO2maxCardProps) {
   const series = useMemo(() => buildVo2WeeklySeries(runs), [runs]);
   const { displayChartData, trendSeries, latestSmoothedVo2 } = useMemo(() => {
     const base = series.map((r) => ({ label: r.week, value: r.vo2 ?? 0, rawValue: r.vo2 }));
@@ -122,7 +127,7 @@ export function VO2maxCard({ runs }: { runs: RunRow[] }) {
           showArea
           showDots={false}
           formatValue={(value) => `${Number(value).toFixed(1)}`}
-          interactive
+          interactive={interactive}
           formatTooltip={(d) => {
             const smooth = d.value;
             let text = `VO2max estimé : ${smooth.toFixed(1)} (moyenne 3 sem.)`;

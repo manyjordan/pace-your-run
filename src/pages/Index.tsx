@@ -137,13 +137,12 @@ const Dashboard = () => {
     const cachedProfile = cache.get<ProfileRow>(`profile_${storedUserId}`);
     const cachedLifetimeStats = cache.get<RunStatsLifetimeRow>(`lifetimeStats_${storedUserId}`);
 
-    if (cachedRuns || cachedProfile) {
-      if (cachedRuns) {
-        setRecentRuns(cachedRuns);
-        setRunCount(cachedRuns.length);
-      }
-      if (cachedRunsStats) {
-        setRunsForStats(cachedRunsStats);
+    if (cachedRuns || cachedProfile || cachedRunsStats) {
+      const runs = cachedRuns ?? cachedRunsStats;
+      if (runs) {
+        setRecentRuns(runs);
+        setRunCount(runs.length);
+        setRunsForStats(runs);
       }
       if (cachedProfile) {
         setAthleteName(cachedProfile.first_name?.trim() || "Coureur");
