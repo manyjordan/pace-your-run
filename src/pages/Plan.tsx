@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { differenceInDays, endOfWeek, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Calendar, Check, Footprints, Target, Trophy } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppCard } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
-import { cache } from "@/lib/cache";
-import { getProfile, getRuns, type RunRow } from "@/lib/database";
 import GoalTab from "@/components/plan/GoalTab";
 import EquipmentTab from "@/components/plan/EquipmentTab";
 import type { Session, TrainingPlan } from "@/lib/plans/types";
@@ -62,54 +61,17 @@ function sessionDayIndex(session: Session): number {
 export default function PlanPage() {
   const [searchParams] = useSearchParams();
   const { session } = useAuth();
+  const { runs: recentRuns, profile } = useData();
   const tabParam = searchParams.get("tab");
   const mainTab = tabParam === "goal" || tabParam === "equipment" ? tabParam : "goal";
-  const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
-  const [userGoal, setUserGoal] = useState<PlanGoal | null>(null);
-  const [availableDays, setAvailableDays] = useState<string[]>([]);
 
-  useEffect(() => {
-    const userId = localStorage.getItem("pace_user_id");
-    if (!userId) return;
-    const cachedRuns = cache.get<RunRow[]>(`runs_${userId}`);
-    if (cachedRuns) setRecentRuns(cachedRuns);
-    const cachedProfile = cache.get<{ goal_data?: unknown; available_days?: string[] }>(`profile_${userId}`);
-    if (cachedProfile?.goal_data && typeof cachedProfile.goal_data === "object" && !Array.isArray(cachedProfile.goal_data)) {
-      setUserGoal(cachedProfile.goal_data as PlanGoal);
-    }
-    setAvailableDays(cachedProfile?.available_days ?? []);
-  }, []);
+  const userGoal = useMemo((): PlanGoal | null => {
+    const gd = profile?.goal_data;
+    if (gd && typeof gd === "object" && !Array.isArray(gd)) return gd as PlanGoal;
+    return null;
+  }, [profile?.goal_data]);
 
-  useEffect(() => {
-    const userId = session?.user?.id;
-    if (!userId) {
-      setRecentRuns([]);
-      setUserGoal(null);
-      setAvailableDays([]);
-      return;
-    }
-
-    const cachedRuns = cache.get<RunRow[]>(`runs_${userId}`);
-    if (cachedRuns) setRecentRuns(cachedRuns);
-    const cachedProfile = cache.get<{ goal_data?: unknown }>(`profile_${userId}`);
-    if (cachedProfile?.goal_data && typeof cachedProfile.goal_data === "object" && !Array.isArray(cachedProfile.goal_data)) {
-      setUserGoal(cachedProfile.goal_data as PlanGoal);
-    }
-    const cachedProfileWithDays = cache.get<{ available_days?: string[] }>(`profile_${userId}`);
-    setAvailableDays(cachedProfileWithDays?.available_days ?? []);
-
-    void Promise.all([getProfile(userId), getRuns(userId)])
-      .then(([profile, runs]) => {
-        setRecentRuns(runs ?? []);
-        if (profile?.goal_data && typeof profile.goal_data === "object" && !Array.isArray(profile.goal_data)) {
-          setUserGoal(profile.goal_data as PlanGoal);
-        } else {
-          setUserGoal(null);
-        }
-        setAvailableDays(profile?.available_days ?? []);
-      })
-      .catch(() => {});
-  }, [session?.user?.id]);
+  const availableDays = profile?.available_days ?? [];
 
   const normalizedGoalType = userGoal?.goalType || userGoal?.goal_type || "";
   const normalizedRaceType = userGoal?.raceType || userGoal?.race_type || "";

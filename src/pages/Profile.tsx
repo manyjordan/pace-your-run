@@ -1,13 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { differenceInDays, format, getWeek, startOfMonth, startOfWeek, startOfYear, subWeeks } from "date-fns";
 import { ChevronRight, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { AppCard } from "@/components/ui/page-layout";
-import { cache } from "@/lib/cache";
-import { getProfile, getRuns, type ProfileRow, type RunRow } from "@/lib/database";
 import { normalizeGoalData, type GoalDataShape } from "@/lib/goalHelpers";
 import { cn } from "@/lib/utils";
 
@@ -35,68 +34,18 @@ function goalSummaryLabel(goal: ProfileGoalData): string {
 }
 
 export default function Profile() {
-  const { session, signOut } = useAuth();
+  const { signOut } = useAuth();
   const navigate = useNavigate();
-  const [runs, setRuns] = useState<RunRow[]>([]);
-  const [profile, setProfile] = useState<ProfileRow | null>(null);
-  const [userGoal, setUserGoal] = useState<ProfileGoalData | null>(null);
+  const { runs, profile } = useData();
   const [period, setPeriod] = useState<StatsPeriod>(readStatsPeriod);
 
-  useEffect(() => {
-    if (!session?.user?.id) return;
-    const userId = session.user.id;
-    const cached = cache.get<RunRow[]>(`runs_${userId}`);
-    const cachedProfile = cache.get<ProfileRow>(`profile_${userId}`);
-    if (cached?.length) setRuns(cached);
-    if (cachedProfile) {
-      setProfile(cachedProfile);
-      if (cachedProfile.goal_data && typeof cachedProfile.goal_data === "object" && !Array.isArray(cachedProfile.goal_data)) {
-        setUserGoal(normalizeGoalData(cachedProfile.goal_data as GoalDataShape));
-      }
+  const userGoal = useMemo(() => {
+    const gd = profile?.goal_data;
+    if (gd && typeof gd === "object" && !Array.isArray(gd)) {
+      return normalizeGoalData(gd as GoalDataShape);
     }
-
-    void Promise.all([getRuns(userId), getProfile(userId)])
-      .then(([r, p]) => {
-        if (r) {
-          setRuns(r);
-          cache.set(`runs_${userId}`, r);
-          cache.set(`runsStats_${userId}`, r);
-        }
-        if (p) {
-          setProfile(p);
-          cache.set(`profile_${userId}`, p);
-          if (p.goal_data && typeof p.goal_data === "object" && !Array.isArray(p.goal_data)) {
-            setUserGoal(normalizeGoalData(p.goal_data as GoalDataShape));
-          } else {
-            setUserGoal(null);
-          }
-        }
-      })
-      .catch(() => {});
-
-    const onRefresh = () => {
-      void Promise.all([getRuns(userId), getProfile(userId)]).then(([r, p]) => {
-        if (r) {
-          setRuns(r);
-          cache.set(`runs_${userId}`, r);
-          cache.set(`runsStats_${userId}`, r);
-        }
-        if (p) {
-          setProfile(p);
-          cache.set(`profile_${userId}`, p);
-          if (p.goal_data && typeof p.goal_data === "object" && !Array.isArray(p.goal_data)) {
-            setUserGoal(normalizeGoalData(p.goal_data as GoalDataShape));
-          }
-        }
-      });
-    };
-    window.addEventListener("pace-goal-updated", onRefresh);
-    window.addEventListener("pace-runs-updated", onRefresh);
-    return () => {
-      window.removeEventListener("pace-goal-updated", onRefresh);
-      window.removeEventListener("pace-runs-updated", onRefresh);
-    };
-  }, [session?.user?.id]);
+    return null;
+  }, [profile?.goal_data]);
 
   const filteredRuns = useMemo(() => {
     const now = new Date();

@@ -1,30 +1,15 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
 import { ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { getProfile, getRuns, getRunWithGps, type ProfileRow, type RunGpsPoint, type RunRow } from "@/lib/database";
-import { normalizeGoalData } from "@/lib/goalHelpers";
-import { cache } from "@/lib/cache";
+import { useData } from "@/contexts/DataContext";
+import { getRunWithGps, type RunGpsPoint, type RunRow } from "@/lib/database";
 import { ActivityDetail } from "@/components/ActivityDetail";
 import { GpsTraceSvg } from "@/components/GpsTraceSvg";
 import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { formatDuration, formatPaceFromSeconds, formatRelativeTime } from "@/lib/runFormatters";
-
-type ProfileGoalData = {
-  goalType: "weight" | "race" | "distance" | "none";
-  raceType: "marathon" | "semi" | "20k" | "10k" | "5k" | "other";
-  raceDistanceKm: string;
-  raceTargetDate: string;
-  raceTargetTime: string;
-  distanceKm?: string;
-  targetWeightKg?: string;
-  selectedPlanId?: string;
-  goalSavedAt?: string;
-  distanceTargetDate?: string;
-  weightTargetDate?: string;
-};
 
 function parseGpsTraceForDetail(trace: RunRow["gps_trace"]): RunGpsPoint[] | undefined {
   if (!Array.isArray(trace)) return undefined;
@@ -58,76 +43,11 @@ function formatRelativeDate(raw: string | null | undefined): string {
 export default function Index() {
   const navigate = useNavigate();
   const { session } = useAuth();
-  const [recentRuns, setRecentRuns] = useState<RunRow[]>([]);
-  const [athleteName, setAthleteName] = useState("Coureur");
-  const [isLoading, setIsLoading] = useState(true);
+  const { runs: recentRuns, profile, isLoading } = useData();
   const [selectedRunForDetail, setSelectedRunForDetail] = useState<RunRow | null>(null);
   const [selectedDetailTrace, setSelectedDetailTrace] = useState<RunGpsPoint[] | undefined>(undefined);
-  const [_userGoal, setUserGoal] = useState<ProfileGoalData | null>(null);
 
-  useEffect(() => {
-    const userId = localStorage.getItem("pace_user_id");
-    if (!userId) return;
-    const cached = cache.get<RunRow[]>(`runs_${userId}`);
-    const cachedProfile = cache.get<ProfileRow>(`profile_${userId}`);
-    if (cached?.length) {
-      setRecentRuns(cached);
-      setIsLoading(false);
-    }
-    if (cachedProfile) {
-      setAthleteName(cachedProfile.first_name?.trim() || "Coureur");
-      if (
-        cachedProfile.goal_data &&
-        typeof cachedProfile.goal_data === "object" &&
-        !Array.isArray(cachedProfile.goal_data)
-      ) {
-        setUserGoal(normalizeGoalData(cachedProfile.goal_data as ProfileGoalData) as ProfileGoalData);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!session?.user?.id) {
-      setRecentRuns([]);
-      setIsLoading(false);
-      return;
-    }
-
-    const userId = session.user.id;
-    localStorage.setItem("pace_user_id", userId);
-
-    const load = () => {
-      void Promise.all([getRuns(userId), getProfile(userId)])
-        .then(([runs, profile]) => {
-          if (runs) {
-            setRecentRuns(runs);
-            cache.set(`runs_${userId}`, runs);
-            cache.set(`runsStats_${userId}`, runs);
-          }
-          if (profile) {
-            cache.set(`profile_${userId}`, profile);
-            setAthleteName(profile.first_name?.trim() || "Coureur");
-            if (profile.goal_data && typeof profile.goal_data === "object" && !Array.isArray(profile.goal_data)) {
-              setUserGoal(normalizeGoalData(profile.goal_data as ProfileGoalData) as ProfileGoalData);
-            } else {
-              setUserGoal(null);
-            }
-          }
-          setIsLoading(false);
-        })
-        .catch(() => setIsLoading(false));
-    };
-
-    load();
-
-    const onRefresh = () => load();
-    window.addEventListener("pace-goal-updated", onRefresh);
-    window.addEventListener("pace-runs-updated", onRefresh);
-    return () => {
-      window.removeEventListener("pace-goal-updated", onRefresh);
-      window.removeEventListener("pace-runs-updated", onRefresh);
-    };
-  }, [session?.user?.id]);
+  const athleteName = profile?.first_name?.trim() || "Coureur";
 
   const thisWeekRuns = useMemo(() => {
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
@@ -180,9 +100,7 @@ export default function Index() {
             <p className="text-xs uppercase tracking-widest text-muted-foreground">
               {format(new Date(), "EEEE dd MMMM", { locale: fr })}
             </p>
-            <h1 className="mt-0.5 text-2xl font-black text-foreground">
-              Bonjour {athleteName} 👋
-            </h1>
+            <h1 className="mt-0.5 text-2xl font-black text-foreground">Bonjour {athleteName} 👋</h1>
           </div>
           <button
             type="button"

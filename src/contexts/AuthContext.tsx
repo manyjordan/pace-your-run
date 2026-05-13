@@ -4,7 +4,6 @@ import { User, Session } from "@supabase/supabase-js";
 import { logger } from "@/lib/logger";
 import { supabase } from "@/lib/supabase";
 import { cache } from "@/lib/cache";
-import { getProfile, getRuns } from "@/lib/database";
 
 interface AuthContextType {
   user: User | null;
@@ -57,25 +56,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => subscription?.unsubscribe();
   }, []);
-
-  useEffect(() => {
-    if (!session?.user?.id) return;
-    const userId = session.user.id;
-
-    localStorage.setItem("pace_user_id", userId);
-
-    if (cache.get(`runs_${userId}`)) return;
-
-    void Promise.all([getProfile(userId), getRuns(userId)])
-      .then(([profile, runs]) => {
-        if (profile) cache.set(`profile_${userId}`, profile);
-        if (runs?.length) {
-          cache.set(`runs_${userId}`, runs);
-          cache.set(`runsStats_${userId}`, runs);
-        }
-      })
-      .catch(() => {});
-  }, [session?.user?.id]);
 
   const signOut = useCallback(async () => {
     try {

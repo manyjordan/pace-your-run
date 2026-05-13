@@ -15,6 +15,7 @@ import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { cache } from "@/lib/cache";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useData } from "@/contexts/DataContext";
 import {
   getRunStatsLifetime,
   getRunStatsWeekly,
@@ -786,6 +787,7 @@ const Health = () => {
   const { issueKey } = useParams<{ issueKey: string }>();
   const navigate = useNavigate();
   const { session } = useAuth();
+  const { runs } = useData();
   const resolvedIssueKey = useMemo(() => resolveIssueKeyFromUrl(issueKey), [issueKey]);
   const issueDetails = resolvedIssueKey ? issuesData[resolvedIssueKey] : null;
   const [searchQuery, setSearchQuery] = useState("");
