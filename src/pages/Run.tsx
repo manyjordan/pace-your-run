@@ -31,9 +31,7 @@ import { AppCard, PageContainer } from "@/components/ui/page-layout";
 import { fetchCurrentWeather, type RunWeather } from "@/lib/weather";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
-import { FEATURES } from "@/lib/featureFlags";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -59,9 +57,6 @@ export default function Run() {
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [currentWeather, setCurrentWeather] = useState<RunWeather | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [isLandscape, setIsLandscape] = useState(
-    typeof window !== "undefined" ? window.innerWidth > window.innerHeight : false,
-  );
 
   const speechPrefsRef = useRef<RunPreferences>(getDefaultRunPreferences());
   const postAudienceRef = useRef<"private" | "friends" | "public">("public");
@@ -111,18 +106,12 @@ export default function Run() {
     elapsed,
     pace,
     rollingPaceSecondsPerKm,
-    elevationGain,
-    gradeAdjustedPace,
-    estimatedFinishTimes,
     gpsTrace,
     gpsAccuracy,
     gpsError,
     formatTime,
     routeProgress,
     setRouteProgress,
-    currentKmSplit,
-    currentKmPaceSec,
-    completedKmSplits,
     showRunRecovery,
     runRecoveryData,
     handleSaveRecoveredRun,
@@ -269,19 +258,6 @@ export default function Run() {
       { timeout: 5000, maximumAge: 300_000 },
     );
   }, [status]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      setIsLandscape(window.innerWidth > window.innerHeight);
-    };
-
-    window.addEventListener("resize", handleResize);
-    screen.orientation?.addEventListener("change", handleResize);
-    return () => {
-      window.removeEventListener("resize", handleResize);
-      screen.orientation?.removeEventListener("change", handleResize);
-    };
-  }, []);
 
   useEffect(() => {
     return () => {
@@ -462,26 +438,6 @@ export default function Run() {
 
         {status === "running" ? (
           <div className="flex min-h-screen flex-col bg-background">
-            <div className="flex items-center justify-between px-6 pt-3 pt-safe">
-              <div className="flex items-center gap-2">
-                <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-                <span className="text-xs font-semibold uppercase tracking-widest text-accent">Course en cours</span>
-              </div>
-              <div
-                className={cn(
-                  "flex items-center gap-1 text-xs",
-                  gpsAccuracy && gpsAccuracy < 10
-                    ? "text-accent"
-                    : gpsAccuracy && gpsAccuracy < 30
-                      ? "text-yellow-500"
-                      : "text-red-400",
-                )}
-              >
-                <div className="h-1.5 w-1.5 rounded-full bg-current" />
-                {gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : "GPS..."}
-              </div>
-            </div>
-
             <RunMainTimerCard
               formatTime={formatTime}
               elapsed={elapsed}
@@ -489,8 +445,6 @@ export default function Run() {
               distanceUnitShortLabel={distanceUnitShortLabel}
               displayPace={displayPace}
               formatPace={formatPace}
-              gradeAdjustedPace={gradeAdjustedPace}
-              elevationGain={elevationGain}
               bluetooth={{
                 isBluetoothConnected: bluetooth.isBluetoothConnected,
                 heartRate: bluetooth.heartRate,
@@ -503,17 +457,9 @@ export default function Run() {
               stop={stop}
               isProgrammedMode={isProgrammedMode}
               isProgramActive={isProgramActive}
-              estimatedFinishTimes={estimatedFinishTimes}
-              isLandscape={FEATURES.LANDSCAPE_MODE && isLandscape}
-              showControls={false}
-              showStatusBadge={false}
-              showGpsStatus={false}
-              currentKmSplit={currentKmSplit}
-              currentKmPaceSec={currentKmPaceSec}
-              completedSplits={completedKmSplits}
             />
 
-            <div className="flex justify-center gap-6 pb-6 pb-safe">
+            <div className="flex shrink-0 justify-center gap-6 pb-6 pb-safe">
               <button
                 type="button"
                 onClick={pause}
@@ -588,35 +534,47 @@ export default function Run() {
 
         {treadmill.isTreadmill && status === "running" && <RunTreadmillSpeedPanel treadmill={treadmill} />}
 
-        {status === "paused" && (
-          <RunMainTimerCard
-            formatTime={formatTime}
-            elapsed={elapsed}
-            displayDistance={displayDistance}
-            distanceUnitShortLabel={distanceUnitShortLabel}
-            displayPace={displayPace}
-            formatPace={formatPace}
-            gradeAdjustedPace={gradeAdjustedPace}
-            elevationGain={elevationGain}
-            bluetooth={{
-              isBluetoothConnected: bluetooth.isBluetoothConnected,
-              heartRate: bluetooth.heartRate,
-            }}
-            gpsAccuracy={gpsAccuracy}
-            status={status}
-            start={start}
-            pause={pause}
-            resume={resume}
-            stop={stop}
-            isProgrammedMode={isProgrammedMode}
-            isProgramActive={isProgramActive}
-            estimatedFinishTimes={estimatedFinishTimes}
-            isLandscape={FEATURES.LANDSCAPE_MODE && isLandscape}
-            currentKmSplit={currentKmSplit}
-            currentKmPaceSec={currentKmPaceSec}
-            completedSplits={completedKmSplits}
-          />
-        )}
+        {status === "paused" ? (
+          <div className="flex min-h-screen flex-col bg-background">
+            <RunMainTimerCard
+              formatTime={formatTime}
+              elapsed={elapsed}
+              displayDistance={displayDistance}
+              distanceUnitShortLabel={distanceUnitShortLabel}
+              displayPace={displayPace}
+              formatPace={formatPace}
+              bluetooth={{
+                isBluetoothConnected: bluetooth.isBluetoothConnected,
+                heartRate: bluetooth.heartRate,
+              }}
+              gpsAccuracy={gpsAccuracy}
+              status={status}
+              start={start}
+              pause={pause}
+              resume={resume}
+              stop={stop}
+              isProgrammedMode={isProgrammedMode}
+              isProgramActive={isProgramActive}
+            />
+
+            <div className="flex shrink-0 justify-center gap-6 pb-6 pb-safe">
+              <button
+                type="button"
+                onClick={resume}
+                className="flex h-20 w-20 items-center justify-center rounded-full bg-accent shadow-lg transition-all active:scale-95"
+              >
+                <Play className="ml-1 h-7 w-7 fill-white text-white" />
+              </button>
+              <button
+                type="button"
+                onClick={() => void stop()}
+                className="flex h-16 w-16 items-center justify-center self-center rounded-full border border-destructive/30 bg-destructive/10 transition-all active:scale-95"
+              >
+                <Square className="h-5 w-5 fill-destructive text-destructive" />
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {runSummary && status === "idle" && (
           <RunPerformanceRecapCard

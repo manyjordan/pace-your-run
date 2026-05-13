@@ -1,12 +1,11 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { Pause, Play, Square, Heart } from "lucide-react";
+import { Play, Heart } from "lucide-react";
 import { FEATURES } from "@/lib/featureFlags";
 import { cn } from "@/lib/utils";
-import { formatSplitPace } from "@/lib/splitCalculator";
-import { useEffect, useMemo, useState } from "react";
-import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
 import { useCadence } from "@/hooks/useCadence";
 import { InfoTooltip } from "@/components/InfoTooltip";
+import { useEffect, useMemo, useState } from "react";
+import { getHRZones, getZoneForBpm } from "@/lib/heartRateZones";
 
 type RunStatus = "idle" | "running" | "paused";
 
@@ -33,23 +32,7 @@ type Props = {
   stop: () => void | Promise<void>;
   isProgrammedMode: boolean;
   isProgramActive: boolean;
-  estimatedFinishTimes: Array<{
-    label: string;
-    totalSeconds: number;
-    remainingSeconds: number;
-  }> | null;
-  isLandscape?: boolean;
   showControls?: boolean;
-  showStatusBadge?: boolean;
-  showGpsStatus?: boolean;
-  showEstimatedFinish?: boolean;
-  currentKmSplit?: {
-    kmNumber: number;
-    elapsedAtKmStart: number;
-    distanceAtKmStart: number;
-  } | null;
-  currentKmPaceSec?: number;
-  completedSplits?: Array<{ km: number; paceSecPerKm: number }>;
 };
 
 export function RunMainTimerCard({
@@ -65,20 +48,12 @@ export function RunMainTimerCard({
   gpsAccuracy,
   status,
   start,
-  pause,
-  resume,
-  stop,
+  pause: _pause,
+  resume: _resume,
+  stop: _stop,
   isProgrammedMode,
   isProgramActive,
-  estimatedFinishTimes,
-  isLandscape = false,
   showControls = true,
-  showStatusBadge = true,
-  showGpsStatus = true,
-  showEstimatedFinish = true,
-  currentKmSplit = null,
-  currentKmPaceSec = 0,
-  completedSplits = [],
 }: Props) {
   const [tick, setTick] = useState(false);
   useEffect(() => {
@@ -106,111 +81,68 @@ export function RunMainTimerCard({
   const formattedPace = displayPace > 0 ? formatPace(displayPace).replace(` /${distanceUnitShortLabel}`, "") : "--:--";
   const formattedGap =
     gradeAdjustedPace > 0 ? formatPace(gradeAdjustedPace / 60).replace(` /${distanceUnitShortLabel}`, "") : null;
-  const formatPaceFromSeconds = (paceSec: number): string => {
-    if (!paceSec || paceSec <= 0) return "--:--";
-    const wholeMin = Math.floor(paceSec / 60);
-    const secs = Math.round(paceSec % 60);
-    const safeSecs = secs === 60 ? 59 : secs;
-    return `${wholeMin}:${String(safeSecs).padStart(2, "0")}`;
-  };
-  const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
-  const isGpsMedium = gpsAccuracy !== null && gpsAccuracy < 30;
 
-  if (FEATURES.LANDSCAPE_MODE && isLandscape && status === "running") {
+  if (status === "running" || status === "paused") {
+    const formattedElapsed = formatTime(elapsed);
     return (
-      <div className="flex h-screen w-full flex-col">
-        <div className="flex flex-1 items-center justify-between px-8 py-4">
-        <div className="flex flex-col items-center">
-          <div className="font-metric flex items-baseline justify-center gap-0 text-7xl font-black leading-none text-foreground">
-            {hPart > 0 ? (
-              <>
-                <span>{hPart}</span>
-                <span className="opacity-100">:</span>
-                <span>{String(mPart).padStart(2, "0")}</span>
-                <span className={colonPulseClass}>:</span>
-                <span>{String(sPart).padStart(2, "0")}</span>
-              </>
-            ) : (
-              <>
-                <span>{String(mPart).padStart(2, "0")}</span>
-                <span className={colonPulseClass}>:</span>
-                <span>{String(sPart).padStart(2, "0")}</span>
-              </>
-            )}
-          </div>
-          <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">durée</div>
-        </div>
-
-        <div className="flex flex-col items-center gap-4">
-          <div className="text-center">
-            <div className="font-metric text-5xl font-bold text-foreground">{displayDistance.toFixed(2)}</div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">{distanceUnitShortLabel}</div>
-          </div>
-          <div className="text-center">
-            <div className="font-metric text-4xl font-bold text-accent">{formattedPace}</div>
-            <div className="text-xs uppercase tracking-wider text-muted-foreground">/{distanceUnitShortLabel}</div>
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-4">
-          {FEATURES.CADENCE && cadence > 0 && (
-            <div className="text-center">
-              <div className="font-metric text-3xl font-bold text-foreground">{cadence}</div>
-              <div className="text-xs uppercase text-muted-foreground">spm</div>
-            </div>
+      <div className="flex w-full flex-1 flex-col items-center justify-center gap-8 px-6 pt-safe">
+        <div className="flex items-center gap-2">
+          {status === "running" ? (
+            <>
+              <div className="h-2 w-2 animate-pulse rounded-full bg-accent" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-accent">En cours</span>
+            </>
+          ) : (
+            <>
+              <div className="h-2 w-2 rounded-full bg-muted-foreground" />
+              <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">En pause</span>
+            </>
           )}
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={pause}
-              className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-muted active:scale-95"
-            >
-              <Pause className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void stop()}
-              className="flex h-14 w-14 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 active:scale-95"
-            >
-              <Square className="h-5 w-5 fill-destructive text-destructive" />
-            </button>
-          </div>
-          {FEATURES.ELEVATION_REALTIME && elevationGain > 0 ? (
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">+{Math.round(elevationGain)}m</div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">D+</div>
-            </div>
-          ) : null}
-          {formattedGap ? (
-            <div className="text-center">
-              <div className="font-metric text-xl font-bold text-foreground">{formattedGap}</div>
-              <div className="text-xs uppercase tracking-wider text-muted-foreground">GAP</div>
-            </div>
-          ) : null}
-        </div>
         </div>
 
-        {completedSplits.length > 0 && (
-          <div className="w-full shrink-0 border-t border-border/40 px-8 pb-safe pt-2">
-            <p className="mb-1.5 text-center text-xs uppercase tracking-wider text-muted-foreground">Splits</p>
-            <div className="flex justify-center gap-2">
-              {completedSplits.slice(-3).map((split, i, arr) => (
-                <div
-                  key={split.km}
-                  className={cn(
-                    "flex-1 max-w-[120px] rounded-xl py-1.5 text-center",
-                    i === arr.length - 1 ? "bg-accent/10" : "bg-muted/50",
-                  )}
-                >
-                  <p className="text-[11px] text-muted-foreground">km {split.km}</p>
-                  <p className="text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
-                    {formatSplitPace(split.paceSecPerKm)}
-                  </p>
-                </div>
-              ))}
-            </div>
+        <div className="text-center">
+          <div
+            className="text-8xl font-black leading-none text-foreground"
+            style={{ fontFamily: "var(--font-mono-display)", letterSpacing: "-0.04em" }}
+          >
+            {formattedPace || "--:--"}
           </div>
-        )}
+          <p className="mt-2 text-sm uppercase tracking-widest text-muted-foreground">
+            /{distanceUnitShortLabel}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-12">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              {displayDistance.toFixed(2)}
+            </div>
+            <p className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">{distanceUnitShortLabel}</p>
+          </div>
+
+          <div className="h-10 w-px bg-border" />
+
+          <div className="text-center">
+            <div className="text-3xl font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              {formattedElapsed}
+            </div>
+            <p className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">chrono</p>
+          </div>
+        </div>
+
+        <div
+          className={cn(
+            "flex items-center gap-1.5 text-xs",
+            gpsAccuracy && gpsAccuracy < 10
+              ? "text-accent"
+              : gpsAccuracy && gpsAccuracy < 30
+                ? "text-yellow-500"
+                : "text-muted-foreground",
+          )}
+        >
+          <div className="h-1.5 w-1.5 rounded-full bg-current" />
+          {gpsAccuracy ? `GPS ±${Math.round(gpsAccuracy)}m` : "GPS en attente..."}
+        </div>
       </div>
     );
   }
@@ -218,13 +150,6 @@ export function RunMainTimerCard({
   return (
     <ScrollReveal>
       <div className="flex w-full flex-col items-center px-4 pb-2 pt-1">
-        {showStatusBadge && status === "running" && (
-          <div className="mb-6 flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-            <span className="text-xs font-semibold uppercase tracking-widest text-accent">Course en cours</span>
-          </div>
-        )}
-
         <div
           className="font-metric mb-1 flex items-baseline justify-center gap-0 text-8xl font-black leading-none text-foreground"
           style={{ letterSpacing: "-0.04em" }}
@@ -314,75 +239,6 @@ export function RunMainTimerCard({
           )}
         </div>
 
-        {status === "running" && completedSplits.length > 0 && (
-          <div className="mb-6 w-full px-1">
-            <p className="mb-2 text-center text-xs uppercase tracking-wider text-muted-foreground">Splits</p>
-            <div className="flex justify-center gap-2">
-              {completedSplits.slice(-3).map((split, i, arr) => (
-                <div
-                  key={`${split.km}-${i}`}
-                  className={cn(
-                    "flex-1 max-w-[110px] rounded-xl py-2 text-center",
-                    i === arr.length - 1 ? "bg-accent/10" : "bg-muted/50",
-                  )}
-                >
-                  <p className="text-xs text-muted-foreground">km {split.km}</p>
-                  <p className="text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
-                    {formatSplitPace(split.paceSecPerKm)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {showGpsStatus && status === "running" && (
-          <div className="mb-6 flex items-center gap-1.5">
-            <div
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                isGpsGood ? "bg-accent" : isGpsMedium ? "bg-yellow-400" : "bg-red-400",
-              )}
-            />
-            <span className="text-xs text-muted-foreground">
-              {gpsAccuracy ? `GPS +/-${Math.round(gpsAccuracy)}m` : "GPS en attente..."}
-            </span>
-          </div>
-        )}
-
-        {FEATURES.FINISH_TIME_ESTIMATE &&
-          showEstimatedFinish &&
-          status === "running" &&
-          estimatedFinishTimes &&
-          estimatedFinishTimes.length > 0 && (
-          <div className="mt-4 w-full px-2">
-            <p className="mb-2 text-center text-xs uppercase tracking-wider text-muted-foreground">A ce rythme</p>
-            <div className="flex justify-center gap-3">
-              {estimatedFinishTimes.map((est) => (
-                <div key={est.label} className="flex-1 rounded-xl bg-muted p-3 text-center">
-                  <p className="mb-1 text-xs text-muted-foreground">{est.label}</p>
-                  <p className="font-metric text-lg font-bold text-foreground">{formatTime(Math.round(est.totalSeconds))}</p>
-                  <p className="mt-0.5 text-xs text-accent">
-                    encore {formatTime(Math.round(est.remainingSeconds))}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {status === "running" && currentKmSplit && currentKmPaceSec > 0 && (
-          <div className="mt-4 flex w-full items-center justify-between rounded-xl bg-muted/50 px-4 py-2.5">
-            <div className="flex items-center gap-2">
-              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-accent" />
-              <span className="text-xs font-medium text-muted-foreground">Km {currentKmSplit.kmNumber} en cours</span>
-            </div>
-            <span className="font-metric text-sm font-bold text-foreground">
-              {formatPaceFromSeconds(currentKmPaceSec)} /km
-            </span>
-          </div>
-        )}
-
         {showControls && status === "idle" && (
           <button
             type="button"
@@ -395,44 +251,6 @@ export function RunMainTimerCard({
           >
             <Play className="ml-1 h-8 w-8 fill-white text-white" />
           </button>
-        )}
-
-        {showControls && status === "running" && (
-          <div className="flex gap-6">
-            <button
-              type="button"
-              onClick={pause}
-              className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted transition-transform active:scale-95"
-            >
-              <Pause className="h-6 w-6 text-foreground" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void stop()}
-              className="flex h-16 w-16 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 transition-transform active:scale-95"
-            >
-              <Square className="h-5 w-5 fill-destructive text-destructive" />
-            </button>
-          </div>
-        )}
-
-        {showControls && status === "paused" && (
-          <div className="flex gap-6">
-            <button
-              type="button"
-              onClick={resume}
-              className="flex h-20 w-20 items-center justify-center rounded-full bg-accent shadow-lg transition-transform active:scale-95"
-            >
-              <Play className="ml-1 h-7 w-7 fill-white text-white" />
-            </button>
-            <button
-              type="button"
-              onClick={() => void stop()}
-              className="self-center flex h-16 w-16 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 transition-transform active:scale-95"
-            >
-              <Square className="h-5 w-5 fill-destructive text-destructive" />
-            </button>
-          </div>
         )}
       </div>
     </ScrollReveal>
