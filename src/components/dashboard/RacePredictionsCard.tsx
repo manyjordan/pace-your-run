@@ -61,7 +61,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
   }, [prediction]);
 
   return (
-    <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
       <div className="mb-4">
         <div className="flex items-center gap-2">
           <Timer className="h-4 w-4 text-muted-foreground" />
@@ -104,7 +104,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{prediction.reference.explanation}</p>
           </div>
 
-          <Card className="border-accent/40 bg-accent/5">
+          <Card className="border-border bg-accent/5">
             <CardContent className="space-y-2 p-4">
               <p className="font-metric text-3xl font-bold text-accent">
                 {formatPredictionTime(prediction.consensusSeconds)}

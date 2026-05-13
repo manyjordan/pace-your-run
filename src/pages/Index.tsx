@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ChevronRight, Footprints } from "lucide-react";
+import { ChevronRight, Footprints, Route } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
@@ -95,12 +95,12 @@ export default function Index() {
       ) : null}
 
       <PageContainer>
-        <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <div className="flex items-center justify-between pb-2 pt-4">
           <div>
             <p className="text-xs text-muted-foreground uppercase tracking-widest">
               {format(new Date(), "EEEE dd MMMM", { locale: fr })}
             </p>
-            <h1 className="mt-0.5 text-2xl font-bold text-foreground">Bonjour {athleteName}</h1>
+            <h1 className="mt-0.5 text-2xl font-bold text-foreground">Bonjour {athleteName} 👋</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -122,9 +122,8 @@ export default function Index() {
           </div>
         </div>
 
-        <div className="space-y-3 px-4 pb-24">
-          <AppCard>
-            <div className="mb-3 flex items-center justify-between">
+        <AppCard>
+            <div className="mb-2 flex items-center justify-between">
               <p className="text-sm font-semibold text-foreground">Cette semaine</p>
               <p className="text-xs text-muted-foreground">
                 {thisWeekRuns.length} sortie{thisWeekRuns.length !== 1 ? "s" : ""}
@@ -152,7 +151,7 @@ export default function Index() {
           {lastRun ? (
             <button type="button" onClick={() => openRunDetail(lastRun)} className="w-full text-left">
               <AppCard className="overflow-hidden p-0">
-                {mapTrace ? <GpsTraceSvg trace={mapTrace} height={140} className="w-full rounded-t-xl" /> : null}
+                {mapTrace ? <GpsTraceSvg trace={mapTrace} height={140} className="w-full rounded-t-2xl" /> : null}
                 <div className="p-4">
                   <div className="mb-2 flex items-center justify-between">
                     <p className="text-xs text-muted-foreground">
@@ -165,13 +164,13 @@ export default function Index() {
                       <p className="font-metric text-xl font-bold text-foreground">
                         {(lastRun.distance_km ?? 0).toFixed(2)}
                       </p>
-                      <p className="text-xs text-muted-foreground">km</p>
+                      <p className="mt-1 text-xs text-muted-foreground">km</p>
                     </div>
                     <div>
                       <p className="font-metric text-xl font-bold text-foreground">
                         {formatDuration(lastRun.duration_seconds ?? 0)}
                       </p>
-                      <p className="text-xs text-muted-foreground">durée</p>
+                      <p className="mt-1 text-xs text-muted-foreground">durée</p>
                     </div>
                     <div>
                       <p className="font-metric text-xl font-bold text-accent">
@@ -180,7 +179,7 @@ export default function Index() {
                           "",
                         )}
                       </p>
-                      <p className="text-xs text-muted-foreground">allure</p>
+                      <p className="mt-1 text-xs text-muted-foreground">allure</p>
                     </div>
                   </div>
                 </div>
@@ -189,7 +188,7 @@ export default function Index() {
           ) : null}
 
           <AppCard>
-            <p className="mb-3 text-sm font-semibold text-foreground">Passer à l&apos;action</p>
+            <p className="mb-2 text-sm font-semibold text-foreground">Passer à l&apos;action</p>
             <div className="flex gap-2">
               <button
                 type="button"
@@ -210,10 +209,10 @@ export default function Index() {
 
           {recentRuns.slice(1, 8).map((run) => (
             <button key={run.id} type="button" onClick={() => openRunDetail(run)} className="w-full text-left">
-              <AppCard className="py-3">
+              <AppCard>
                 <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10 text-lg">
-                    🏃
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10">
+                    <Route className="h-5 w-5 text-accent" aria-hidden />
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-foreground">{run.title || "Course"}</p>
@@ -235,9 +234,11 @@ export default function Index() {
 
           {recentRuns.length === 0 && !isLoading ? (
             <div className="flex flex-col items-center space-y-4 py-16 text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-3xl">🏃</div>
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10">
+                <Route className="h-8 w-8 text-accent" aria-hidden />
+              </div>
               <div>
-                <p className="font-bold text-foreground">Prêt à courir ?</p>
+                <p className="font-bold text-foreground">Prêt à courir ? 🏃</p>
                 <p className="mt-1 text-sm text-muted-foreground">Votre première course apparaîtra ici.</p>
               </div>
               <button
@@ -249,7 +250,6 @@ export default function Index() {
               </button>
             </div>
           ) : null}
-        </div>
       </PageContainer>
     </>
   );

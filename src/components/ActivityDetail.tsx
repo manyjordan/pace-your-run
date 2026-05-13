@@ -601,7 +601,7 @@ export function ActivityDetail({
         </div>
 
         <div className="space-y-4 px-4 pb-6 pt-4">
-          <div className="rounded-lg border border-accent/20 bg-card p-4">
+          <div className="rounded-lg border border-border bg-card p-4">
             {activity.run_type === "treadmill" && (
               <Badge variant="outline" className="mb-2 border-muted-foreground/30 text-xs text-muted-foreground">
                 Tapis roulant
@@ -655,7 +655,7 @@ export function ActivityDetail({
           ) : null}
 
         {kmSplits.length > 0 ? (
-          <div className="space-y-2 rounded-lg border border-accent/20 bg-card p-3">
+          <div className="space-y-2 rounded-lg border border-border bg-card p-3">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Splits</h3>
             <div className="overflow-hidden rounded-xl border border-border">
               <div className="grid grid-cols-4 bg-muted/50 px-4 py-2">
@@ -698,7 +698,7 @@ export function ActivityDetail({
         ) : null}
 
         {elevationData.length > 5 ? (
-          <div className="rounded-lg border border-accent/20 bg-card p-3">
+          <div className="rounded-lg border border-border bg-card p-3">
             <h3 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Profil d&apos;élévation
             </h3>
@@ -714,7 +714,7 @@ export function ActivityDetail({
         ) : null}
 
         {zoneDistribution.length > 0 ? (
-          <div className="space-y-3 rounded-lg border border-accent/20 bg-card p-3">
+          <div className="space-y-3 rounded-lg border border-border bg-card p-3">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Zones FC</h3>
             <div className="space-y-2">
               {zoneDistribution.map(({ zone, seconds, percentage }) => {
@@ -748,7 +748,7 @@ export function ActivityDetail({
         ) : null}
 
         {analysis.hasHeartRateCurve && (
-          <div className="rounded-lg border border-accent/20 bg-card p-4">
+          <div className="rounded-lg border border-border bg-card p-4">
             <div className="mb-3 flex items-center gap-2">
               <Heart className="h-4 w-4 text-accent" />
               <h3 className="text-sm font-semibold">Évolution de la fréquence cardiaque</h3>

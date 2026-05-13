@@ -202,8 +202,8 @@ export default function Profile() {
           {period === "all" && stats.weeklyStreak > 0 ? (
             <div className="mt-3 border-t border-border pt-3 text-center">
               <p className="text-sm font-semibold text-accent">
-                🔥 {stats.weeklyStreak} semaine{stats.weeklyStreak > 1 ? "s" : ""} consécutive
-                {stats.weeklyStreak > 1 ? "s" : ""}
+                {stats.weeklyStreak}{" "}
+                {stats.weeklyStreak > 1 ? "semaines consécutives" : "semaine consécutive"}
               </p>
             </div>
           ) : null}
@@ -213,7 +213,7 @@ export default function Profile() {
 
         {hasActiveGoal && !goalIsExpired ? (
           <button type="button" onClick={() => navigate("/plan")} className="w-full text-left">
-            <AppCard className="border-accent/20">
+            <AppCard className="border-2 border-accent">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Mon plan</p>

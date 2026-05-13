@@ -869,7 +869,7 @@ export default function GoalTab({
       {savedAt && formData.goalType && !isChanging && !isDefining && (
         <>
           <ScrollReveal>
-            <AppCard className="relative min-h-[9.5rem] overflow-hidden border-accent/20">
+            <AppCard className="relative min-h-[9.5rem] overflow-hidden">
               <div className="pointer-events-none absolute -right-6 -top-6 h-24 w-24 rounded-full bg-accent/10" />
               <div className="relative flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">

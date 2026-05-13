@@ -313,7 +313,7 @@ export function RunPerformanceRecapCard({
                 ) : null}
 
                 {newBadgeEarned ? (
-                  <AppCard className="border-accent/30 bg-accent/5 py-4 text-center">
+                  <AppCard className="border-border bg-accent/5 py-4 text-center">
                     <p className="mb-1 text-2xl">{newBadgeEarned.emoji}</p>
                     <p className="font-bold text-foreground">Nouveau badge !</p>
                     <p className="text-sm text-muted-foreground">{newBadgeEarned.title}</p>

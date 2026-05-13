@@ -311,20 +311,20 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
                 <NavLink
                   key={item.to}
                   to={item.to}
-                  className={cn("flex flex-col items-center gap-1 -mt-5")}
+                  className={cn("flex flex-col items-center gap-1 -mt-4")}
                 >
                   <div
                     className={cn(
-                      "w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all",
-                      isActive ? "bg-accent scale-110" : "bg-accent/90",
+                      "flex h-12 w-12 items-center justify-center rounded-full bg-accent shadow-[0_2px_12px_hsl(141_69%_42%/0.35)] transition-all",
+                      isActive && "scale-110",
                     )}
                   >
-                    <item.icon className="w-5 h-5 text-white" />
+                    <Play className="ml-0.5 h-5 w-5 fill-white text-white" />
                   </div>
                   <span
                     className={cn(
                       "text-[10px]",
-                      isActive ? "text-accent font-semibold" : "text-muted-foreground",
+                      isActive ? "font-semibold text-accent" : "text-muted-foreground",
                     )}
                   >
                     {item.label}

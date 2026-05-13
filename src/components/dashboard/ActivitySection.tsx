@@ -89,7 +89,7 @@ export const ActivitySection = ({
 
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-accent/20 bg-card p-5 text-sm text-muted-foreground">
+      <div className="rounded-2xl border border-border bg-card p-4 text-sm text-muted-foreground shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
         Aucune activité trouvée. Si tu as des courses enregistrées sur d&apos;autres applications ou supports,{" "}
         <Link to="/import" className="font-medium text-accent underline underline-offset-4">
           importe tes données. Clique ici pour savoir comment faire

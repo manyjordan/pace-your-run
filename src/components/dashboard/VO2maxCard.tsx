@@ -91,7 +91,7 @@ export function VO2maxCard({ runs, interactive = true }: VO2maxCardProps) {
 
   if (!hasAnyPoint) {
     return (
-      <div className="rounded-xl border border-accent/20 bg-card/95 p-5">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
         <h2 className="mb-2 text-sm font-semibold">VO2max — évolution</h2>
         <p className="text-sm text-muted-foreground">
           Enregistrez des courses avec distance et durée sur les dernières semaines pour afficher l&apos;évolution de votre
@@ -103,7 +103,7 @@ export function VO2maxCard({ runs, interactive = true }: VO2maxCardProps) {
   }
 
   return (
-    <div className="rounded-xl border border-accent/20 bg-card/95 p-5">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold">VO2max — évolution (8 semaines)</h2>
         <span

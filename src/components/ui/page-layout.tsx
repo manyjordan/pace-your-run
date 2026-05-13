@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 export const PageContainer = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div className={cn("space-y-6 px-4 pb-24", className)}>{children}</div>
+  <div className={cn("space-y-3 px-4 pb-32", className)}>{children}</div>
 );
 
 export const PageHeader = ({
@@ -24,7 +24,12 @@ export const PageHeader = ({
 );
 
 export const AppCard = ({ children, className }: { children: ReactNode; className?: string }) => (
-  <div className={cn("rounded-xl border border-border bg-card p-5 shadow-sm", className)}>
+  <div
+    className={cn(
+      "rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]",
+      className,
+    )}
+  >
     {children}
   </div>
 );

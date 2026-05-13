@@ -1115,7 +1115,7 @@ const Health = () => {
 
       <ScrollReveal>
         {fitnessScore ? (
-          <AppCard className="border-accent/20">
+          <AppCard>
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-wider text-muted-foreground">Forme actuelle</p>
@@ -1139,7 +1139,7 @@ const Health = () => {
 
       <ScrollReveal>
         {weeklyView ? (
-          <AppCard className="border-accent/20">
+          <AppCard>
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Vue hebdomadaire</h3>
               <span className={cn("text-xs font-semibold", weeklyView.trend >= 0 ? "text-accent" : "text-orange-600")}>
@@ -1214,13 +1214,13 @@ const Health = () => {
 
       {issueKey && issueDetailPanel ? (
         <ScrollReveal>
-          <AppCard className="border-border shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+          <AppCard>
             {issueDetailPanel}
           </AppCard>
         </ScrollReveal>
       ) : (
         <ScrollReveal>
-          <AppCard className="border-border">
+          <AppCard>
             <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <h2 className="mb-2 text-sm font-semibold">Explorer les symptômes</h2>
@@ -1234,7 +1234,7 @@ const Health = () => {
               </div>
             </div>
 
-            <div className="mb-6 rounded-2xl border border-accent/20 bg-gradient-to-r from-card via-card to-accent/5 p-4 shadow-[0_18px_40px_hsl(var(--accent)/0.08)]">
+            <div className="mb-6 rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
@@ -1249,7 +1249,7 @@ const Health = () => {
               </p>
             </div>
 
-            <Card className="border-accent/20 bg-card/95 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
+            <Card className="border-border bg-card shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
               <CardContent className="p-4">
                 {filteredZones.length > 0 ? (
                   <Accordion type="multiple" className="space-y-2">
