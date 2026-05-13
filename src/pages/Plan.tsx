@@ -258,7 +258,10 @@ export default function PlanPage() {
     return base + raceKm;
   }, [currentWeekData?.totalDistance, raceIsThisWeek, normalizedGoalType, userGoal, numericTargetDistance]);
 
-  const hasNoGoal = !normalizedGoalType || normalizedGoalType === "none";
+  const hasNoGoal =
+    !userGoal
+      ? !profile?.goal_type || profile.goal_type === "none"
+      : !normalizedGoalType || normalizedGoalType === "none";
 
   if (hasNoGoal) {
     return (
