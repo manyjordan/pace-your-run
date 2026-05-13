@@ -57,8 +57,6 @@ function AppRoutes() {
                   index: <Index />,
                   social: <Social />,
                   run: <Run />,
-                  plan: <Plan />,
-                  health: <Health />,
                 }}
               >
                 <Routes>
@@ -66,7 +64,9 @@ function AppRoutes() {
                   <Route path="/forum/:categoryId" element={<ForumCategory />} />
                   <Route path="/routes" element={<RoutesPage />} />
                   <Route path="/profile" element={<Profile />} />
+                  <Route path="/plan" element={<Plan />} />
                   <Route path="/health/issue/:issueKey" element={<Health />} />
+                  <Route path="/health" element={<Health />} />
                   <Route path="/import" element={<Import />} />
                   <Route path="/healthkit" element={<HealthKitSync />} />
                   <Route path="/settings" element={<Settings />} />

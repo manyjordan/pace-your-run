@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { Heart, Home, ClipboardList, Play, Settings, User, Users } from "lucide-react";
+import { Home, Play, Settings, User, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { createPost, getUnreadNotificationsCount, saveRun, type RunInput } from "@/lib/database";
@@ -37,25 +37,21 @@ function isOfflinePostOnlyItem(item: unknown): item is OfflinePostOnlyQueueItem 
   return o.syncPostOnly === true && typeof o.runId === "string";
 }
 
-const desktopNavItems = [
+const desktopTabs = [
   { to: "/", icon: Home, label: "Accueil" },
-  { to: "/social", icon: Users, label: "Social" },
   { to: "/run", icon: Play, label: "Course" },
-  { to: "/plan", icon: ClipboardList, label: "Plan" },
-  { to: "/health", icon: Heart, label: "Santé" },
-  { to: "/profile", icon: User, label: "Profil" },
-];
-
-const mobileNavItems = [
-  { to: "/", icon: Home, label: "Accueil" },
   { to: "/social", icon: Users, label: "Social" },
-  { to: "/run", icon: Play, label: "Course", isPrimary: true },
-  { to: "/plan", icon: ClipboardList, label: "Plan" },
-  { to: "/health", icon: Heart, label: "Santé" },
   { to: "/profile", icon: User, label: "Profil" },
 ];
 
-type MainTabKey = "index" | "social" | "run" | "plan" | "health";
+const mobileTabs = [
+  { to: "/", icon: Home, label: "Accueil" },
+  { to: "/run", icon: Play, label: "Course", isPrimary: true },
+  { to: "/social", icon: Users, label: "Social" },
+  { to: "/profile", icon: User, label: "Profil" },
+];
+
+type MainTabKey = "index" | "social" | "run";
 
 type AppShellProps = {
   children: React.ReactNode;
@@ -207,11 +203,7 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
         ? "social"
         : currentPath === "/run"
           ? "run"
-          : currentPath === "/plan"
-            ? "plan"
-            : currentPath === "/health"
-              ? "health"
-              : null;
+          : null;
 
   const [mountedTabs, setMountedTabs] = useState<Set<MainTabKey>>(
     new Set([activeMainTab ?? "index"]),
@@ -241,7 +233,7 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
 
           {/* Desktop nav */}
           <nav className="hidden items-center gap-1 md:flex">
-            {desktopNavItems.map((item) => (
+            {desktopTabs.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -299,19 +291,13 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
         <div className={activeMainTab === "run" ? "block" : "hidden"}>
           {mountedTabs.has("run") ? mainTabs.run : null}
         </div>
-        <div className={activeMainTab === "plan" ? "block" : "hidden"}>
-          {mountedTabs.has("plan") ? mainTabs.plan : null}
-        </div>
-        <div className={activeMainTab === "health" ? "block" : "hidden"}>
-          {mountedTabs.has("health") ? mainTabs.health : null}
-        </div>
         {activeMainTab === null ? children : null}
       </main>
 
-      {/* Mobile bottom nav — 5 tabs */}
+      {/* Mobile bottom nav — 4 tabs */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl md:hidden">
-        <div className="grid grid-cols-6 items-end gap-1 px-2 py-2">
-          {mobileNavItems.map((item) => {
+        <div className="grid grid-cols-4 items-end gap-1 px-2 py-2">
+          {mobileTabs.map((item) => {
             const isActive =
               item.to === "/profile"
                 ? location.pathname.startsWith("/profile")
