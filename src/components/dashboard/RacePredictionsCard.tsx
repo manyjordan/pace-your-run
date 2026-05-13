@@ -2,7 +2,6 @@ import { useMemo, useState } from "react";
 import { Timer } from "lucide-react";
 import type { RunRow } from "@/lib/database";
 import {
-  RACE_DISTANCES,
   formatPredictionTime,
   getPredictionEligibleRuns,
   getRacePrediction,
@@ -11,8 +10,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+
+const RACE_DISTANCES = [
+  { label: "5km", km: 5 },
+  { label: "10km", km: 10 },
+  { label: "Semi", km: 21.097 },
+  { label: "Marathon", km: 42.195 },
+];
 
 function confidenceBadge(conf: PredictionResult["confidence"]) {
   switch (conf) {
@@ -57,28 +62,30 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
 
   return (
     <div className="rounded-xl border border-accent/20 bg-card/95 p-5 shadow-[0_12px_30px_hsl(var(--accent)/0.08)]">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <Timer className="h-4 w-4 text-muted-foreground" />
-            <h2 className="text-sm font-semibold">Prévisions de performance</h2>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Estimations à partir de vos courses des 3 dernières semaines (référence médiane par allure).
-          </p>
+      <div className="mb-4">
+        <div className="flex items-center gap-2">
+          <Timer className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-semibold">Prévisions de performance</h2>
         </div>
-        <Select value={selectedLabel} onValueChange={setSelectedLabel}>
-          <SelectTrigger className="h-9 w-[160px] text-xs" aria-label="Distance cible">
-            <SelectValue placeholder="Distance" />
-          </SelectTrigger>
-          <SelectContent>
-            {RACE_DISTANCES.map((d) => (
-              <SelectItem key={d.label} value={d.label}>
-                {d.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Estimations à partir de vos courses des 3 dernières semaines (référence médiane par allure).
+        </p>
+      </div>
+
+      <div className="mb-4 flex gap-2">
+        {RACE_DISTANCES.map((d) => (
+          <button
+            key={d.label}
+            type="button"
+            onClick={() => setSelectedLabel(d.label)}
+            className={cn(
+              "flex-1 rounded-xl py-2 text-xs font-semibold transition-all",
+              selectedLabel === d.label ? "bg-accent text-white" : "bg-muted text-muted-foreground",
+            )}
+          >
+            {d.label}
+          </button>
+        ))}
       </div>
 
       {qualifyingCount < 2 ? (

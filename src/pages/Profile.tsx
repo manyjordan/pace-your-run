@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { differenceInDays, getWeek, startOfMonth, startOfYear, subWeeks } from "date-fns";
+import { differenceInDays, format, getWeek, startOfMonth, startOfWeek, startOfYear, subWeeks } from "date-fns";
 import { ChevronRight, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { AppCard } from "@/components/ui/page-layout";
 import { cache } from "@/lib/cache";
@@ -140,6 +141,29 @@ export default function Profile() {
     return { totalKm, totalHours, totalRuns, weeklyStreak };
   }, [filteredRuns, period, runs]);
 
+  const chartData = useMemo(() => {
+    const weeks = new Map<number, { label: string; value: number }>();
+    filteredRuns.forEach((r) => {
+      const raw = r.started_at ?? r.created_at;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (Number.isNaN(d.getTime())) return;
+      const weekStart = startOfWeek(d, { weekStartsOn: 1 });
+      const key = weekStart.getTime();
+      const label = format(weekStart, "dd/MM");
+      const dist = r.distance_km ?? 0;
+      const cur = weeks.get(key);
+      if (cur) {
+        weeks.set(key, { label: cur.label, value: cur.value + dist });
+      } else {
+        weeks.set(key, { label, value: dist });
+      }
+    });
+    return Array.from(weeks.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([, { label, value }]) => ({ label, value: Math.round(value * 10) / 10 }));
+  }, [filteredRuns]);
+
   const firstName = profile?.first_name?.trim() || "Coureur";
 
   const targetDate =
@@ -160,18 +184,20 @@ export default function Profile() {
     Boolean(profileGoalType && profileGoalType !== "none");
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex flex-col bg-background" style={{ minHeight: "100dvh" }}>
       <div className="pt-safe" />
 
-      <div className="flex flex-col items-center gap-2 px-6 pb-4 pt-6 text-center">
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/20 text-3xl font-black text-accent">
-          {firstName.charAt(0).toUpperCase()}
+      <div className="flex flex-1 flex-col space-y-3 px-4 pb-32">
+        <div className="flex flex-col items-center gap-2 pb-2 pt-6 text-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/20 text-3xl font-black text-accent">
+            {firstName.charAt(0).toUpperCase()}
+          </div>
+          <p className="text-xl font-black text-foreground">{firstName}</p>
+          {profile?.username ? (
+            <p className="text-sm text-muted-foreground">@{profile.username.replace(/^@+/, "")}</p>
+          ) : null}
         </div>
-        <p className="text-xl font-black text-foreground">{firstName}</p>
-        {profile?.username ? <p className="text-sm text-muted-foreground">@{profile.username.replace(/^@+/, "")}</p> : null}
-      </div>
 
-      <div className="space-y-3 px-4 pb-24">
         <div className="flex gap-2">
           {(["7d", "month", "year", "all"] as const).map((p) => (
             <button
@@ -212,6 +238,18 @@ export default function Profile() {
               <p className="mt-1 text-xs text-muted-foreground">sorties</p>
             </div>
           </div>
+          {chartData.length > 1 ? (
+            <div className="mt-4 border-t border-border pt-3">
+              <p className="mb-2 text-xs text-muted-foreground">km / semaine</p>
+              <BarChartSvg
+                data={chartData}
+                height={80}
+                color="hsl(var(--accent))"
+                highlightLast={true}
+                showValueLabels={false}
+              />
+            </div>
+          ) : null}
           {period === "all" && stats.weeklyStreak > 0 ? (
             <div className="mt-3 border-t border-border pt-3 text-center">
               <p className="text-sm font-semibold text-accent">

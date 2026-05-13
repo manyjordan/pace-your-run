@@ -11,6 +11,8 @@ interface BarChartSvgProps {
   height?: number;
   color?: string;
   highlightLast?: boolean;
+  /** When false, do not draw value labels above bars. */
+  showValueLabels?: boolean;
   unit?: string;
   formatValue?: (v: number) => string;
   formatLabel?: (l: string) => string;
@@ -21,6 +23,7 @@ export function BarChartSvg({
   height = 120,
   color = "hsl(var(--accent))",
   highlightLast = true,
+  showValueLabels = true,
   formatValue,
   formatLabel,
 }: BarChartSvgProps) {
@@ -142,7 +145,8 @@ export function BarChartSvg({
         const drawnX = x - (drawnBarWidth - barWidth) / 2;
         const label = formatLabel ? formatLabel(bar.label) : bar.label;
         const isSignificant = bar.value >= maxValue * 0.12;
-        const canShowTopLabel = showBarLabel(i, bars.length) && bar.value > 0 && barH >= 14 && isSignificant;
+        const canShowTopLabel =
+          showValueLabels && showBarLabel(i, bars.length) && bar.value > 0 && barH >= 14 && isSignificant;
         const topLabel = formatValue ? formatValue(bar.value) : String(Math.round(bar.value));
 
         return (
