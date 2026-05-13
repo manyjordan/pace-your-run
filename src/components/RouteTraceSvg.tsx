@@ -51,7 +51,7 @@ export function RouteTraceSvg({ trace, height = 160, className, showEndpoints = 
       <path
         d={pathPoints}
         fill="none"
-        stroke="#B4DC5A"
+        stroke="hsl(var(--accent))"
         strokeWidth="2.5"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -59,8 +59,8 @@ export function RouteTraceSvg({ trace, height = 160, className, showEndpoints = 
       />
       {showEndpoints ? (
         <>
-          <circle cx={startX} cy={startY} r={5} fill="#B4DC5A" />
-          <circle cx={endX} cy={endY} r={5} fill="white" stroke="#B4DC5A" strokeWidth={2} />
+          <circle cx={startX} cy={startY} r={5} fill="hsl(var(--accent))" />
+          <circle cx={endX} cy={endY} r={5} fill="white" stroke="hsl(var(--accent))" strokeWidth={2} />
         </>
       ) : null}
     </svg>

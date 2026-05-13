@@ -750,7 +750,7 @@ export function ActivityDetail({
         {analysis.hasHeartRateCurve && (
           <div className="rounded-lg border border-accent/20 bg-card p-4">
             <div className="mb-3 flex items-center gap-2">
-              <Heart className="h-4 w-4 text-lime" />
+              <Heart className="h-4 w-4 text-accent" />
               <h3 className="text-sm font-semibold">Évolution de la fréquence cardiaque</h3>
             </div>
             <div className="h-52">

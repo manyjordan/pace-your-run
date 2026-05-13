@@ -1,5 +1,4 @@
-/* Color filter utility to convert green logos to yellow.
- * Avec theme-trendy.css, img.header-logo reçoit un filtre vert Pace (surcharge ci-dessous si thème absent). */
+/* Color filter utility to convert green logos to yellow (splash / legacy assets). */
 
 /* Hue-rotate filter to convert green (#84cc16) to yellow (#d4a927) */
 .logo-yellow-filter {
@@ -28,19 +27,12 @@ img.splash-logo {
   filter: hue-rotate(-35deg) saturate(0.95);
 }
 
-/* Header logo */
+/* Header logo — pace-header glass styles live in src/index.css */
 img.header-logo {
-  filter: hue-rotate(-35deg) saturate(0.95);
+  filter: saturate(1.06) brightness(1.02);
 }
 
 /* App icons */
 img.app-icon {
   filter: hue-rotate(-35deg) saturate(0.95);
-}
-
-/* En-tête AppShell — même rendu qu’avant Option C si theme-trendy.css n’est pas importé */
-.pace-header {
-  background-color: hsl(var(--accent));
-  border-bottom: 1px solid hsl(var(--accent) / 0.6);
-  box-shadow: 0 10px 30px hsl(var(--accent) / 0.18);
 }

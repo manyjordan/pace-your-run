@@ -3,7 +3,6 @@ import { registerSW } from "virtual:pwa-register";
 import App from "./App.tsx";
 import "./index.css";
 import "./styles/logo-colors.css";
-import "./styles/theme-trendy.css"; // Thème vert Pace (actif)
 
 document.documentElement.classList.remove("dark");
 document.documentElement.classList.add("light");

@@ -267,7 +267,7 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
 
   const getAccuracyColor = useCallback((accuracy: number | null) => {
     if (accuracy === null) return "bg-gray-400";
-    if (accuracy < 10) return "bg-lime-500";
+    if (accuracy < 10) return "bg-accent";
     if (accuracy < 30) return "bg-yellow-500";
     return "bg-red-500";
   }, []);

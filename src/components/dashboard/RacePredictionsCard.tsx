@@ -104,9 +104,9 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{prediction.reference.explanation}</p>
           </div>
 
-          <Card className="border-lime-500/40 bg-lime-500/5">
+          <Card className="border-accent/40 bg-accent/5">
             <CardContent className="space-y-2 p-4">
-              <p className="font-metric text-3xl font-bold text-lime-600">
+              <p className="font-metric text-3xl font-bold text-accent">
                 {formatPredictionTime(prediction.consensusSeconds)}
               </p>
               <p className="text-sm font-medium text-foreground">Estimation consensus</p>
@@ -122,7 +122,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             <div className="relative pt-1">
               <div className="h-3 w-full rounded-full bg-muted">
                 <div
-                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-lime-500 shadow-md shadow-lime-500/30"
+                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-accent shadow-md shadow-accent/30"
                   style={{ left: `${rangePositionPercent}%` }}
                   aria-hidden
                 />
@@ -130,13 +130,13 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
             </div>
             <div className="flex items-start justify-between gap-2 text-xs">
               <div>
-                <p className="font-metric font-semibold text-lime-600">
+                <p className="font-metric font-semibold text-accent">
                   {formatPredictionTime(prediction.rangeMinSeconds)}
                 </p>
                 <p className="text-muted-foreground">Optimiste</p>
               </div>
               <div className="text-right">
-                <p className="font-metric font-semibold text-lime-600">
+                <p className="font-metric font-semibold text-accent">
                   {formatPredictionTime(prediction.rangeMaxSeconds)}
                 </p>
                 <p className="text-muted-foreground">Prudent</p>
@@ -147,7 +147,7 @@ export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
           <Collapsible open={modelsOpen} onOpenChange={setModelsOpen}>
             <CollapsibleTrigger
               className={cn(
-                "w-full text-left text-xs text-lime-700 underline underline-offset-2",
+                "w-full text-left text-xs text-accent underline underline-offset-2",
                 "cursor-pointer hover:opacity-90",
               )}
             >

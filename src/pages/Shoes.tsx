@@ -206,7 +206,7 @@ const ShoesPage = () => {
                         className="h-full rounded-full transition-all"
                         style={{
                           width: `${pct}%`,
-                          backgroundColor: nearingLimit ? "#f97316" : "#B4DC5A",
+                          backgroundColor: nearingLimit ? "#f97316" : "hsl(var(--accent))",
                         }}
                       />
                     </div>
