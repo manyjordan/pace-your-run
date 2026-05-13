@@ -1,5 +1,6 @@
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { Pause, Play, Square, Heart } from "lucide-react";
+import { FEATURES } from "@/lib/featureFlags";
 import { cn } from "@/lib/utils";
 import { formatSplitPace } from "@/lib/splitCalculator";
 import { useEffect, useMemo, useState } from "react";
@@ -85,7 +86,7 @@ export function RunMainTimerCard({
     setTick((t) => !t);
   }, [elapsed, status]);
 
-  const { cadence } = useCadence(status === "running");
+  const { cadence } = useCadence(FEATURES.CADENCE && status === "running");
   const isBluetoothConnected = bluetooth.isBluetoothConnected;
   const heartRate = bluetooth.heartRate ?? 0;
   const maxHR = useMemo(() => {
@@ -115,7 +116,7 @@ export function RunMainTimerCard({
   const isGpsGood = gpsAccuracy !== null && gpsAccuracy < 10;
   const isGpsMedium = gpsAccuracy !== null && gpsAccuracy < 30;
 
-  if (isLandscape && status === "running") {
+  if (FEATURES.LANDSCAPE_MODE && isLandscape && status === "running") {
     return (
       <div className="flex h-screen w-full flex-col">
         <div className="flex flex-1 items-center justify-between px-8 py-4">
@@ -152,7 +153,7 @@ export function RunMainTimerCard({
         </div>
 
         <div className="flex flex-col items-center gap-4">
-          {cadence > 0 && (
+          {FEATURES.CADENCE && cadence > 0 && (
             <div className="text-center">
               <div className="font-metric text-3xl font-bold text-foreground">{cadence}</div>
               <div className="text-xs uppercase text-muted-foreground">spm</div>
@@ -174,7 +175,7 @@ export function RunMainTimerCard({
               <Square className="h-5 w-5 fill-destructive text-destructive" />
             </button>
           </div>
-          {elevationGain > 0 ? (
+          {FEATURES.ELEVATION_REALTIME && elevationGain > 0 ? (
             <div className="text-center">
               <div className="font-metric text-xl font-bold text-foreground">+{Math.round(elevationGain)}m</div>
               <div className="text-xs uppercase tracking-wider text-muted-foreground">D+</div>
@@ -258,7 +259,7 @@ export function RunMainTimerCard({
             <div className="mt-1 text-xs uppercase tracking-wider text-muted-foreground">/{distanceUnitShortLabel}</div>
           </div>
 
-          {cadence > 0 && (
+          {FEATURES.CADENCE && cadence > 0 && (
             <>
               <div className="h-10 w-px bg-border" />
               <div className="text-center">
@@ -268,7 +269,7 @@ export function RunMainTimerCard({
             </>
           )}
 
-          {elevationGain > 0 && (
+          {FEATURES.ELEVATION_REALTIME && elevationGain > 0 && (
             <>
               <div className="h-10 w-px bg-border" />
               <div className="text-center">
@@ -349,7 +350,11 @@ export function RunMainTimerCard({
           </div>
         )}
 
-        {showEstimatedFinish && status === "running" && estimatedFinishTimes && estimatedFinishTimes.length > 0 && (
+        {FEATURES.FINISH_TIME_ESTIMATE &&
+          showEstimatedFinish &&
+          status === "running" &&
+          estimatedFinishTimes &&
+          estimatedFinishTimes.length > 0 && (
           <div className="mt-4 w-full px-2">
             <p className="mb-2 text-center text-xs uppercase tracking-wider text-muted-foreground">A ce rythme</p>
             <div className="flex justify-center gap-3">

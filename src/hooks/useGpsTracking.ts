@@ -3,6 +3,7 @@ import { Capacitor } from "@capacitor/core";
 import type { RunGpsPoint } from "@/lib/database";
 import { logger } from "@/lib/logger";
 import { haversineDistanceKm } from "@/lib/parsers/gpxParser";
+import { FEATURES } from "@/lib/featureFlags";
 
 type UseGpsTrackingOptions = {
   onPermissionDenied?: () => void;
@@ -139,13 +140,17 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
           setGpsTrace((t) => {
             const nextTrace = [...t, newPoint];
             resolvePace(nextTrace, speed);
-            const prevAltitude = lastGpsPointRef.current?.altitude;
-            const altDiff =
-              altitude !== null && altitude !== undefined && prevAltitude !== undefined ? altitude - prevAltitude : 0;
-            const gradePct = dist > 0.001 ? (altDiff / (dist * 1000)) * 100 : 0;
-            const gapFactor = gradeAdjustmentFactor(gradePct);
-            const gapSecondsPerKm = smoothedPaceRef.current > 0 ? smoothedPaceRef.current / gapFactor : 0;
-            setGradeAdjustedPace(gapSecondsPerKm > 0 ? gapSecondsPerKm : 0);
+            if (FEATURES.GRADE_ADJUSTED_PACE) {
+              const prevAltitude = lastGpsPointRef.current?.altitude;
+              const altDiff =
+                altitude !== null && altitude !== undefined && prevAltitude !== undefined ? altitude - prevAltitude : 0;
+              const gradePct = dist > 0.001 ? (altDiff / (dist * 1000)) * 100 : 0;
+              const gapFactor = gradeAdjustmentFactor(gradePct);
+              const gapSecondsPerKm = smoothedPaceRef.current > 0 ? smoothedPaceRef.current / gapFactor : 0;
+              setGradeAdjustedPace(gapSecondsPerKm > 0 ? gapSecondsPerKm : 0);
+            } else {
+              setGradeAdjustedPace(0);
+            }
             return nextTrace;
           });
           lastGpsPointRef.current = newPoint;
@@ -156,7 +161,7 @@ export function useGpsTracking({ onPermissionDenied, onDistanceDelta }: UseGpsTr
         lastGpsPointRef.current = newPoint;
       }
     },
-    [calculateRollingPace, onDistanceDelta],
+    [calculateRollingPace, gradeAdjustmentFactor, onDistanceDelta],
   );
 
   const startGpsTracking = useCallback(async (): Promise<boolean> => {

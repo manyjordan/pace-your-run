@@ -33,6 +33,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
+import { FEATURES } from "@/lib/featureFlags";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -503,7 +504,7 @@ export default function Run() {
               isProgrammedMode={isProgrammedMode}
               isProgramActive={isProgramActive}
               estimatedFinishTimes={estimatedFinishTimes}
-              isLandscape={isLandscape}
+              isLandscape={FEATURES.LANDSCAPE_MODE && isLandscape}
               showControls={false}
               showStatusBadge={false}
               showGpsStatus={false}
@@ -610,7 +611,7 @@ export default function Run() {
             isProgrammedMode={isProgrammedMode}
             isProgramActive={isProgramActive}
             estimatedFinishTimes={estimatedFinishTimes}
-            isLandscape={isLandscape}
+            isLandscape={FEATURES.LANDSCAPE_MODE && isLandscape}
             currentKmSplit={currentKmSplit}
             currentKmPaceSec={currentKmPaceSec}
             completedSplits={completedKmSplits}

@@ -2,6 +2,7 @@ import { ScrollReveal } from "@/components/ScrollReveal";
 import type { RunRow } from "@/lib/database";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { VO2maxCard } from "@/components/dashboard/VO2maxCard";
+import { FEATURES } from "@/lib/featureFlags";
 
 export const PerformanceSection = ({
   runs,
@@ -10,9 +11,11 @@ export const PerformanceSection = ({
 }) => {
   return (
     <div className="space-y-6">
-      <ScrollReveal>
-        <VO2maxCard runs={runs} />
-      </ScrollReveal>
+      {FEATURES.VO2MAX && (
+        <ScrollReveal>
+          <VO2maxCard runs={runs} />
+        </ScrollReveal>
+      )}
 
       <ScrollReveal>
         <RacePredictionsCard runs={runs} />
