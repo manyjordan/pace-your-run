@@ -1,6 +1,6 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useCallback, useEffect, useState } from "react";
-import { Heart, Home, ClipboardList, Play, Settings, Users } from "lucide-react";
+import { Heart, Home, ClipboardList, Play, Settings, User, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { createPost, getUnreadNotificationsCount, saveRun, type RunInput } from "@/lib/database";
@@ -43,6 +43,7 @@ const desktopNavItems = [
   { to: "/run", icon: Play, label: "Course" },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
+  { to: "/profile", icon: User, label: "Profil" },
 ];
 
 const mobileNavItems = [
@@ -51,6 +52,7 @@ const mobileNavItems = [
   { to: "/run", icon: Play, label: "Course", isPrimary: true },
   { to: "/plan", icon: ClipboardList, label: "Plan" },
   { to: "/health", icon: Heart, label: "Santé" },
+  { to: "/profile", icon: User, label: "Profil" },
 ];
 
 type MainTabKey = "index" | "social" | "run" | "plan" | "health";
@@ -308,11 +310,11 @@ export const AppShell = ({ children, mainTabs }: AppShellProps) => {
 
       {/* Mobile bottom nav — 5 tabs */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-card/95 backdrop-blur-xl md:hidden">
-        <div className="grid grid-cols-5 items-end gap-1 px-2 py-2">
+        <div className="grid grid-cols-6 items-end gap-1 px-2 py-2">
           {mobileNavItems.map((item) => {
             const isActive =
               item.to === "/profile"
-                ? location.pathname.startsWith("/profile") || location.pathname.startsWith("/settings")
+                ? location.pathname.startsWith("/profile")
                 : item.to === "/"
                   ? location.pathname === "/"
                   : location.pathname.startsWith(item.to);
