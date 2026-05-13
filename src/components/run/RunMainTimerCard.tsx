@@ -151,7 +151,7 @@ export function RunMainTimerCard({
     <ScrollReveal>
       <div className="flex w-full flex-col items-center px-4 pb-2 pt-1">
         <div
-          className="font-metric mb-1 flex items-baseline justify-center gap-0 text-8xl font-black leading-none text-foreground"
+          className="font-metric mb-1 flex items-baseline justify-center gap-0 text-8xl font-bold leading-none text-foreground"
           style={{ letterSpacing: "-0.04em" }}
         >
           {hPart > 0 ? (

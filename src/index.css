@@ -50,6 +50,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Typographie — 2 poids seulement */
+/* Regular (400) : texte courant, labels, descriptions */
+/* Bold (700) : titres, métriques, CTAs */
+/* Interdire font-semibold (600) sauf exception */
+/* Hiérarchie : */
+/* Titre page : pace-xl + font-bold */
+/* Section title : pace-sm + font-bold + uppercase + tracking-wider */
+/* Corps : pace-base + font-normal */
+/* Label sous métrique : pace-sm + font-normal + text-muted-foreground */
+/* Métrique chiffre : pace-metric + font-bold + font-metric */
+
 /* DM Mono for numbers */
 .font-metric {
   font-family: var(--font-mono-display);

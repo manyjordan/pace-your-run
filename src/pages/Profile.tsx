@@ -138,10 +138,10 @@ export default function Profile() {
 
       <div className="flex flex-1 flex-col space-y-3 px-4 pb-32">
         <div className="flex flex-col items-center gap-2 pb-2 pt-6 text-center">
-          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/20 text-3xl font-black text-accent">
+          <div className="flex h-20 w-20 items-center justify-center rounded-full bg-accent/20 text-3xl font-bold text-accent">
             {firstName.charAt(0).toUpperCase()}
           </div>
-          <p className="text-xl font-black text-foreground">{firstName}</p>
+          <p className="text-xl font-bold text-foreground">{firstName}</p>
           {profile?.username ? (
             <p className="text-sm text-muted-foreground">@{profile.username.replace(/^@+/, "")}</p>
           ) : null}
@@ -169,19 +169,19 @@ export default function Profile() {
         <AppCard>
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              <p className="font-metric text-3xl font-bold text-foreground">
                 {Math.round(stats.totalKm)}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">km</p>
             </div>
             <div>
-              <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              <p className="font-metric text-3xl font-bold text-foreground">
                 {Math.round(stats.totalHours)}h
               </p>
               <p className="mt-1 text-xs text-muted-foreground">temps</p>
             </div>
             <div>
-              <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+              <p className="font-metric text-3xl font-bold text-foreground">
                 {stats.totalRuns}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">sorties</p>

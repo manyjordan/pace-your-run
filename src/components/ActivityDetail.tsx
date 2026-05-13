@@ -581,19 +581,19 @@ export function ActivityDetail({
 
         <div className="grid grid-cols-3 divide-x divide-border border-b border-border">
           <div className="px-4 py-4 text-center">
-            <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+            <p className="font-metric text-2xl font-bold text-foreground">
               {activity.distance_km != null ? activity.distance_km.toFixed(2) : "--"}
             </p>
             <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">km</p>
           </div>
           <div className="px-4 py-4 text-center">
-            <p className="text-2xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+            <p className="font-metric text-2xl font-bold text-foreground">
               {formatDuration(activity.duration_seconds ?? 0)}
             </p>
             <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">durée</p>
           </div>
           <div className="px-4 py-4 text-center">
-            <p className="text-2xl font-black text-accent" style={{ fontFamily: "var(--font-mono-display)" }}>
+            <p className="font-metric text-2xl font-bold text-accent">
               {statsPaceDisplay}
             </p>
             <p className="mt-1 text-xs uppercase tracking-wide text-muted-foreground">allure</p>

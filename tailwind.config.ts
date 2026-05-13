@@ -16,6 +16,13 @@ export default {
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
       },
+      fontSize: {
+        "pace-sm": ["13px", { lineHeight: "1.4", letterSpacing: "0" }],
+        "pace-base": ["15px", { lineHeight: "1.5", letterSpacing: "-0.01em" }],
+        "pace-xl": ["24px", { lineHeight: "1.2", letterSpacing: "-0.03em" }],
+        "pace-metric": ["32px", { lineHeight: "1", letterSpacing: "-0.04em" }],
+        "pace-metric-lg": ["56px", { lineHeight: "1", letterSpacing: "-0.05em" }],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

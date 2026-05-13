@@ -16,8 +16,8 @@ export const PageHeader = ({
 }) => (
   <div className="flex items-start justify-between gap-3 pt-2">
     <div>
-      <h1 className="text-2xl font-bold tracking-tight text-foreground">{title}</h1>
-      {subtitle ? <p className="mt-0.5 text-sm text-muted-foreground">{subtitle}</p> : null}
+      <h1 className="text-pace-xl font-bold text-foreground">{title}</h1>
+      {subtitle ? <p className="mt-0.5 text-pace-base font-normal text-muted-foreground">{subtitle}</p> : null}
     </div>
     {action ? <div className="shrink-0">{action}</div> : null}
   </div>
@@ -30,5 +30,5 @@ export const AppCard = ({ children, className }: { children: ReactNode; classNam
 );
 
 export const SectionTitle = ({ children }: { children: ReactNode }) => (
-  <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">{children}</h2>
+  <p className="mb-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">{children}</p>
 );

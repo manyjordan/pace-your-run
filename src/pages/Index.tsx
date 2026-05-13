@@ -97,10 +97,10 @@ export default function Index() {
       <PageContainer>
         <div className="flex items-center justify-between px-4 pb-2 pt-4">
           <div>
-            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+            <p className="text-xs text-muted-foreground uppercase tracking-widest">
               {format(new Date(), "EEEE dd MMMM", { locale: fr })}
             </p>
-            <h1 className="mt-0.5 text-2xl font-black text-foreground">Bonjour {athleteName} 👋</h1>
+            <h1 className="mt-0.5 text-2xl font-bold text-foreground">Bonjour {athleteName}</h1>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -132,7 +132,7 @@ export default function Index() {
             </div>
             <div className="mb-2 flex items-end justify-between">
               <div>
-                <span className="text-3xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                <span className="font-metric text-3xl font-bold text-foreground">
                   {thisWeekKm.toFixed(1)}
                 </span>
                 <span className="ml-1 text-sm text-muted-foreground">/ {weeklyGoalKm} km</span>
@@ -162,19 +162,19 @@ export default function Index() {
                   </div>
                   <div className="flex gap-6">
                     <div>
-                      <p className="text-xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                      <p className="font-metric text-xl font-bold text-foreground">
                         {(lastRun.distance_km ?? 0).toFixed(2)}
                       </p>
                       <p className="text-xs text-muted-foreground">km</p>
                     </div>
                     <div>
-                      <p className="text-xl font-black text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                      <p className="font-metric text-xl font-bold text-foreground">
                         {formatDuration(lastRun.duration_seconds ?? 0)}
                       </p>
                       <p className="text-xs text-muted-foreground">durée</p>
                     </div>
                     <div>
-                      <p className="text-xl font-black text-accent" style={{ fontFamily: "var(--font-mono-display)" }}>
+                      <p className="font-metric text-xl font-bold text-accent">
                         {formatPaceFromSeconds(lastRun.duration_seconds ?? 0, (lastRun.distance_km ?? 0) * 1000).replace(
                           " /km",
                           "",
