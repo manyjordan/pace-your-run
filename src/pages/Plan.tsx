@@ -1,16 +1,13 @@
 import { useCallback, useMemo, useState } from "react";
 import { differenceInDays, endOfWeek, format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Calendar, Check, Footprints, Target, Trophy } from "lucide-react";
-import { useSearchParams } from "react-router-dom";
+import { Check, Target, Trophy } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
 import { ScrollReveal } from "@/components/ScrollReveal";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppCard } from "@/components/ui/page-layout";
 import { cn } from "@/lib/utils";
 import GoalTab from "@/components/plan/GoalTab";
-import EquipmentTab from "@/components/plan/EquipmentTab";
 import type { Session, TrainingPlan } from "@/lib/plans/types";
 import { getPlanById, mapSessionsToDays } from "@/lib/plans";
 import { resolveTrainingPlan } from "@/lib/trainingPlan";
@@ -59,12 +56,8 @@ function sessionDayIndex(session: Session): number {
 }
 
 export default function PlanPage() {
-  const [searchParams] = useSearchParams();
   const { session } = useAuth();
   const { runs: recentRuns, profile } = useData();
-  const tabParam = searchParams.get("tab");
-  const mainTab = tabParam === "goal" || tabParam === "equipment" ? tabParam : "goal";
-
   const userGoal = useMemo((): PlanGoal | null => {
     const gd = profile?.goal_data;
     if (gd && typeof gd === "object" && !Array.isArray(gd)) return gd as PlanGoal;
@@ -265,27 +258,37 @@ export default function PlanPage() {
     return base + raceKm;
   }, [currentWeekData?.totalDistance, raceIsThisWeek, normalizedGoalType, userGoal, numericTargetDistance]);
 
+  const hasNoGoal = !normalizedGoalType || normalizedGoalType === "none";
+
+  if (hasNoGoal) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="pt-safe" />
+        <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-3 backdrop-blur">
+          <h1 className="text-xl font-bold text-foreground">Mon objectif</h1>
+        </div>
+        <div className="px-4 py-4">
+          <GoalTab
+            userId={session?.user?.id ?? ""}
+            openChangeGoalNonce={goalTabChangeNonce}
+            forceReset={forceGoalReset}
+            onResetHandled={() => setForceGoalReset(false)}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Tabs key={mainTab} defaultValue={mainTab} className="space-y-6">
+    <div className="space-y-6">
       <ScrollReveal>
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Plan</h1>
-          <p className="text-sm text-muted-foreground">Objectif, entrainement et equipement</p>
+          <p className="text-sm text-muted-foreground">Objectif et entraînement</p>
         </div>
       </ScrollReveal>
 
-      <div className="sticky top-0 z-10 border-b border-border bg-background/95 px-4 py-2 backdrop-blur">
-        <TabsList className="w-full">
-          <TabsTrigger value="goal" className="flex-1">
-            Objectif & Plan
-          </TabsTrigger>
-          <TabsTrigger value="equipment" className="flex-1">
-            Équipement
-          </TabsTrigger>
-        </TabsList>
-      </div>
-
-      <TabsContent value="goal" className="space-y-6">
+      <div className="space-y-6">
         <GoalTab
           userId={session?.user?.id ?? ""}
           openChangeGoalNonce={goalTabChangeNonce}
@@ -482,10 +485,7 @@ export default function PlanPage() {
             ) : null}
           </div>
         )}
-      </TabsContent>
-      <TabsContent value="equipment">
-        <EquipmentTab />
-      </TabsContent>
-    </Tabs>
+      </div>
+    </div>
   );
 }

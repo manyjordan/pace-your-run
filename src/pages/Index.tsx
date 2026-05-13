@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { format, startOfWeek } from "date-fns";
 import { fr } from "date-fns/locale";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, Footprints } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useData } from "@/contexts/DataContext";
@@ -102,14 +102,24 @@ export default function Index() {
             </p>
             <h1 className="mt-0.5 text-2xl font-black text-foreground">Bonjour {athleteName} 👋</h1>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate("/profile")}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 text-sm font-bold text-accent"
-            aria-label="Profil"
-          >
-            {athleteName.charAt(0).toUpperCase()}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate("/shoes")}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-muted"
+              aria-label="Équipement"
+            >
+              <Footprints className="h-4 w-4 text-muted-foreground" />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 text-sm font-bold text-accent"
+              aria-label="Profil"
+            >
+              {athleteName.charAt(0).toUpperCase()}
+            </button>
+          </div>
         </div>
 
         <div className="space-y-3 px-4 pb-24">
