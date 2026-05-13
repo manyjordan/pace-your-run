@@ -32,6 +32,7 @@ import { fetchCurrentWeather, type RunWeather } from "@/lib/weather";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { logger } from "@/lib/logger";
+import { cn } from "@/lib/utils";
 
 const SELECTED_ROUTE_KEY = "pace-selected-route";
 
@@ -268,7 +269,7 @@ export default function Run() {
   }, []);
 
   return (
-    <PageContainer>
+    <PageContainer className="space-y-0 px-0 pb-0">
       {showRunRecovery && runRecoveryData && (
         <div className="fixed inset-0 z-[300] flex items-center justify-center bg-background/90 p-6 backdrop-blur">
           <AppCard className="w-full max-w-sm space-y-4 text-center">
@@ -359,125 +360,189 @@ export default function Run() {
         />
       </Suspense>
 
-      <div className="space-y-6">
-        {status === "idle" && !runSummary ? (
-          <div className="flex min-h-screen flex-col bg-background">
-            <div className="px-6 pt-4 pt-safe">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">
-                {format(new Date(), "EEEE dd MMMM", { locale: fr })}
-              </p>
-            </div>
+      {status === "idle" && !runSummary ? (
+        <div className="flex min-h-[100dvh] flex-col bg-background">
+          <div className="pt-safe shrink-0" />
+          <div className="flex shrink-0 items-center justify-between px-6 pt-4">
+            <p className="text-xs uppercase tracking-widest text-muted-foreground">
+              {format(new Date(), "EEEE dd MMMM", { locale: fr })}
+            </p>
+            {currentWeather ? (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span>{currentWeather.emoji}</span>
+                <span>{currentWeather.temperature}°C</span>
+              </div>
+            ) : null}
+          </div>
 
-            <div className="flex flex-1 flex-col items-center justify-center gap-6">
-              {currentWeather ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="text-xl">{currentWeather.emoji}</span>
-                  <span>
-                    {currentWeather.temperature}°C — {currentWeather.description}
-                  </span>
-                  <span>· Vent {currentWeather.windSpeed} km/h</span>
-                </div>
-              ) : null}
-
-              {activeSession ? (
-                <div className="rounded-2xl border border-accent/20 bg-accent/10 px-6 py-3 text-center">
-                  <p className="text-xs uppercase tracking-wider text-muted-foreground">Session programmée</p>
-                  <p className="mt-0.5 font-bold text-accent">{activeSession.session.label}</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {activeSession.session.distance} km · {activeSession.session.pace} /km
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearActiveSession();
-                      setActiveSession(null);
-                    }}
-                    className="mt-1 text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Ignorer
-                  </button>
-                </div>
-              ) : null}
-
-              <div className="relative">
-                <div className="absolute inset-0 scale-110 animate-ping rounded-full bg-accent/20 opacity-30" />
+          <div className="flex flex-1 flex-col items-center justify-center gap-8">
+            {activeSession ? (
+              <div className="px-6 text-center">
+                <p className="mb-1 text-xs font-medium uppercase tracking-widest text-muted-foreground">
+                  Séance du jour
+                </p>
+                <p className="font-bold text-foreground">{activeSession.session.label}</p>
+                <p className="text-sm text-muted-foreground">{activeSession.session.distance} km</p>
                 <button
                   type="button"
-                  onClick={start}
-                  className="relative flex h-36 w-36 items-center justify-center rounded-full bg-accent shadow-2xl transition-all duration-150 active:scale-95"
-                  style={{ boxShadow: "0 0 60px hsl(var(--accent) / 0.4)" }}
+                  onClick={() => {
+                    clearActiveSession();
+                    setActiveSession(null);
+                  }}
+                  className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
                 >
-                  <Play className="ml-2 h-14 w-14 fill-white text-white" />
+                  Ignorer
                 </button>
               </div>
-              <p className="text-sm tracking-wide text-muted-foreground">Appuyez pour démarrer</p>
-            </div>
+            ) : null}
 
-            <div className="px-6 pb-4 pb-safe">
-              <div className="flex justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowSettings(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-muted px-4 py-2.5 text-xs font-medium text-muted-foreground"
-                >
-                  <Settings className="h-3.5 w-3.5" />
-                  Réglages
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/routes")}
-                  className="flex items-center gap-1.5 rounded-xl bg-muted px-4 py-2.5 text-xs font-medium text-muted-foreground"
-                >
-                  <Map className="h-3.5 w-3.5" />
-                  Parcours
-                </button>
-              </div>
+            <button
+              type="button"
+              onClick={start}
+              disabled={isProgrammedMode && !isProgramActive}
+              className={cn(
+                "flex h-28 w-28 items-center justify-center rounded-full bg-accent transition-all duration-150 active:scale-95",
+                isProgrammedMode && !isProgramActive && "cursor-not-allowed opacity-50 active:scale-100",
+              )}
+              style={{ boxShadow: "0 4px 24px hsl(141 69% 42% / 0.35)" }}
+            >
+              <Play className="ml-1 h-10 w-10 fill-white text-white" />
+            </button>
+
+            <p className="text-sm text-muted-foreground">Appuyez pour démarrer</p>
+          </div>
+
+          <div className="flex shrink-0 justify-center gap-3 px-6 pb-8 pb-safe">
+            <button
+              type="button"
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-1.5 rounded-xl bg-muted px-4 py-2.5 text-xs font-medium text-muted-foreground transition-all active:scale-95"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Réglages
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate("/routes")}
+              className="flex items-center gap-1.5 rounded-xl bg-muted px-4 py-2.5 text-xs font-medium text-muted-foreground transition-all active:scale-95"
+            >
+              <Map className="h-3.5 w-3.5" />
+              Parcours
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {status === "running" ? (
+        <div className="flex min-h-[100dvh] flex-col bg-background">
+          <div className="shrink-0 pt-safe" />
+          <div className="flex shrink-0 justify-end px-6 pt-3">
+            <div
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                gpsAccuracy && gpsAccuracy < 15
+                  ? "text-accent"
+                  : gpsAccuracy && gpsAccuracy < 40
+                    ? "text-yellow-500"
+                    : "text-muted-foreground",
+              )}
+            >
+              <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
+              {gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : "GPS..."}
             </div>
           </div>
-        ) : null}
 
-        {status === "running" ? (
-          <div className="flex min-h-screen flex-col bg-background">
-            <RunMainTimerCard
-              formatTime={formatTime}
-              elapsed={elapsed}
-              displayDistance={displayDistance}
-              distanceUnitShortLabel={distanceUnitShortLabel}
-              displayPace={displayPace}
-              formatPace={formatPace}
-              bluetooth={{
-                isBluetoothConnected: bluetooth.isBluetoothConnected,
-                heartRate: bluetooth.heartRate,
-              }}
-              gpsAccuracy={gpsAccuracy}
-              status={status}
-              start={start}
-              pause={pause}
-              resume={resume}
-              stop={stop}
-              isProgrammedMode={isProgrammedMode}
-              isProgramActive={isProgramActive}
-            />
+          {treadmill.isTreadmill ? (
+            <div className="shrink-0 px-4 pt-2">
+              <RunTreadmillSpeedPanel treadmill={treadmill} />
+            </div>
+          ) : null}
 
-            <div className="flex shrink-0 justify-center gap-6 pb-6 pb-safe">
-              <button
-                type="button"
-                onClick={pause}
-                className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted transition-all active:scale-95"
-              >
-                <Pause className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={() => void stop()}
-                className="flex h-16 w-16 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 transition-all active:scale-95"
-              >
-                <Square className="h-5 w-5 fill-destructive text-destructive" />
-              </button>
+          <RunMainTimerCard
+            formatTime={formatTime}
+            elapsed={elapsed}
+            displayDistance={displayDistance}
+            distanceUnitShortLabel={distanceUnitShortLabel}
+            displayPace={displayPace}
+            formatPace={formatPace}
+            className="min-h-0"
+          />
+
+          <div className="flex shrink-0 justify-center gap-6 pb-10 pb-safe">
+            <button
+              type="button"
+              onClick={pause}
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-border bg-muted transition-all active:scale-95"
+            >
+              <Pause className="h-6 w-6 text-foreground" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void stop()}
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-destructive/30 bg-destructive/10 transition-all active:scale-95"
+            >
+              <Square className="h-5 w-5 fill-destructive text-destructive" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {status === "paused" ? (
+        <div className="flex min-h-[100dvh] flex-col bg-background">
+          <div className="shrink-0 pt-safe" />
+          <div className="flex shrink-0 justify-end px-6 pt-3">
+            <div
+              className={cn(
+                "flex items-center gap-1.5 text-xs",
+                gpsAccuracy && gpsAccuracy < 15
+                  ? "text-accent"
+                  : gpsAccuracy && gpsAccuracy < 40
+                    ? "text-yellow-500"
+                    : "text-muted-foreground",
+              )}
+            >
+              <div className="h-1.5 w-1.5 rounded-full bg-current" />
+              {gpsAccuracy ? `±${Math.round(gpsAccuracy)}m` : "GPS..."}
             </div>
           </div>
-        ) : null}
 
+          {treadmill.isTreadmill ? (
+            <div className="shrink-0 px-4 pt-2">
+              <RunTreadmillSpeedPanel treadmill={treadmill} />
+            </div>
+          ) : null}
+
+          <RunMainTimerCard
+            formatTime={formatTime}
+            elapsed={elapsed}
+            displayDistance={displayDistance}
+            distanceUnitShortLabel={distanceUnitShortLabel}
+            displayPace={displayPace}
+            formatPace={formatPace}
+            className="min-h-0"
+          />
+
+          <div className="flex shrink-0 justify-center gap-6 pb-10 pb-safe">
+            <button
+              type="button"
+              onClick={resume}
+              className="flex h-20 w-20 items-center justify-center rounded-full bg-accent transition-all active:scale-95"
+              style={{ boxShadow: "0 4px 24px hsl(141 69% 42% / 0.35)" }}
+            >
+              <Play className="ml-1 h-8 w-8 fill-white text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void stop()}
+              className="flex h-16 w-16 items-center justify-center self-center rounded-full border border-destructive/30 bg-destructive/10 transition-all active:scale-95"
+            >
+              <Square className="h-5 w-5 fill-destructive text-destructive" />
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <div className="space-y-6 px-4 pb-24">
         {isRunActive && isProgramActive && currentSegment ? (
           <Card className="border-accent/30 bg-card/95">
             <CardContent className="space-y-3 p-4">
@@ -532,50 +597,6 @@ export default function Run() {
           />
         )}
 
-        {treadmill.isTreadmill && status === "running" && <RunTreadmillSpeedPanel treadmill={treadmill} />}
-
-        {status === "paused" ? (
-          <div className="flex min-h-screen flex-col bg-background">
-            <RunMainTimerCard
-              formatTime={formatTime}
-              elapsed={elapsed}
-              displayDistance={displayDistance}
-              distanceUnitShortLabel={distanceUnitShortLabel}
-              displayPace={displayPace}
-              formatPace={formatPace}
-              bluetooth={{
-                isBluetoothConnected: bluetooth.isBluetoothConnected,
-                heartRate: bluetooth.heartRate,
-              }}
-              gpsAccuracy={gpsAccuracy}
-              status={status}
-              start={start}
-              pause={pause}
-              resume={resume}
-              stop={stop}
-              isProgrammedMode={isProgrammedMode}
-              isProgramActive={isProgramActive}
-            />
-
-            <div className="flex shrink-0 justify-center gap-6 pb-6 pb-safe">
-              <button
-                type="button"
-                onClick={resume}
-                className="flex h-20 w-20 items-center justify-center rounded-full bg-accent shadow-lg transition-all active:scale-95"
-              >
-                <Play className="ml-1 h-7 w-7 fill-white text-white" />
-              </button>
-              <button
-                type="button"
-                onClick={() => void stop()}
-                className="flex h-16 w-16 items-center justify-center self-center rounded-full border border-destructive/30 bg-destructive/10 transition-all active:scale-95"
-              >
-                <Square className="h-5 w-5 fill-destructive text-destructive" />
-              </button>
-            </div>
-          </div>
-        ) : null}
-
         {runSummary && status === "idle" && (
           <RunPerformanceRecapCard
             runSummary={runSummary}
@@ -605,16 +626,18 @@ export default function Run() {
           />
         )}
 
-        <RunSplitsCard
-          elapsed={elapsed}
-          status={status}
-          distance={distance}
-          gpsTrace={gpsTrace}
-          splitDistanceKm={splitDistanceKm}
-          distanceUnitShortLabel={distanceUnitShortLabel}
-          runPreferences={runPreferences}
-          formatPace={formatPace}
-        />
+        {status === "idle" ? (
+          <RunSplitsCard
+            elapsed={elapsed}
+            status={status}
+            distance={distance}
+            gpsTrace={gpsTrace}
+            splitDistanceKm={splitDistanceKm}
+            distanceUnitShortLabel={distanceUnitShortLabel}
+            runPreferences={runPreferences}
+            formatPace={formatPace}
+          />
+        ) : null}
       </div>
     </PageContainer>
   );
