@@ -1,180 +1,57 @@
-import { useMemo, useState } from "react";
-import { Timer } from "lucide-react";
+import { useMemo } from "react";
 import type { RunRow } from "@/lib/database";
 import {
   formatPredictionTime,
   getPredictionEligibleRuns,
   getRacePrediction,
-  type PredictionResult,
 } from "@/lib/racePredictions";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
 
 const RACE_DISTANCES = [
   { label: "5km", km: 5 },
   { label: "10km", km: 10 },
   { label: "Semi", km: 21.097 },
   { label: "Marathon", km: 42.195 },
-];
-
-function confidenceBadge(conf: PredictionResult["confidence"]) {
-  switch (conf) {
-    case "high":
-      return (
-        <Badge className="border-0 bg-emerald-500/15 text-emerald-800">Élevée</Badge>
-      );
-    case "medium":
-      return (
-        <Badge className="border-0 bg-amber-500/15 text-amber-900">Moyenne</Badge>
-      );
-    default:
-      return <Badge variant="secondary">Faible</Badge>;
-  }
-}
+] as const;
 
 export function RacePredictionsCard({ runs }: { runs: RunRow[] }) {
-  const defaultDistance = RACE_DISTANCES.find((d) => d.km === 10) ?? RACE_DISTANCES[1];
-  const [selectedLabel, setSelectedLabel] = useState(defaultDistance.label);
-  const [modelsOpen, setModelsOpen] = useState(false);
-
   const qualifyingCount = useMemo(() => getPredictionEligibleRuns(runs).length, [runs]);
 
-  const selectedKm = useMemo(
-    () => RACE_DISTANCES.find((d) => d.label === selectedLabel)?.km ?? 10,
-    [selectedLabel],
+  const predictions = useMemo(
+    () =>
+      RACE_DISTANCES.map((d) => ({
+        ...d,
+        prediction: getRacePrediction(runs, d.km, d.label),
+      })),
+    [runs],
   );
 
-  const prediction = useMemo(
-    () => getRacePrediction(runs, selectedKm, selectedLabel),
-    [runs, selectedKm, selectedLabel],
-  );
-
-  const rangePositionPercent = useMemo(() => {
-    if (!prediction) return 50;
-    const { rangeMinSeconds, rangeMaxSeconds, consensusSeconds } = prediction;
-    const span = rangeMaxSeconds - rangeMinSeconds;
-    if (span <= 0) return 50;
-    const p = ((consensusSeconds - rangeMinSeconds) / span) * 100;
-    return Math.min(100, Math.max(0, p));
-  }, [prediction]);
+  if (qualifyingCount < 2) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
+        <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">Vos temps estimés</p>
+        <p className="rounded-xl border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
+          Enregistrez au moins 2 courses de plus de 3 km pour voir vos temps estimés.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-[0_1px_4px_rgba(0,0,0,0.06)]">
-      <div className="mb-4">
-        <div className="flex items-center gap-2">
-          <Timer className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-sm font-semibold">Prévisions de performance</h2>
-        </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Estimations à partir de vos courses des 3 dernières semaines (référence médiane par allure).
-        </p>
-      </div>
-
-      <div className="mb-4 flex gap-2">
-        {RACE_DISTANCES.map((d) => (
-          <button
-            key={d.label}
-            type="button"
-            onClick={() => setSelectedLabel(d.label)}
-            className={cn(
-              "flex-1 rounded-xl py-2 text-xs font-semibold transition-all",
-              selectedLabel === d.label ? "bg-accent text-white" : "bg-muted text-muted-foreground",
-            )}
-          >
-            {d.label}
-          </button>
+      <p className="mb-3 text-xs uppercase tracking-widest text-muted-foreground">Vos temps estimés</p>
+      <div className="grid grid-cols-2 gap-3">
+        {predictions.map(({ label, prediction }) => (
+          <div key={label} className="rounded-xl bg-muted/40 px-3 py-3 text-center">
+            <p className="mb-1 text-xs text-muted-foreground">{label}</p>
+            <p className="font-metric text-lg font-bold text-foreground">
+              {prediction ? formatPredictionTime(prediction.consensusSeconds) : "—"}
+            </p>
+          </div>
         ))}
       </div>
-
-      {qualifyingCount < 2 ? (
-        <p className="rounded-xl border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-          Enregistrez au moins 2 courses de plus de 3 km sur les 3 dernières semaines pour voir vos prévisions.
-        </p>
-      ) : !prediction ? (
-        <p className="rounded-xl border border-border bg-muted/30 px-4 py-6 text-center text-sm text-muted-foreground">
-          Données insuffisantes pour estimer cette distance.
-        </p>
-      ) : (
-        <div className="space-y-5">
-          <div className="rounded-xl border border-border bg-muted/20 px-4 py-3">
-            <p className="text-xs font-medium text-muted-foreground">Course de référence (Riegel, Jack Daniels)</p>
-            <p className="mt-1 text-sm font-medium text-foreground leading-snug">{prediction.reference.label}</p>
-            <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{prediction.reference.explanation}</p>
-          </div>
-
-          <Card className="border-border bg-accent/5">
-            <CardContent className="space-y-2 p-4">
-              <p className="font-metric text-3xl font-bold text-accent">
-                {formatPredictionTime(prediction.consensusSeconds)}
-              </p>
-              <p className="text-sm font-medium text-foreground">Estimation consensus</p>
-              <p className="text-xs text-muted-foreground">
-                Basé sur vos {qualifyingCount} courses éligibles sur les 3 dernières semaines (&gt; 3 km). Le Riegel
-                étendu moyenne vos 3 meilleures allures sur cette fenêtre.
-              </p>
-            </CardContent>
-          </Card>
-
-          <div className="space-y-2">
-            <p className="text-xs font-medium text-muted-foreground">Fourchette entre modèles</p>
-            <div className="relative pt-1">
-              <div className="h-3 w-full rounded-full bg-muted">
-                <div
-                  className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-background bg-accent shadow-md shadow-accent/30"
-                  style={{ left: `${rangePositionPercent}%` }}
-                  aria-hidden
-                />
-              </div>
-            </div>
-            <div className="flex items-start justify-between gap-2 text-xs">
-              <div>
-                <p className="font-metric font-semibold text-accent">
-                  {formatPredictionTime(prediction.rangeMinSeconds)}
-                </p>
-                <p className="text-muted-foreground">Optimiste</p>
-              </div>
-              <div className="text-right">
-                <p className="font-metric font-semibold text-accent">
-                  {formatPredictionTime(prediction.rangeMaxSeconds)}
-                </p>
-                <p className="text-muted-foreground">Prudent</p>
-              </div>
-            </div>
-          </div>
-
-          <Collapsible open={modelsOpen} onOpenChange={setModelsOpen}>
-            <CollapsibleTrigger
-              className={cn(
-                "w-full text-left text-xs text-accent underline underline-offset-2",
-                "cursor-pointer hover:opacity-90",
-              )}
-            >
-              {modelsOpen ? "Réduire ↑" : "Voir le détail des modèles ↓"}
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-3 space-y-3">
-              {prediction.predictions.map((p) => (
-                <div
-                  key={p.model}
-                  className="flex flex-col gap-2 rounded-xl border border-border bg-card/80 p-3 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold">{p.model}</p>
-                    <p className="text-xs text-muted-foreground">{p.description}</p>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
-                    <span className="font-metric text-sm font-bold text-foreground">
-                      {formatPredictionTime(p.predictedSeconds)}
-                    </span>
-                    {confidenceBadge(p.confidence)}
-                  </div>
-                </div>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      )}
+      <p className="mt-3 text-center text-xs text-muted-foreground">
+        Basé sur vos {qualifyingCount} dernières courses
+      </p>
     </div>
   );
 }

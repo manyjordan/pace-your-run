@@ -207,30 +207,6 @@ export default function Index() {
             </div>
           </AppCard>
 
-          {recentRuns.slice(1, 8).map((run) => (
-            <button key={run.id} type="button" onClick={() => openRunDetail(run)} className="w-full text-left">
-              <AppCard>
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent/10">
-                    <Route className="h-5 w-5 text-accent" aria-hidden />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-foreground">{run.title || "Course"}</p>
-                    <p className="text-xs text-muted-foreground">{formatRelativeDate(run.started_at ?? run.created_at)}</p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
-                      {(run.distance_km ?? 0).toFixed(2)} km
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatPaceFromSeconds(run.duration_seconds ?? 0, (run.distance_km ?? 0) * 1000)}
-                    </p>
-                  </div>
-                  <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
-                </div>
-              </AppCard>
-            </button>
-          ))}
 
           {recentRuns.length === 0 && !isLoading ? (
             <div className="flex flex-col items-center space-y-4 py-16 text-center">

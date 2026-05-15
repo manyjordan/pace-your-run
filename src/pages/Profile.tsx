@@ -1,24 +1,20 @@
 import { useMemo, useState } from "react";
 import { differenceInDays, format, getWeek, startOfMonth, startOfWeek, startOfYear, subWeeks } from "date-fns";
+import { fr } from "date-fns/locale";
 import { ChevronRight, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { ActivityDetail } from "@/components/ActivityDetail";
 import { BarChartSvg } from "@/components/charts/BarChartSvg";
 import { RacePredictionsCard } from "@/components/dashboard/RacePredictionsCard";
 import { AppCard } from "@/components/ui/page-layout";
+import type { RunRow } from "@/lib/database";
 import { normalizeGoalData, type GoalDataShape } from "@/lib/goalHelpers";
+import { formatPaceFromSeconds } from "@/lib/runFormatters";
 import { cn } from "@/lib/utils";
 
-type StatsPeriod = "7d" | "month" | "year" | "all";
-
 type ProfileGoalData = ReturnType<typeof normalizeGoalData>;
-
-function readStatsPeriod(): StatsPeriod {
-  const raw = localStorage.getItem("pace_stats_period");
-  if (raw === "7d" || raw === "month" || raw === "year" || raw === "all") return raw;
-  return "all";
-}
 
 function goalSummaryLabel(goal: ProfileGoalData): string {
   if (goal.goalType === "none") return "Sans objectif";
@@ -34,10 +30,13 @@ function goalSummaryLabel(goal: ProfileGoalData): string {
 }
 
 export default function Profile() {
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
   const navigate = useNavigate();
   const { runs, profile } = useData();
-  const [period, setPeriod] = useState<StatsPeriod>(readStatsPeriod);
+  const [period, setPeriod] = useState<"month" | "year" | "all">(
+    () => (localStorage.getItem("pace_stats_period") as "month" | "year" | "all" | null) ?? "month",
+  );
+  const [selectedRun, setSelectedRun] = useState<RunRow | null>(null);
 
   const userGoal = useMemo(() => {
     const gd = profile?.goal_data;
@@ -54,7 +53,6 @@ export default function Profile() {
       if (!raw) return false;
       const d = new Date(raw);
       if (Number.isNaN(d.getTime())) return false;
-      if (period === "7d") return differenceInDays(now, d) <= 7;
       if (period === "month") return d >= startOfMonth(now);
       if (period === "year") return d >= startOfYear(now);
       return true;
@@ -148,7 +146,7 @@ export default function Profile() {
         </div>
 
         <div className="flex gap-2">
-          {(["7d", "month", "year", "all"] as const).map((p) => (
+          {(["month", "year", "all"] as const).map((p) => (
             <button
               key={p}
               type="button"
@@ -161,7 +159,7 @@ export default function Profile() {
                 period === p ? "bg-accent text-white" : "bg-muted text-muted-foreground",
               )}
             >
-              {p === "7d" ? "7j" : p === "month" ? "Mois" : p === "year" ? "Année" : "Total"}
+              {p === "month" ? "Mois" : p === "year" ? "Année" : "Total"}
             </button>
           ))}
         </div>
@@ -228,6 +226,37 @@ export default function Profile() {
           </button>
         ) : null}
 
+        {runs.length > 0 ? (
+          <div>
+            <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">Activités</p>
+            <div className="space-y-2">
+              {runs.slice(0, 20).map((run) => (
+                <button key={run.id} type="button" onClick={() => setSelectedRun(run)} className="w-full text-left">
+                  <AppCard className="py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-bold text-foreground">{run.title || "Course"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(run.started_at ?? run.created_at ?? ""), "dd MMM yyyy", { locale: fr })}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold text-foreground" style={{ fontFamily: "var(--font-mono-display)" }}>
+                          {(run.distance_km ?? 0).toFixed(2)} km
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatPaceFromSeconds(run.duration_seconds ?? 0, (run.distance_km ?? 0) * 1000)}
+                        </p>
+                      </div>
+                      <ChevronRight className="ml-1 h-4 w-4 shrink-0 text-muted-foreground" />
+                    </div>
+                  </AppCard>
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <button type="button" onClick={() => navigate("/settings")} className="w-full text-left">
           <AppCard>
             <div className="flex items-center gap-3">
@@ -246,6 +275,15 @@ export default function Profile() {
           Se déconnecter
         </button>
       </div>
+
+      {selectedRun && session?.user?.id ? (
+        <ActivityDetail
+          activity={selectedRun}
+          userId={session.user.id}
+          onClose={() => setSelectedRun(null)}
+          allActivities={runs}
+        />
+      ) : null}
     </div>
   );
 }
